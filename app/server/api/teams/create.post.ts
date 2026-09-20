@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { eq, sql } from 'drizzle-orm'
 import { serverSupabaseUser } from '#supabase/server'
 import { useAdminDb, schema } from '~/server/utils/db'
+import { pgError } from '~/server/utils/pg-error'
 import { nextUniqueSlug, toSlug } from '~/utils/slug'
 
 const bodySchema = z.object({
@@ -51,7 +52,7 @@ export default defineEventHandler(async (event) => {
     )
     return { slug: row?.slug ?? slug }
   } catch (err) {
-    const e = err as { code?: string; message?: string }
+    const e = pgError(err)
     if (e.code === '23505') {
       throw createError({ statusCode: 409, statusMessage: 'Slug already taken' })
     }

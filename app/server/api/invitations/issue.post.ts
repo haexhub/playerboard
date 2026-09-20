@@ -4,6 +4,7 @@ import { and, eq, isNull, sql } from 'drizzle-orm'
 import { serverSupabaseServiceRole, serverSupabaseUser } from '#supabase/server'
 import type { Database } from '~/types/database'
 import { useAdminDb, schema } from '~/server/utils/db'
+import { pgError } from '~/server/utils/pg-error'
 
 const bodySchema = z.object({
   team_id: z.string().uuid(),
@@ -84,13 +85,14 @@ export default defineEventHandler(async (event) => {
     })
     invitationId = result.id
   } catch (err) {
-    const e = err as { code?: string; message?: string }
+    const e = pgError(err)
     if (e.code === '23505') {
       throw createError({
         statusCode: 409,
         statusMessage: 'An open invitation for this email already exists',
       })
     }
+    console.error('[invitations/issue] insert failed', e.code, e.constraint_name, e.message)
     throw createError({ statusCode: 500, statusMessage: e.message ?? 'Invitation insert failed' })
   }
 
