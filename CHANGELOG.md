@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/haexhub/playerboard/compare/v0.3.0...v0.3.1) (2026-09-20)
+
+
+### Bug Fixes
+
+* read Postgres errors from DrizzleQueryError cause ([a5dcb11](https://github.com/haexhub/playerboard/commit/a5dcb113750e0cef0aba5b8f85af1ae432ed0a7f))
+* read Postgres errors from DrizzleQueryError cause ([ccc153f](https://github.com/haexhub/playerboard/commit/ccc153fb2cd7833ea2d839925b16407c14c50309))
+
 ## [0.3.0](https://github.com/haexhub/playerboard/compare/v0.2.2...v0.3.0) (2026-09-18)
 
 
