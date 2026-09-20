@@ -104,9 +104,7 @@ test.describe('US1 — trainer records point entries + at least one photo', () =
     await expect(page.getByTestId('training-save-button')).toBeEnabled({ timeout: 15_000 })
 
     // Enter one point value → auto-save on blur → check mark shows up.
-    const aliceEinsatz = page.locator(
-      'input[aria-label*="Alice Anker"][aria-label*="Einsatz"]',
-    )
+    const aliceEinsatz = page.locator('input[aria-label*="Alice Anker"][aria-label*="Einsatz"]')
     await aliceEinsatz.first().fill('4')
     await aliceEinsatz.first().blur()
     await expect(page.getByText('✓').first()).toBeVisible({ timeout: 10_000 })

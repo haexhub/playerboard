@@ -100,7 +100,10 @@ test.describe('RLS negative — cross team (SC-008, SC-009)', () => {
     await foundTeam(trainerAPage, `RLS X Team A ${suffix}`, teamASlug)
 
     await trainerAPage.goto(`/t/${teamASlug}/team/members`, { waitUntil: 'networkidle' })
-    await trainerAPage.getByLabel(/e-mail/i).first().fill(playerAEmail)
+    await trainerAPage
+      .getByLabel(/e-mail/i)
+      .first()
+      .fill(playerAEmail)
     await trainerAPage.getByLabel(/rolle/i).selectOption('player')
     await trainerAPage.getByRole('button', { name: /einladen/i }).click()
     await expect(trainerAPage.getByText(playerAEmail)).toBeVisible({ timeout: 10_000 })
@@ -204,10 +207,10 @@ test.describe('RLS negative — cross team (SC-008, SC-009)', () => {
       expect(x2.ok()).toBe(false)
 
       // X3 — call get_team_ranking for team B.
-      const x3 = await trainerACtx.request.post(
-        `${SUPABASE_URL}/rest/v1/rpc/get_team_ranking`,
-        { headers: asUser(token), data: { p_team: teamBId, p_from: '2000-01-01', p_to: today } },
-      )
+      const x3 = await trainerACtx.request.post(`${SUPABASE_URL}/rest/v1/rpc/get_team_ranking`, {
+        headers: asUser(token),
+        data: { p_team: teamBId, p_from: '2000-01-01', p_to: today },
+      })
       expect(x3.ok()).toBe(true)
       expect(await x3.json()).toBeNull()
 
@@ -248,10 +251,10 @@ test.describe('RLS negative — cross team (SC-008, SC-009)', () => {
     expect(await x8.json()).toEqual([])
 
     // X9 — anon calls get_public_ranking: projection only, no PII.
-    const x9 = await trainerACtx.request.post(
-      `${SUPABASE_URL}/rest/v1/rpc/get_public_ranking`,
-      { headers: asAnon(), data: { p_slug: teamBSlug, p_from: '2000-01-01', p_to: today } },
-    )
+    const x9 = await trainerACtx.request.post(`${SUPABASE_URL}/rest/v1/rpc/get_public_ranking`, {
+      headers: asAnon(),
+      data: { p_slug: teamBSlug, p_from: '2000-01-01', p_to: today },
+    })
     expect(x9.ok()).toBe(true)
     const x9Body = (await x9.json()) as {
       rows: Array<Record<string, unknown>>

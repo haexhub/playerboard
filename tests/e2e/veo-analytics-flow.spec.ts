@@ -68,7 +68,12 @@ const seedMatch = async (
   opponent_name: string,
   own_score: number,
   opponent_score: number,
-  stats: { team_association: 'own' | 'opponent'; stat_type: string; category: string; value: number }[],
+  stats: {
+    team_association: 'own' | 'opponent'
+    stat_type: string
+    category: string
+    value: number
+  }[],
 ) => {
   const [match] = await restInsert<{ id: string }>('veo_matches', [
     {
@@ -112,16 +117,56 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     })
 
     await seedMatch(teamIdA, `match-draw-${suffix}`, 'SG Neukirchen', 2, 2, [
-      { team_association: 'own', stat_type: 'football_goal_total', category: 'attacking', value: 2 },
-      { team_association: 'opponent', stat_type: 'football_goal_total', category: 'attacking', value: 2 },
-      { team_association: 'own', stat_type: 'football_corner_total', category: 'set_pieces', value: 3 },
-      { team_association: 'opponent', stat_type: 'football_corner_total', category: 'set_pieces', value: 1 },
+      {
+        team_association: 'own',
+        stat_type: 'football_goal_total',
+        category: 'attacking',
+        value: 2,
+      },
+      {
+        team_association: 'opponent',
+        stat_type: 'football_goal_total',
+        category: 'attacking',
+        value: 2,
+      },
+      {
+        team_association: 'own',
+        stat_type: 'football_corner_total',
+        category: 'set_pieces',
+        value: 3,
+      },
+      {
+        team_association: 'opponent',
+        stat_type: 'football_corner_total',
+        category: 'set_pieces',
+        value: 1,
+      },
     ])
     await seedMatch(teamIdA, `match-win-${suffix}`, 'FSV Limbach', 9, 0, [
-      { team_association: 'own', stat_type: 'football_goal_total', category: 'attacking', value: 9 },
-      { team_association: 'opponent', stat_type: 'football_goal_total', category: 'attacking', value: 0 },
-      { team_association: 'own', stat_type: 'football_corner_total', category: 'set_pieces', value: 5 },
-      { team_association: 'opponent', stat_type: 'football_corner_total', category: 'set_pieces', value: 1 },
+      {
+        team_association: 'own',
+        stat_type: 'football_goal_total',
+        category: 'attacking',
+        value: 9,
+      },
+      {
+        team_association: 'opponent',
+        stat_type: 'football_goal_total',
+        category: 'attacking',
+        value: 0,
+      },
+      {
+        team_association: 'own',
+        stat_type: 'football_corner_total',
+        category: 'set_pieces',
+        value: 5,
+      },
+      {
+        team_association: 'opponent',
+        stat_type: 'football_corner_total',
+        category: 'set_pieces',
+        value: 1,
+      },
     ])
 
     // Team B: founded, but nothing Veo-related ever seeded for it.

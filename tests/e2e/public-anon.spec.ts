@@ -38,9 +38,7 @@ const setupPage = (page: Page) => {
   })
 }
 
-const seedRankedTeam = async (
-  teamSlug: string,
-): Promise<{ team_id: string; jersey: number }> => {
+const seedRankedTeam = async (teamSlug: string): Promise<{ team_id: string; jersey: number }> => {
   if (!SUPABASE_SERVICE_KEY) {
     throw new Error('SUPABASE_SERVICE_KEY missing — required to seed the public ranking fixture')
   }

@@ -171,7 +171,10 @@ test.describe('US4 — trainer resets an inappropriate avatar or name', () => {
     await foundTeam(trainerPage, teamName, teamSlug)
 
     await trainerPage.goto(`/t/${teamSlug}/team/members`, { waitUntil: 'networkidle' })
-    await trainerPage.getByLabel(/e-mail/i).first().fill(memberEmail)
+    await trainerPage
+      .getByLabel(/e-mail/i)
+      .first()
+      .fill(memberEmail)
     await trainerPage.getByRole('button', { name: /einladen/i }).click()
     await expect(trainerPage.getByText(memberEmail)).toBeVisible({ timeout: 10_000 })
 
@@ -205,9 +208,7 @@ test.describe('US4 — trainer resets an inappropriate avatar or name', () => {
     await expect(memberRow).not.toContainText('Unangemessen')
     await expect(memberRow.getByTestId('member-avatar-image')).toHaveCount(0)
 
-    const [team] = await restGet<{ id: string }>(
-      `teams?slug=eq.${teamSlug}&select=id`,
-    )
+    const [team] = await restGet<{ id: string }>(`teams?slug=eq.${teamSlug}&select=id`)
     const [membership] = await restGet<{ user_id: string }>(
       `memberships?team_id=eq.${team!.id}&role=eq.player&select=user_id`,
     )

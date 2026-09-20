@@ -11,7 +11,9 @@ const setupPage = (page: Page) => {
 }
 
 test.describe('US4 — trainer manages the player roster', () => {
-  test('CRUD, consent toggle, jersey-uniqueness violation, link via invite', async ({ browser }) => {
+  test('CRUD, consent toggle, jersey-uniqueness violation, link via invite', async ({
+    browser,
+  }) => {
     test.setTimeout(150_000)
     const suffix = uniqueSuffix()
     const trainerEmail = `trainer-plr-${suffix}@example.com`
@@ -134,7 +136,9 @@ test.describe('US4 — trainer manages the player roster', () => {
     await memberRow.locator('select').selectOption('trainer')
 
     await trainerPage.goto(`/t/${teamSlug}/players`, { waitUntil: 'networkidle' })
-    const unlinkedBruno = trainerPage.getByTestId('player-row').filter({ hasText: 'Bruno Bereit II' })
+    const unlinkedBruno = trainerPage
+      .getByTestId('player-row')
+      .filter({ hasText: 'Bruno Bereit II' })
     await expect(unlinkedBruno.getByTestId('player-linked')).toHaveCount(0)
     await expect(unlinkedBruno.getByLabel(/Konto für Bruno Bereit II wählen/)).toHaveCount(0)
 
@@ -233,7 +237,9 @@ test.describe('US4 — trainer manages the player roster', () => {
     await expect(playerDialog).toBeVisible()
 
     // No candidates exist yet — the "link existing account" option isn't offered.
-    await expect(playerDialog.getByRole('radio', { name: 'Bestehendes Konto verknüpfen' })).toHaveCount(0)
+    await expect(
+      playerDialog.getByRole('radio', { name: 'Bestehendes Konto verknüpfen' }),
+    ).toHaveCount(0)
 
     await playerDialog.getByRole('radio', { name: 'Per E-Mail einladen' }).check()
     await playerDialog.getByLabel('Name').fill('Nina Neuling')
@@ -289,7 +295,10 @@ test.describe('US4 — trainer manages the player roster', () => {
 
     await trainerPage.goto(`/t/${teamSlug}/team/members`, { waitUntil: 'networkidle' })
     // Role defaults to "player" — the optional roster fields are already visible.
-    await trainerPage.getByLabel(/e-mail/i).first().fill(inviteeEmail)
+    await trainerPage
+      .getByLabel(/e-mail/i)
+      .first()
+      .fill(inviteeEmail)
     await trainerPage.getByLabel('Name').fill('Malik Muster')
     await trainerPage.getByLabel(/Trikotnummer/).fill('23')
     await trainerPage.getByRole('button', { name: /einladen/i }).click()

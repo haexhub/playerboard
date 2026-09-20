@@ -70,7 +70,9 @@ const asUser = (token: string) => ({
 })
 
 test.describe('RLS negative — single team (SC-003)', () => {
-  test('a player cannot perform trainer-only writes or see draft trainings', async ({ browser }) => {
+  test('a player cannot perform trainer-only writes or see draft trainings', async ({
+    browser,
+  }) => {
     test.setTimeout(180_000)
     const suffix = uniqueSuffix()
     const trainerEmail = `trainer-rlsn-${suffix}@example.com`
@@ -88,7 +90,10 @@ test.describe('RLS negative — single team (SC-003)', () => {
     await trainerPage.waitForURL(new RegExp(`/t/${teamSlug}(/|$)`), { timeout: 15_000 })
 
     await trainerPage.goto(`/t/${teamSlug}/team/members`, { waitUntil: 'networkidle' })
-    await trainerPage.getByLabel(/e-mail/i).first().fill(playerEmail)
+    await trainerPage
+      .getByLabel(/e-mail/i)
+      .first()
+      .fill(playerEmail)
     await trainerPage.getByLabel(/rolle/i).selectOption('player')
     await trainerPage.getByRole('button', { name: /einladen/i }).click()
     await expect(trainerPage.getByText(playerEmail)).toBeVisible({ timeout: 10_000 })
@@ -101,9 +106,7 @@ test.describe('RLS negative — single team (SC-003)', () => {
     await playerPage.getByRole('button', { name: /annehmen/i }).click()
     await playerPage.waitForURL(new RegExp(`/t/${teamSlug}(/|$)`), { timeout: 15_000 })
 
-    const [team] = await restGet<{ id: string }>(
-      `teams?slug=eq.${teamSlug}&select=id`,
-    )
+    const [team] = await restGet<{ id: string }>(`teams?slug=eq.${teamSlug}&select=id`)
     const teamId = team!.id
     const [category] = await restInsert<{ id: string }>('point_categories', [
       { team_id: teamId, name: 'Einsatz', sort_order: 1, value_min: 0, value_max: 5 },
@@ -142,14 +145,15 @@ test.describe('RLS negative — single team (SC-003)', () => {
       ],
     })
     expect(n1.ok()).toBe(false)
-    expect(
-      await restGet(`point_entries?training_id=eq.${savedTraining!.id}`),
-    ).toHaveLength(0)
+    expect(await restGet(`point_entries?training_id=eq.${savedTraining!.id}`)).toHaveLength(0)
 
     // N2 — update players set active=false as the player.
     const n2 = await playerCtx.request.patch(
       `${SUPABASE_URL}/rest/v1/players?id=eq.${rosterPlayer!.id}`,
-      { headers: { ...asUser(playerToken), Prefer: 'return=representation' }, data: { active: false } },
+      {
+        headers: { ...asUser(playerToken), Prefer: 'return=representation' },
+        data: { active: false },
+      },
     )
     const n2Body = n2.ok() ? ((await n2.json()) as unknown[]) : []
     expect(n2Body).toHaveLength(0)
@@ -191,7 +195,10 @@ test.describe('RLS negative — single team (SC-003)', () => {
     const playerUserId = decodeJwtSub(playerToken)
     const n6 = await playerCtx.request.patch(
       `${SUPABASE_URL}/rest/v1/memberships?user_id=eq.${playerUserId}&team_id=eq.${teamId}`,
-      { headers: { ...asUser(playerToken), Prefer: 'return=representation' }, data: { role: 'trainer' } },
+      {
+        headers: { ...asUser(playerToken), Prefer: 'return=representation' },
+        data: { role: 'trainer' },
+      },
     )
     const n6Body = n6.ok() ? ((await n6.json()) as unknown[]) : []
     expect(n6Body).toHaveLength(0)

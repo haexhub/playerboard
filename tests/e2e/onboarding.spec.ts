@@ -32,7 +32,10 @@ test.describe('US0 — signup, team founding, invitation acceptance', () => {
     await trainerPage.waitForURL(new RegExp(`/t/${teamSlug}(/|$)`), { timeout: 15_000 })
 
     await trainerPage.goto(`/t/${teamSlug}/team/members`, { waitUntil: 'networkidle' })
-    await trainerPage.getByLabel(/e-mail/i).first().fill(playerEmail)
+    await trainerPage
+      .getByLabel(/e-mail/i)
+      .first()
+      .fill(playerEmail)
     await trainerPage.getByLabel(/rolle/i).selectOption('player')
     await trainerPage.getByRole('button', { name: /einladen/i }).click()
     await expect(trainerPage.getByText(playerEmail)).toBeVisible({ timeout: 10_000 })

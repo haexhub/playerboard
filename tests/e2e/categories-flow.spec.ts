@@ -38,7 +38,9 @@ const setupPage = (page: Page) => {
 
 const seedOnePlayer = async (teamSlug: string): Promise<void> => {
   if (!SUPABASE_SERVICE_KEY) {
-    throw new Error('SUPABASE_SERVICE_KEY missing — required to seed a player for propagation check')
+    throw new Error(
+      'SUPABASE_SERVICE_KEY missing — required to seed a player for propagation check',
+    )
   }
   const teams = await restGet<{ id: string }>(
     `teams?slug=eq.${encodeURIComponent(teamSlug)}&select=id`,
