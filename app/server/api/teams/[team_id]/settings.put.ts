@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { useUserDb, schema } from '~/server/utils/db'
+import { pgError } from '~/server/utils/pg-error'
 
 const teamIdSchema = z.string().uuid()
 const seasonStartSchema = z
@@ -64,14 +65,8 @@ export default defineEventHandler(async (event) => {
       return { slug: parsed.data.slug }
     })
   } catch (err) {
-    const error = err as {
-      code?: string
-      statusCode?: number
-      statusMessage?: string
-      message?: string
-    }
-    if (error.statusCode) throw err
-    if (error.code === '23505') {
+    if ((err as { statusCode?: number }).statusCode) throw err
+    if (pgError(err).code === '23505') {
       throw createError({ statusCode: 409, statusMessage: 'Slug already taken' })
     }
     console.error('Failed to update team settings', err)

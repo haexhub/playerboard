@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { sql } from 'drizzle-orm'
 import { serverSupabaseUser } from '#supabase/server'
 import { useAdminDb } from '~/server/utils/db'
+import { pgError } from '~/server/utils/pg-error'
 
 const bodySchema = z.object({
   token: z.string().min(8).max(128),
@@ -30,7 +31,7 @@ export default defineEventHandler(async (event) => {
       alreadyAccepted: row?.already_accepted ?? false,
     }
   } catch (err) {
-    const e = err as { code?: string; message?: string }
+    const e = pgError(err)
     const msg = e.message ?? ''
     if (/invitation not found/i.test(msg) || e.code === 'P0002') {
       throw createError({ statusCode: 404, statusMessage: 'Invitation not found' })
