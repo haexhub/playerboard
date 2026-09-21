@@ -1,29 +1,29 @@
 {
-  "generation_id": "g_20260917T153851Z_e3b0",
+  "generation_id": "g_20260921T003220Z_e3b0",
   "molecules": [
+    {
+      "id": "com.github.haexmas.atoms.coding-guideline-javascript-typescript",
+      "paths": [
+        ".spaex/constitution.md"
+      ],
+      "revision": "1a292194da6a279eb382e562870fed1c41ebdf8e",
+      "source": "https://github.com/haexmas/atoms"
+    },
     {
       "id": "com.github.haexmas.atoms.general-coding",
       "paths": [
         ".spaex/constitution.md"
       ],
-      "revision": "cc9e9935998732f7a09486a68dd4c74859481c98",
+      "revision": "1a292194da6a279eb382e562870fed1c41ebdf8e",
       "source": "https://github.com/haexmas/atoms"
     },
     {
-      "hook_status": "failed",
+      "hook_status": "skipped",
       "id": "com.github.haexmas.atoms.graphify-first-authoring",
       "paths": [
         ".spaex/constitution.md"
       ],
-      "revision": "cc9e9935998732f7a09486a68dd4c74859481c98",
-      "source": "https://github.com/haexmas/atoms"
-    },
-    {
-      "id": "com.github.haexmas.atoms.javascript-typescript",
-      "paths": [
-        ".spaex/constitution.md"
-      ],
-      "revision": "cc9e9935998732f7a09486a68dd4c74859481c98",
+      "revision": "1a292194da6a279eb382e562870fed1c41ebdf8e",
       "source": "https://github.com/haexmas/atoms"
     },
     {
@@ -31,17 +31,17 @@
       "paths": [
         ".spaex/constitution.md"
       ],
-      "revision": "cc9e9935998732f7a09486a68dd4c74859481c98",
+      "revision": "1a292194da6a279eb382e562870fed1c41ebdf8e",
       "source": "https://github.com/haexmas/atoms"
     },
     {
       "id": "com.github.haexmas.atoms.speckit",
       "paths": [],
-      "revision": "cc9e9935998732f7a09486a68dd4c74859481c98",
+      "revision": "1a292194da6a279eb382e562870fed1c41ebdf8e",
       "source": "https://github.com/haexmas/atoms",
       "speckit": {
         "cli_version": "1.0.6",
-        "declaration_fingerprint": "sha256:71da49e0df1330c7d65e8ddc6cedc01636c4f0ea1e84e5b19ab974a56541625e",
+        "declaration_fingerprint": "sha256:cb24e7ed39221bbaf81ac21de91e0deabb9b0c9fade5d76fc82c7b0116e98a05",
         "outcomes": {
           "claude": "installed",
           "codex": "installed"
