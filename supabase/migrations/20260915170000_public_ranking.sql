@@ -18,7 +18,20 @@ $$;
 -- The migration runner is not necessarily a superuser (Supabase's `postgres`
 -- role isn't); ALTER FUNCTION ... OWNER TO below requires membership in the
 -- target role, so grant it to whichever role is currently running this file.
-grant public_ranking_reader to current_user;
+--
+-- Skipped for superusers: they don't need membership for the ownership
+-- transfer. On the self-hosted stack (supabase/postgres 15.8.1.085) this
+-- plain GRANT made the server process die with SIGSEGV when run by
+-- `supabase db push` as supabase_admin, sending the whole database into crash
+-- recovery on every container start. The same statement did not crash when
+-- sent through psql/pgbench, so the exact trigger is not understood.
+do $$
+begin
+  if not (select rolsuper from pg_roles where rolname = current_user) then
+    execute format('grant public_ranking_reader to %I', current_user);
+  end if;
+end
+$$;
 
 grant usage on schema public to public_ranking_reader;
 -- CREATE is needed only transiently so Postgres allows the ownership
