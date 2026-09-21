@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.2](https://github.com/haexhub/playerboard/compare/v0.3.1...v0.3.2) (2026-09-21)
+
+
+### Bug Fixes
+
+* **db:** don't GRANT public_ranking_reader to superuser migration runners ([9be00f4](https://github.com/haexhub/playerboard/commit/9be00f43919dde32d3338222b3e7c5ffe6601f5e))
+* **db:** don't GRANT public_ranking_reader to superuser migration runners ([244573c](https://github.com/haexhub/playerboard/commit/244573cd8cf3873c9aa8a60b728c9419c32aa24f))
+
 ## [0.3.1](https://github.com/haexhub/playerboard/compare/v0.3.0...v0.3.1) (2026-09-20)
 
 
