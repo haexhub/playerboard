@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
+import { signInWithMagicLink } from './helpers/magic-link'
 
-const MAILPIT_URL = process.env.MAILPIT_URL ?? 'http://127.0.0.1:54324'
 const SUPABASE_URL = process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321'
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY ?? ''
 
@@ -29,59 +29,11 @@ const restInsert = async <T>(table: string, rows: unknown[]): Promise<T[]> => {
 
 const uniqueSuffix = () => Math.random().toString(36).slice(2, 8)
 
-type MailpitMessage = {
-  ID: string
-  Created: string
-  To: { Address: string }[]
-  Subject: string
-}
-
-const fetchLatestMagicLink = async (email: string, matcher?: RegExp): Promise<string> => {
-  const target = email.toLowerCase()
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    const listRes = await fetch(`${MAILPIT_URL}/api/v1/messages?limit=200`)
-    if (listRes.ok) {
-      const list = (await listRes.json()) as { messages: MailpitMessage[] }
-      const relevant = list.messages
-        .filter((m) => m.To.some((t) => t.Address.toLowerCase() === target))
-        .sort((a, b) => (a.Created < b.Created ? 1 : -1))
-      for (const m of relevant) {
-        const msgRes = await fetch(`${MAILPIT_URL}/api/v1/message/${m.ID}`)
-        if (!msgRes.ok) continue
-        const msg = (await msgRes.json()) as { HTML?: string; Text?: string }
-        const body = msg.HTML ?? msg.Text ?? ''
-        const urls = body.match(/https?:\/\/[^\s"<>]+/g) ?? []
-        const link = urls.find((u) => (matcher ?? /token=|verify|invite\//i).test(u))
-        if (link) {
-          await fetch(`${MAILPIT_URL}/api/v1/messages`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ IDs: [m.ID] }),
-          })
-          return link.replace(/&amp;/g, '&')
-        }
-      }
-    }
-    await new Promise((r) => setTimeout(r, 500))
-  }
-  throw new Error(`No magic link received for ${email}`)
-}
-
 const setupPage = (page: Page) => {
   page.on('pageerror', (err) => console.error(`[browser error] ${err.message}`))
   page.on('console', (msg) => {
     if (msg.type() === 'error') console.error(`[browser console] ${msg.text()}`)
   })
-}
-
-const signInWithMagicLink = async (page: Page, email: string) => {
-  await page.goto('/login', { waitUntil: 'networkidle' })
-  await expect(page.getByRole('button', { name: /link senden/i })).toBeEnabled()
-  await page.getByLabel(/e-mail/i).fill(email)
-  await page.getByRole('button', { name: /link senden/i }).click()
-  await expect(page.getByText(/prüfe deine e-mails/i)).toBeVisible({ timeout: 15_000 })
-  const link = await fetchLatestMagicLink(email)
-  await page.goto(link, { waitUntil: 'networkidle' })
 }
 
 // Smallest possible valid PNG (1×1 transparent pixel).
@@ -152,9 +104,7 @@ test.describe('US1 — trainer records point entries + at least one photo', () =
     await expect(page.getByTestId('training-save-button')).toBeEnabled({ timeout: 15_000 })
 
     // Enter one point value → auto-save on blur → check mark shows up.
-    const aliceEinsatz = page.locator(
-      'input[aria-label*="Alice Anker"][aria-label*="Einsatz"]',
-    )
+    const aliceEinsatz = page.locator('input[aria-label*="Alice Anker"][aria-label*="Einsatz"]')
     await aliceEinsatz.first().fill('4')
     await aliceEinsatz.first().blur()
     await expect(page.getByText('✓').first()).toBeVisible({ timeout: 10_000 })

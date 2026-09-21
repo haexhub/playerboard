@@ -1,46 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
-
-const MAILPIT_URL = process.env.MAILPIT_URL ?? 'http://127.0.0.1:54324'
+import { fetchLatestMagicLink, signInWithMagicLink } from './helpers/magic-link'
 
 const uniqueSuffix = () => Math.random().toString(36).slice(2, 8)
-
-type MailpitMessage = {
-  ID: string
-  Created: string
-  To: { Address: string }[]
-  Subject: string
-}
-
-const fetchLatestMagicLink = async (email: string, matcher?: RegExp): Promise<string> => {
-  const target = email.toLowerCase()
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    const listRes = await fetch(`${MAILPIT_URL}/api/v1/messages?limit=200`)
-    if (listRes.ok) {
-      const list = (await listRes.json()) as { messages: MailpitMessage[] }
-      const relevant = list.messages
-        .filter((m) => m.To.some((t) => t.Address.toLowerCase() === target))
-        .sort((a, b) => (a.Created < b.Created ? 1 : -1))
-      for (const m of relevant) {
-        const msgRes = await fetch(`${MAILPIT_URL}/api/v1/message/${m.ID}`)
-        if (!msgRes.ok) continue
-        const msg = (await msgRes.json()) as { HTML?: string; Text?: string }
-        const body = msg.HTML ?? msg.Text ?? ''
-        const urls = body.match(/https?:\/\/[^\s"<>]+/g) ?? []
-        const link = urls.find((u) => (matcher ?? /token=|verify|invite\//i).test(u))
-        if (link) {
-          await fetch(`${MAILPIT_URL}/api/v1/messages`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ IDs: [m.ID] }),
-          })
-          return link.replace(/&amp;/g, '&')
-        }
-      }
-    }
-    await new Promise((r) => setTimeout(r, 500))
-  }
-  throw new Error(`No magic link received for ${email}`)
-}
 
 const setupPage = (page: Page) => {
   page.on('pageerror', (err) => console.error(`[browser error] ${err.message}`))
@@ -49,18 +10,10 @@ const setupPage = (page: Page) => {
   })
 }
 
-const signInWithMagicLink = async (page: Page, email: string) => {
-  await page.goto('/login', { waitUntil: 'networkidle' })
-  await expect(page.getByRole('button', { name: /link senden/i })).toBeEnabled()
-  await page.getByLabel(/e-mail/i).fill(email)
-  await page.getByRole('button', { name: /link senden/i }).click()
-  await expect(page.getByText(/prüfe deine e-mails/i)).toBeVisible({ timeout: 15_000 })
-  const link = await fetchLatestMagicLink(email)
-  await page.goto(link, { waitUntil: 'networkidle' })
-}
-
 test.describe('US4 — trainer manages the player roster', () => {
-  test('CRUD, consent toggle, jersey-uniqueness violation, link via invite', async ({ browser }) => {
+  test('CRUD, consent toggle, jersey-uniqueness violation, link via invite', async ({
+    browser,
+  }) => {
     test.setTimeout(150_000)
     const suffix = uniqueSuffix()
     const trainerEmail = `trainer-plr-${suffix}@example.com`
@@ -183,7 +136,9 @@ test.describe('US4 — trainer manages the player roster', () => {
     await memberRow.locator('select').selectOption('trainer')
 
     await trainerPage.goto(`/t/${teamSlug}/players`, { waitUntil: 'networkidle' })
-    const unlinkedBruno = trainerPage.getByTestId('player-row').filter({ hasText: 'Bruno Bereit II' })
+    const unlinkedBruno = trainerPage
+      .getByTestId('player-row')
+      .filter({ hasText: 'Bruno Bereit II' })
     await expect(unlinkedBruno.getByTestId('player-linked')).toHaveCount(0)
     await expect(unlinkedBruno.getByLabel(/Konto für Bruno Bereit II wählen/)).toHaveCount(0)
 
@@ -282,7 +237,9 @@ test.describe('US4 — trainer manages the player roster', () => {
     await expect(playerDialog).toBeVisible()
 
     // No candidates exist yet — the "link existing account" option isn't offered.
-    await expect(playerDialog.getByRole('radio', { name: 'Bestehendes Konto verknüpfen' })).toHaveCount(0)
+    await expect(
+      playerDialog.getByRole('radio', { name: 'Bestehendes Konto verknüpfen' }),
+    ).toHaveCount(0)
 
     await playerDialog.getByRole('radio', { name: 'Per E-Mail einladen' }).check()
     await playerDialog.getByLabel('Name').fill('Nina Neuling')
@@ -338,7 +295,10 @@ test.describe('US4 — trainer manages the player roster', () => {
 
     await trainerPage.goto(`/t/${teamSlug}/team/members`, { waitUntil: 'networkidle' })
     // Role defaults to "player" — the optional roster fields are already visible.
-    await trainerPage.getByLabel(/e-mail/i).first().fill(inviteeEmail)
+    await trainerPage
+      .getByLabel(/e-mail/i)
+      .first()
+      .fill(inviteeEmail)
     await trainerPage.getByLabel('Name').fill('Malik Muster')
     await trainerPage.getByLabel(/Trikotnummer/).fill('23')
     await trainerPage.getByRole('button', { name: /einladen/i }).click()

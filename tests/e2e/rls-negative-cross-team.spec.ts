@@ -1,9 +1,9 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import { fetchLatestMagicLink, signInWithMagicLink } from './helpers/magic-link'
 
 // SC-008/SC-009: no cross-team leak, even by calling PostgREST/Storage
 // directly. See contracts/rls-policies.md rows X1..X10.
 
-const MAILPIT_URL = process.env.MAILPIT_URL ?? 'http://127.0.0.1:54324'
 const SUPABASE_URL = process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321'
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY ?? ''
 const SUPABASE_ANON_KEY =
@@ -11,59 +11,11 @@ const SUPABASE_ANON_KEY =
 
 const uniqueSuffix = () => Math.random().toString(36).slice(2, 8)
 
-type MailpitMessage = {
-  ID: string
-  Created: string
-  To: { Address: string }[]
-  Subject: string
-}
-
-const fetchLatestMagicLink = async (email: string): Promise<string> => {
-  const target = email.toLowerCase()
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    const listRes = await fetch(`${MAILPIT_URL}/api/v1/messages?limit=200`)
-    if (listRes.ok) {
-      const list = (await listRes.json()) as { messages: MailpitMessage[] }
-      const relevant = list.messages
-        .filter((m) => m.To.some((t) => t.Address.toLowerCase() === target))
-        .sort((a, b) => (a.Created < b.Created ? 1 : -1))
-      for (const m of relevant) {
-        const msgRes = await fetch(`${MAILPIT_URL}/api/v1/message/${m.ID}`)
-        if (!msgRes.ok) continue
-        const msg = (await msgRes.json()) as { HTML?: string; Text?: string }
-        const body = msg.HTML ?? msg.Text ?? ''
-        const urls = body.match(/https?:\/\/[^\s"<>]+/g) ?? []
-        const link = urls.find((u) => /token=|verify|invite\//i.test(u))
-        if (link) {
-          await fetch(`${MAILPIT_URL}/api/v1/messages`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ IDs: [m.ID] }),
-          })
-          return link.replace(/&amp;/g, '&')
-        }
-      }
-    }
-    await new Promise((r) => setTimeout(r, 500))
-  }
-  throw new Error(`No magic link received for ${email}`)
-}
-
 const setupPage = (page: Page) => {
   page.on('pageerror', (err) => console.error(`[browser error] ${err.message}`))
   page.on('console', (msg) => {
     if (msg.type() === 'error') console.error(`[browser console] ${msg.text()}`)
   })
-}
-
-const signInWithMagicLink = async (page: Page, email: string) => {
-  await page.goto('/login', { waitUntil: 'networkidle' })
-  await expect(page.getByRole('button', { name: /link senden/i })).toBeEnabled()
-  await page.getByLabel(/e-mail/i).fill(email)
-  await page.getByRole('button', { name: /link senden/i }).click()
-  await expect(page.getByText(/prüfe deine e-mails/i)).toBeVisible({ timeout: 15_000 })
-  const link = await fetchLatestMagicLink(email)
-  await page.goto(link, { waitUntil: 'networkidle' })
 }
 
 const foundTeam = async (page: Page, teamName: string, teamSlug: string) => {
@@ -148,7 +100,10 @@ test.describe('RLS negative — cross team (SC-008, SC-009)', () => {
     await foundTeam(trainerAPage, `RLS X Team A ${suffix}`, teamASlug)
 
     await trainerAPage.goto(`/t/${teamASlug}/team/members`, { waitUntil: 'networkidle' })
-    await trainerAPage.getByLabel(/e-mail/i).first().fill(playerAEmail)
+    await trainerAPage
+      .getByLabel(/e-mail/i)
+      .first()
+      .fill(playerAEmail)
     await trainerAPage.getByLabel(/rolle/i).selectOption('player')
     await trainerAPage.getByRole('button', { name: /einladen/i }).click()
     await expect(trainerAPage.getByText(playerAEmail)).toBeVisible({ timeout: 10_000 })
@@ -252,10 +207,10 @@ test.describe('RLS negative — cross team (SC-008, SC-009)', () => {
       expect(x2.ok()).toBe(false)
 
       // X3 — call get_team_ranking for team B.
-      const x3 = await trainerACtx.request.post(
-        `${SUPABASE_URL}/rest/v1/rpc/get_team_ranking`,
-        { headers: asUser(token), data: { p_team: teamBId, p_from: '2000-01-01', p_to: today } },
-      )
+      const x3 = await trainerACtx.request.post(`${SUPABASE_URL}/rest/v1/rpc/get_team_ranking`, {
+        headers: asUser(token),
+        data: { p_team: teamBId, p_from: '2000-01-01', p_to: today },
+      })
       expect(x3.ok()).toBe(true)
       expect(await x3.json()).toBeNull()
 
@@ -296,10 +251,10 @@ test.describe('RLS negative — cross team (SC-008, SC-009)', () => {
     expect(await x8.json()).toEqual([])
 
     // X9 — anon calls get_public_ranking: projection only, no PII.
-    const x9 = await trainerACtx.request.post(
-      `${SUPABASE_URL}/rest/v1/rpc/get_public_ranking`,
-      { headers: asAnon(), data: { p_slug: teamBSlug, p_from: '2000-01-01', p_to: today } },
-    )
+    const x9 = await trainerACtx.request.post(`${SUPABASE_URL}/rest/v1/rpc/get_public_ranking`, {
+      headers: asAnon(),
+      data: { p_slug: teamBSlug, p_from: '2000-01-01', p_to: today },
+    })
     expect(x9.ok()).toBe(true)
     const x9Body = (await x9.json()) as {
       rows: Array<Record<string, unknown>>
