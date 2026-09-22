@@ -4,7 +4,7 @@ import CategoryForm from '~/components/categories/CategoryForm.vue'
 import CategoryList from '~/components/categories/CategoryList.vue'
 
 definePageMeta({
-  middleware: ['team-context', 'trainer-only'],
+  middleware: ['trainer-only'],
 })
 
 const { currentTeam } = useTeamContext()

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isoDate } from '~/utils/dates'
 
 export const PHOTO_MIME_TYPES = [
   'image/jpeg',
@@ -53,10 +54,11 @@ export const trainingDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Datum im Format YYYY-MM-DD')
   .refine((value) => {
-    const today = new Date()
-    const isoToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-    return value <= isoToday
-  }, 'Datum darf nicht in der Zukunft liegen')
+    // The regex alone accepts '2025-02-30'; only a round-trip proves the day exists.
+    const d = new Date(value)
+    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value
+  }, 'Ungültiges Datum')
+  .refine((value) => value <= isoDate(new Date()), 'Datum darf nicht in der Zukunft liegen')
 
 // Matches the DB check constraint (user_profiles_display_name_len_check):
 // zero-width characters don't count as visible, so a name made only of them

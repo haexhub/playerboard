@@ -1,4 +1,5 @@
 import type { Database } from '~/types/database'
+import { assertRowsAffected } from '~/utils/errors'
 
 export type ActivePlayer = {
   id: string
@@ -85,13 +86,15 @@ export const usePlayers = () => {
       active: boolean
     }>,
   ) => {
-    const { error } = await client.from('players').update(payload).eq('id', id)
+    const { data, error } = await client.from('players').update(payload).eq('id', id).select('id')
     if (error) throw error
+    assertRowsAffected(data)
   }
 
   const remove = async (id: string) => {
-    const { error } = await client.from('players').delete().eq('id', id)
+    const { data, error } = await client.from('players').delete().eq('id', id).select('id')
     if (error) throw error
+    assertRowsAffected(data)
   }
 
   const setActive = async (id: string, value: boolean) => {
@@ -149,8 +152,13 @@ export const usePlayers = () => {
       throw new Error('Nutzer hat keine Spieler-Mitgliedschaft in diesem Team.')
     }
 
-    const { error } = await client.from('players').update({ linked_user_id: user_id }).eq('id', id)
+    const { data, error } = await client
+      .from('players')
+      .update({ linked_user_id: user_id })
+      .eq('id', id)
+      .select('id')
     if (error) throw error
+    assertRowsAffected(data)
   }
 
   return { listActive, list, create, update, remove, setActive, setConsent, linkUser, listLinkCandidates }

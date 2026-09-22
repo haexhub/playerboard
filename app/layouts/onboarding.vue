@@ -1,19 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-
 const user = useSupabaseUser()
-const client = useSupabaseClient()
-const signOutError = ref<string | null>(null)
-
-const signOut = async () => {
-  signOutError.value = null
-  const { error } = await client.auth.signOut()
-  if (error) {
-    signOutError.value = 'Abmelden fehlgeschlagen. Bitte versuche es erneut.'
-    return
-  }
-  await navigateTo('/login')
-}
+const { signOut, signOutError } = useAuth()
 </script>
 
 <template>

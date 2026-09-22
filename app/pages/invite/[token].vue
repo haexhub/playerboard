@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, watch } from 'vue'
 import InvitationAcceptCard from '~/components/auth/InvitationAcceptCard.vue'
 import LoginMagicLink from '~/components/auth/LoginMagicLink.vue'
 import type { Database } from '~/types/database'
@@ -59,10 +59,6 @@ const loadForAuthenticatedUser = async () => {
 watch(user, (v) => {
   if (v) void loadForAuthenticatedUser()
 }, { immediate: true })
-
-onMounted(() => {
-  if (user.value) void loadForAuthenticatedUser()
-})
 </script>
 
 <template>

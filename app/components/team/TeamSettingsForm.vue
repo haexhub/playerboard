@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { z } from 'zod'
+import { errorMessage, isUniqueViolation } from '~/utils/errors'
 
 const props = defineProps<{
   teamId: string
@@ -55,16 +56,10 @@ const submit = async () => {
     await updateWithSettings(props.teamId, parsed.data)
     emit('saved', { slug: parsed.data.slug })
   } catch (err) {
-    const e = err as {
-      code?: string
-      statusCode?: number
-      statusMessage?: string
-      message?: string
-    }
-    if (e.code === '23505' || e.statusCode === 409) {
+    if (isUniqueViolation(err)) {
       fieldErrors.value.slug = 'Dieser Slug ist bereits vergeben.'
     } else {
-      submitError.value = e.statusMessage ?? e.message ?? 'Einstellungen konnten nicht gespeichert werden.'
+      submitError.value = errorMessage(err, 'Einstellungen konnten nicht gespeichert werden.')
     }
   } finally {
     loading.value = false

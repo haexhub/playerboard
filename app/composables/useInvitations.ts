@@ -1,4 +1,5 @@
 import type { Database } from '~/types/database'
+import { assertRowsAffected } from '~/utils/errors'
 
 type Role = 'trainer' | 'player'
 
@@ -52,8 +53,9 @@ export const useInvitations = () => {
   }
 
   const revoke = async (id: string) => {
-    const { error } = await client.from('invitations').delete().eq('id', id)
+    const { data, error } = await client.from('invitations').delete().eq('id', id).select('id')
     if (error) throw error
+    assertRowsAffected(data)
   }
 
   return { issue, accept, listOpenByTeam, listMineByEmail, revoke }

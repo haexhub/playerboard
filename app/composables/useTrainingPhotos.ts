@@ -18,39 +18,6 @@ export type TrainingPhotoView = TrainingPhotoRow & { signed_url: string }
 
 export type ConsentStatus = 'clean' | 'blocked'
 
-export class TrainingPhotoDatabaseError extends Error {
-  constructor(
-    readonly path: string,
-    readonly databaseError: unknown,
-    readonly cleanupError: unknown,
-  ) {
-    const databaseMessage =
-      databaseError instanceof Error
-        ? databaseError.message
-        : 'Foto konnte nicht gespeichert werden'
-    const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : ''
-    super(
-      cleanupError
-        ? `${databaseMessage} (Aufräumen fehlgeschlagen: ${cleanupMessage})`
-        : databaseMessage,
-    )
-    this.name = 'TrainingPhotoDatabaseError'
-  }
-}
-
-const randomUuid = (): string => {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID()
-  }
-  return Array.from({ length: 16 }, () => Math.floor(Math.random() * 256))
-    .map((n, i) => {
-      const h = n.toString(16).padStart(2, '0')
-      if (i === 4 || i === 6 || i === 8 || i === 10) return `-${h}`
-      return h
-    })
-    .join('')
-}
-
 export const useTrainingPhotos = () => {
   const client = useSupabaseClient<Database>()
   const user = useSupabaseUser()
@@ -71,7 +38,7 @@ export const useTrainingPhotos = () => {
     }
 
     const ext = extensionForMime(file.type)
-    const path = `${team_id}/${training_id}/${randomUuid()}.${ext}`
+    const path = `${team_id}/${training_id}/${crypto.randomUUID()}.${ext}`
 
     const { error: uploadError } = await client.storage.from(BUCKET).upload(path, file, {
       contentType: file.type,
@@ -92,7 +59,10 @@ export const useTrainingPhotos = () => {
       .single()
     if (error) {
       const { error: cleanupError } = await client.storage.from(BUCKET).remove([path])
-      throw new TrainingPhotoDatabaseError(path, error, cleanupError)
+      const cleanupSuffix = cleanupError
+        ? ` (Aufräumen fehlgeschlagen: ${cleanupError.message})`
+        : ''
+      throw new Error(`${error.message}${cleanupSuffix}`, { cause: error })
     }
     return data as TrainingPhotoRow
   }

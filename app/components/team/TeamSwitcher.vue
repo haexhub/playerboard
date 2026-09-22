@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { LAST_SLUG_KEY } from '~/composables/useTeams'
 
 const { memberships, currentSlug } = useTeamContext()
 
@@ -17,7 +18,7 @@ const onChange = async (event: Event) => {
   const target = event.target as HTMLSelectElement
   const slug = target.value
   if (!slug || slug === currentSlug.value) return
-  if (import.meta.client) localStorage.setItem('ifa:lastSlug', slug)
+  if (import.meta.client) localStorage.setItem(LAST_SLUG_KEY, slug)
   await navigateTo(`/t/${slug}`)
 }
 </script>

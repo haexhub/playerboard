@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useProfile } from '~/composables/useProfile'
+import { errorMessage } from '~/utils/errors'
 import { PHOTO_MIME_TYPES } from '~/utils/validators'
 
 const props = defineProps<{
@@ -36,7 +37,7 @@ const submitName = async () => {
     await updateDisplayName(name.value)
     emit('saved')
   } catch (err) {
-    nameError.value = err instanceof Error ? err.message : 'Name konnte nicht gespeichert werden.'
+    nameError.value = errorMessage(err, 'Name konnte nicht gespeichert werden.')
   } finally {
     nameLoading.value = false
   }
@@ -53,7 +54,7 @@ const onAvatarPick = async (evt: Event) => {
     await uploadAvatar(file)
     emit('saved')
   } catch (err) {
-    avatarError.value = err instanceof Error ? err.message : 'Avatar konnte nicht hochgeladen werden.'
+    avatarError.value = errorMessage(err, 'Avatar konnte nicht hochgeladen werden.')
   } finally {
     avatarLoading.value = false
   }
@@ -66,7 +67,7 @@ const onAvatarRemove = async () => {
     await removeAvatar()
     emit('saved')
   } catch (err) {
-    avatarError.value = err instanceof Error ? err.message : 'Avatar konnte nicht entfernt werden.'
+    avatarError.value = errorMessage(err, 'Avatar konnte nicht entfernt werden.')
   } finally {
     avatarLoading.value = false
   }

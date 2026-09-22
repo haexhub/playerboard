@@ -1,18 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import LoginMagicLink from '~/components/auth/LoginMagicLink.vue'
+import { safeInternalPath } from '~/composables/useAuth'
 
 definePageMeta({
   layout: 'onboarding',
 })
 
 const route = useRoute()
-const redirect = computed(() => {
-  const raw = route.query.redirect
-  return typeof raw === 'string' && raw.startsWith('/') && raw[1] !== '/' && raw[1] !== '\\'
-    ? raw
-    : undefined
-})
+const redirect = computed(() => safeInternalPath(route.query.redirect) ?? undefined)
 const initialEmail = computed(() => {
   const raw = route.query.email
   return typeof raw === 'string' ? raw : undefined

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import type { AuthError } from '@supabase/supabase-js'
-import { POST_LOGIN_REDIRECT_KEY } from '~/composables/useAuth'
+import { safeInternalPath } from '~/composables/useAuth'
 import type { Database } from '~/types/database'
 
 interface AuthErrorInfo {
@@ -14,6 +14,7 @@ interface AuthErrorInfo {
 interface CallbackDiag {
   hasHash?: boolean
   hasCode?: boolean
+  hasSession?: boolean
   implicitError?: AuthErrorInfo
   pkceError?: AuthErrorInfo
 }
@@ -24,6 +25,21 @@ const describeAuthError = (err: AuthError): AuthErrorInfo => ({
   code: err.code,
   name: err.name,
 })
+
+// GoTrue reports a link it could not verify (expired, already used) as
+// error/error_code/error_description params on the redirect instead of
+// tokens: in the fragment for implicit links, in the query for PKCE ones.
+const describeRedirectError = (params: URLSearchParams): AuthErrorInfo | null => {
+  const error = params.get('error')
+  const code = params.get('error_code')
+  const description = params.get('error_description')
+  if (!error && !code && !description) return null
+  return {
+    message: description ?? error ?? 'unspecified redirect error',
+    code: code ?? undefined,
+    name: 'AuthRedirectError',
+  }
+}
 
 const reportAuthError = (diag: CallbackDiag) => {
   $fetch('/api/auth/callback-error', { method: 'POST', body: diag }).catch(() => {})
@@ -37,55 +53,39 @@ const user = useSupabaseUser()
 const route = useRoute()
 const client = useSupabaseClient<Database>()
 const error = ref<string | null>(null)
-
-const readStoredRedirect = (): string | null => {
-  if (typeof window === 'undefined') return null
-  const raw = localStorage.getItem(POST_LOGIN_REDIRECT_KEY)
-  localStorage.removeItem(POST_LOGIN_REDIRECT_KEY)
-  if (!raw) return null
-  if (!raw.startsWith('/') || raw[1] === '/' || raw[1] === '\\') return null
-  return raw
-}
+const { resolveLandingPath } = useTeams()
 
 const finalize = async () => {
-  const rawRedirect = route.query.redirect
-  const queryRedirect =
-    typeof rawRedirect === 'string' &&
-    rawRedirect.startsWith('/') &&
-    rawRedirect[1] !== '/' &&
-    rawRedirect[1] !== '\\'
-      ? rawRedirect
-      : null
-  const redirect = queryRedirect ?? readStoredRedirect()
-
+  const redirect = safeInternalPath(route.query.redirect)
   if (redirect) {
     await navigateTo(redirect, { replace: true })
     return
   }
 
   if (!user.value) return
-  const { data } = await client
-    .from('memberships')
-    .select('teams(slug)')
-    .eq('user_id', user.value.sub)
-
-  const slugs = (data ?? []).map((m) => m.teams?.slug).filter((s): s is string => Boolean(s))
-  const lastSlug = import.meta.client ? localStorage.getItem('ifa:lastSlug') : null
-  const target = lastSlug && slugs.includes(lastSlug) ? lastSlug : (slugs[0] ?? null)
-
-  if (target) {
-    await navigateTo(`/t/${target}`, { replace: true })
-  } else {
-    await navigateTo('/start', { replace: true })
+  let target: string
+  try {
+    target = await resolveLandingPath()
+  } catch {
+    error.value = 'Teams konnten nicht geladen werden. Bitte lade die Seite neu.'
+    return
   }
+  await navigateTo(target, { replace: true })
 }
 
 const consumeImplicitFragment = async (diag: CallbackDiag): Promise<boolean> => {
   if (typeof window === 'undefined') return false
-  const hash = window.location.hash
-  diag.hasHash = Boolean(hash && hash.includes('access_token='))
-  if (!diag.hasHash) return false
-  const params = new URLSearchParams(hash.slice(1))
+  const params = new URLSearchParams(window.location.hash.slice(1))
+  diag.hasHash = params.has('access_token')
+  const redirectError = describeRedirectError(params)
+  if (!diag.hasHash && !redirectError) return false
+  // Drop the fragment before anything else so neither the tokens nor the
+  // error params outlive this page in the URL or the browser history.
+  history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
+  if (redirectError) {
+    diag.implicitError = redirectError
+    return false
+  }
   const accessToken = params.get('access_token')
   const refreshToken = params.get('refresh_token')
   if (!accessToken || !refreshToken) return false
@@ -97,14 +97,19 @@ const consumeImplicitFragment = async (diag: CallbackDiag): Promise<boolean> => 
     diag.implicitError = describeAuthError(setErr)
     return false
   }
-  history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
   return true
 }
 
 const consumePkceCode = async (diag: CallbackDiag): Promise<boolean> => {
   if (typeof window === 'undefined') return false
-  const code = new URLSearchParams(window.location.search).get('code')
+  const params = new URLSearchParams(window.location.search)
+  const code = params.get('code')
   diag.hasCode = Boolean(code)
+  const redirectError = describeRedirectError(params)
+  if (redirectError) {
+    diag.pkceError = redirectError
+    return false
+  }
   if (!code) return false
   const { error: exchangeErr } = await client.auth.exchangeCodeForSession(code)
   if (exchangeErr) {
@@ -136,6 +141,9 @@ onMounted(async () => {
   await consumePkceCode(diag)
   const ok = await pollForSession()
   if (!ok) {
+    // Tells "no session at all" apart from "session exists but the user ref
+    // never caught up" (the getClaims() round trip failed or timed out).
+    diag.hasSession = Boolean((await client.auth.getSession()).data.session)
     reportAuthError(diag)
     error.value =
       'Anmeldung konnte nicht abgeschlossen werden. Bitte fordere einen neuen Link an.'

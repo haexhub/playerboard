@@ -3,7 +3,7 @@
   import TeamSettingsForm from '~/components/team/TeamSettingsForm.vue'
 
   definePageMeta({
-    middleware: ['team-context', 'trainer-only'],
+    middleware: ['trainer-only'],
   })
 
   const { currentTeam, refresh: refreshTeamContext } = useTeamContext()

@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { z } from 'zod'
 import type { LinkCandidate } from '~/composables/usePlayers'
+import { errorMessage, pgErrorCode } from '~/utils/errors'
 
 type Mode = 'manual' | 'link' | 'invite'
 
@@ -129,12 +130,12 @@ const submit = async () => {
         // Keep the original operation error visible; cleanup can be retried manually.
       }
     }
-    const e = err as { code?: string; statusCode?: number; statusMessage?: string; message?: string }
-    if (e.code === '23505') {
+    // SQLSTATE only: a 409 from issue() means a duplicate invitation, not a jersey clash.
+    if (pgErrorCode(err) === '23505') {
       submitError.value =
         'Trikotnummer ist im aktiven Kader bereits vergeben. Zuerst den bisherigen Spieler deaktivieren.'
     } else {
-      submitError.value = e.statusMessage ?? e.message ?? 'Spieler konnte nicht gespeichert werden.'
+      submitError.value = errorMessage(err, 'Spieler konnte nicht gespeichert werden.')
     }
   } finally {
     loading.value = false

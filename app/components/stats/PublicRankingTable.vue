@@ -37,8 +37,8 @@ const totalFor = (row: PublicRankingRow): number =>
         Keine Punkte im gewählten Zeitraum.
       </ShadcnTableEmpty>
       <ShadcnTableRow
-        v-for="row in rows"
-        :key="`${row.rank_position}-${row.jersey_number ?? 'none'}`"
+        v-for="(row, i) in rows"
+        :key="i"
         data-testid="public-ranking-row"
       >
         <th scope="row" class="sticky left-0 bg-inherit border-r px-2 py-2 text-left">

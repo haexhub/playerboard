@@ -1,5 +1,7 @@
 import type { Database } from '~/types/database'
 
+export const LAST_SLUG_KEY = 'ifa:lastSlug'
+
 type MyTeam = {
   team_id: string
   role: string
@@ -19,17 +21,6 @@ export const useTeams = () => {
       method: 'POST',
       body: payload,
     })
-  }
-
-  const update = async (team_id: string, payload: { name?: string; slug?: string }) => {
-    const { data, error } = await client
-      .from('teams')
-      .update(payload)
-      .eq('id', team_id)
-      .select('id')
-      .single()
-    if (error) throw error
-    return data
   }
 
   const updateWithSettings = async (
@@ -52,5 +43,14 @@ export const useTeams = () => {
     return (data ?? []) as MyTeam[]
   }
 
-  return { createTeam, update, updateWithSettings, myTeams }
+  // Post-login landing: the last opened team if still a member, else the
+  // first team, else onboarding. Throws when the membership query fails.
+  const resolveLandingPath = async (): Promise<string> => {
+    const slugs = (await myTeams()).flatMap((m) => (m.teams ? [m.teams.slug] : []))
+    const lastSlug = import.meta.client ? localStorage.getItem(LAST_SLUG_KEY) : null
+    const target = lastSlug && slugs.includes(lastSlug) ? lastSlug : slugs[0]
+    return target ? `/t/${target}` : '/start'
+  }
+
+  return { createTeam, updateWithSettings, myTeams, resolveLandingPath }
 }

@@ -5,7 +5,7 @@ import PlayerForm from '~/components/players/PlayerForm.vue'
 import PlayerList from '~/components/players/PlayerList.vue'
 
 definePageMeta({
-  middleware: ['team-context', 'trainer-only'],
+  middleware: ['trainer-only'],
 })
 
 const { currentTeam } = useTeamContext()

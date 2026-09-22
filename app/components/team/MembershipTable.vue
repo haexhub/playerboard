@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { Database } from '~/types/database'
+import { assertRowsAffected, errorMessage } from '~/utils/errors'
 
 const props = defineProps<{
   teamId: string
@@ -52,7 +53,7 @@ const load = async () => {
       avatar_path: profileById.get(r.user_id)?.avatar_path ?? null,
     }))
   } catch (err) {
-    error.value = (err as Error).message
+    error.value = errorMessage(err, 'Mitglieder konnten nicht geladen werden.')
   } finally {
     loading.value = false
   }
@@ -62,46 +63,47 @@ watch(() => props.teamId, load, { immediate: true })
 
 const trainerCount = computed(() => rows.value.filter((r) => r.role === 'trainer').length)
 
+// A team must keep at least one trainer, so the sole trainer cannot be demoted.
+const isLastTrainer = (row: Row) => row.role === 'trainer' && trainerCount.value === 1
+
 const changeRole = async (row: Row, next: 'trainer' | 'player') => {
   error.value = null
-  const { data, error: err } = await client
-    .from('memberships')
-    .update({ role: next })
-    .eq('team_id', props.teamId)
-    .eq('user_id', row.user_id)
-    .select('user_id')
-  if (err) {
-    error.value = /at least one trainer/i.test(err.message)
+  try {
+    const { data, error: err } = await client
+      .from('memberships')
+      .update({ role: next })
+      .eq('team_id', props.teamId)
+      .eq('user_id', row.user_id)
+      .select('user_id')
+    if (err) throw err
+    assertRowsAffected(data)
+    row.role = next
+  } catch (err) {
+    const message = errorMessage(err, 'Mitglied konnte nicht aktualisiert werden.')
+    error.value = /at least one trainer/i.test(message)
       ? 'Ein Team braucht mindestens einen Trainer.'
-      : err.message
-    return
+      : message
   }
-  if (!data || data.length === 0) {
-    error.value = 'Mitglied konnte nicht aktualisiert werden.'
-    return
-  }
-  row.role = next
 }
 
 const remove = async (row: Row) => {
   error.value = null
-  const { data, error: err } = await client
-    .from('memberships')
-    .delete()
-    .eq('team_id', props.teamId)
-    .eq('user_id', row.user_id)
-    .select('user_id')
-  if (err) {
-    error.value = /at least one trainer/i.test(err.message)
+  try {
+    const { data, error: err } = await client
+      .from('memberships')
+      .delete()
+      .eq('team_id', props.teamId)
+      .eq('user_id', row.user_id)
+      .select('user_id')
+    if (err) throw err
+    assertRowsAffected(data)
+    rows.value = rows.value.filter((r) => r.user_id !== row.user_id)
+  } catch (err) {
+    const message = errorMessage(err, 'Mitglied konnte nicht entfernt werden.')
+    error.value = /at least one trainer/i.test(message)
       ? 'Ein Team braucht mindestens einen Trainer.'
-      : err.message
-    return
+      : message
   }
-  if (!data || data.length === 0) {
-    error.value = 'Mitglied konnte nicht entfernt werden.'
-    return
-  }
-  rows.value = rows.value.filter((r) => r.user_id !== row.user_id)
 }
 
 const resetAvatar = async (row: Row) => {
@@ -110,7 +112,7 @@ const resetAvatar = async (row: Row) => {
     await moderateProfile({ target_user_id: row.user_id, team_id: props.teamId, field: 'avatar' })
     await load()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Avatar konnte nicht zurückgesetzt werden.'
+    error.value = errorMessage(err, 'Avatar konnte nicht zurückgesetzt werden.')
   }
 }
 
@@ -120,7 +122,7 @@ const resetName = async (row: Row) => {
     await moderateProfile({ target_user_id: row.user_id, team_id: props.teamId, field: 'name' })
     await load()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Name konnte nicht zurückgesetzt werden.'
+    error.value = errorMessage(err, 'Name konnte nicht zurückgesetzt werden.')
   }
 }
 
@@ -135,7 +137,9 @@ defineExpose({ reload: load })
     <ul v-else class="space-y-2">
       <li v-for="row in rows" :key="row.user_id">
         <ShadcnCard class="py-3">
-          <ShadcnCardContent class="flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between px-3">
+          <ShadcnCardContent
+            class="flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between px-3"
+          >
             <div class="flex items-center gap-3 text-sm">
               <img
                 v-if="row.avatar_path"
@@ -154,19 +158,28 @@ defineExpose({ reload: load })
               <div>
                 <p class="font-medium text-foreground">
                   {{ row.display_name ?? row.user_id }}
-                  <span v-if="row.user_id === currentUser?.sub" class="text-xs text-muted-foreground">(du)</span>
+                  <span
+                    v-if="row.user_id === currentUser?.sub"
+                    class="text-xs text-muted-foreground"
+                    >(du)</span
+                  >
                 </p>
-                <p class="text-muted-foreground">{{ row.role === 'trainer' ? 'Trainer' : 'Spieler' }}</p>
+                <p class="text-muted-foreground">
+                  {{ row.role === 'trainer' ? 'Trainer' : 'Spieler' }}
+                </p>
               </div>
             </div>
             <div v-if="isTrainer" class="flex flex-wrap gap-2">
               <select
                 :value="row.role"
                 class="min-h-touch px-2 rounded-md border border-input bg-background text-sm"
-                @change="(e) => changeRole(row, (e.target as HTMLSelectElement).value as 'trainer' | 'player')"
+                @change="
+                  (e) =>
+                    changeRole(row, (e.target as HTMLSelectElement).value as 'trainer' | 'player')
+                "
               >
-                <option value="player">Spieler</option>
-                <option value="trainer" :disabled="row.role === 'trainer' && trainerCount === 1">Trainer</option>
+                <option value="player" :disabled="isLastTrainer(row)">Spieler</option>
+                <option value="trainer">Trainer</option>
               </select>
               <ShadcnButton
                 type="button"

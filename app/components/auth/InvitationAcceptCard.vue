@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { errorMessage } from '~/utils/errors'
 
 type Invitation = {
   token: string
@@ -47,8 +48,7 @@ const submit = async () => {
       await navigateTo('/')
     }
   } catch (err) {
-    const e = err as { statusCode?: number; statusMessage?: string; message?: string }
-    error.value = e.statusMessage ?? e.message ?? 'Einladung konnte nicht angenommen werden.'
+    error.value = errorMessage(err, 'Einladung konnte nicht angenommen werden.')
   } finally {
     loading.value = false
   }

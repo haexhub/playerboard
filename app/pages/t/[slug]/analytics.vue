@@ -28,10 +28,14 @@ const load = async () => {
   isLoading.value = true
   loadError.value = null
   try {
-    ;[matches.value, syncStatus.value] = await Promise.all([
+    const [matchesResult, statusResult] = await Promise.allSettled([
       listMatches(teamId),
       getSyncStatus(teamId),
     ])
+    // A failed status fetch must not hide the match list.
+    syncStatus.value = statusResult.status === 'fulfilled' ? statusResult.value : null
+    if (matchesResult.status === 'rejected') throw matchesResult.reason
+    matches.value = matchesResult.value
   } catch (err) {
     loadError.value = err instanceof Error ? err.message : 'Konnte Veo-Daten nicht laden'
   } finally {

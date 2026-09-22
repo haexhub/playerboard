@@ -3,12 +3,11 @@ import { reactive, ref } from 'vue'
 import { useTrainingPhotos, type TrainingPhotoView } from '~/composables/useTrainingPhotos'
 import { PHOTO_MIME_TYPES } from '~/utils/validators'
 
-const props = defineProps<{ trainingId: string; teamId: string }>()
-const emit = defineEmits<{ uploaded: [count: number] }>()
+const props = defineProps<{ trainingId: string; teamId: string; photos: TrainingPhotoView[] }>()
+const emit = defineEmits<{ uploaded: [] }>()
 
-const { upload, list } = useTrainingPhotos()
+const { upload } = useTrainingPhotos()
 
-const photos = ref<TrainingPhotoView[]>([])
 const inputRef = ref<HTMLInputElement | null>(null)
 
 type FileState = {
@@ -19,15 +18,6 @@ type FileState = {
 }
 const queued = reactive<FileState[]>([])
 const isBusy = ref(false)
-const reloadError = ref<string | null>(null)
-
-const reload = async () => {
-  photos.value = await list(props.trainingId)
-}
-
-defineExpose({ reload, photos })
-
-await reload()
 
 const handlePick = async (evt: Event) => {
   const input = evt.target as HTMLInputElement
@@ -36,8 +26,6 @@ const handlePick = async (evt: Event) => {
   input.value = ''
   isBusy.value = true
   let anyOk = false
-  let uploadedCount = 0
-  reloadError.value = null
   for (const file of files) {
     const state: FileState = {
       name: file.name,
@@ -49,20 +37,13 @@ const handlePick = async (evt: Event) => {
       await upload(props.trainingId, props.teamId, file)
       state.progress = 'done'
       anyOk = true
-      uploadedCount += 1
     } catch (err) {
       state.progress = 'error'
       state.error = err instanceof Error ? err.message : 'Upload fehlgeschlagen'
     }
   }
-  try {
-    await reload()
-  } catch (err) {
-    reloadError.value = err instanceof Error ? err.message : 'Fotos konnten nicht geladen werden'
-  } finally {
-    if (anyOk) emit('uploaded', uploadedCount)
-    isBusy.value = false
-  }
+  isBusy.value = false
+  if (anyOk) emit('uploaded')
 }
 
 const openPicker = () => inputRef.value?.click()
@@ -80,7 +61,7 @@ const humanSize = (bytes: number) => {
       <div>
         <h2 class="text-lg font-semibold text-neutral-900">Fotos</h2>
         <p class="text-sm text-neutral-600">
-          Mindestens 1 Foto ist Pflicht. JPEG, PNG, HEIC/HEIF oder WebP · bis 10 MB.
+          JPEG, PNG, HEIC/HEIF oder WebP · bis 10 MB.
         </p>
       </div>
       <button
@@ -137,9 +118,6 @@ const humanSize = (bytes: number) => {
 
     <p v-if="photos.length === 0" class="text-sm text-neutral-500" data-testid="photo-empty-hint">
       Noch keine Fotos hochgeladen.
-    </p>
-    <p v-if="reloadError" class="text-sm text-red-700" role="alert">
-      {{ reloadError }}
     </p>
   </section>
 </template>

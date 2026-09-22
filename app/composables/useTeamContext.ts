@@ -23,7 +23,9 @@ export const useTeamContext = () => {
       if (error) throw error
       return data ?? []
     },
-    { watch: [user] },
+    // Watch the user id, not the ref: @nuxtjs/supabase assigns a fresh claims
+    // object on every page:start, which would refetch on each navigation.
+    { watch: [() => user.value?.sub] },
   )
 
   const currentMembership = computed(() => {

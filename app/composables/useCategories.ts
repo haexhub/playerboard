@@ -1,4 +1,5 @@
 import type { Database } from '~/types/database'
+import { assertRowsAffected } from '~/utils/errors'
 
 export type ActiveCategory = {
   id: string
@@ -51,8 +52,13 @@ export const useCategories = () => {
     id: string,
     payload: Partial<{ name: string; value_min: number; value_max: number; sort_order: number; active: boolean }>,
   ) => {
-    const { error } = await client.from('point_categories').update(payload).eq('id', id)
+    const { data, error } = await client
+      .from('point_categories')
+      .update(payload)
+      .eq('id', id)
+      .select('id')
     if (error) throw error
+    assertRowsAffected(data)
   }
 
   const deactivate = async (id: string) => {
@@ -77,8 +83,9 @@ export const useCategories = () => {
   }
 
   const remove = async (id: string) => {
-    const { error } = await client.from('point_categories').delete().eq('id', id)
+    const { data, error } = await client.from('point_categories').delete().eq('id', id).select('id')
     if (error) throw error
+    assertRowsAffected(data)
   }
 
   return { listActive, listAll, create, update, deactivate, reorder, hasEntries, remove }

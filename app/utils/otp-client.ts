@@ -13,23 +13,18 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 // One shared instance: it holds no per-user state, and creating a new one per
 // call would make supabase-js warn about multiple GoTrueClient instances.
 let otpClient: SupabaseClient | undefined
-let otpClientId = ''
 
 export const getOtpClient = (url: string, key: string): SupabaseClient => {
-  const id = `${url}|${key}`
-  if (!otpClient || otpClientId !== id) {
-    otpClient = createClient(url, key, {
-      auth: {
-        flowType: 'implicit',
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-        // Own storage key so this client is not counted as a second instance
-        // of the app's session client.
-        storageKey: 'ifa:otp-request',
-      },
-    })
-    otpClientId = id
-  }
+  otpClient ??= createClient(url, key, {
+    auth: {
+      flowType: 'implicit',
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      // Own storage key so this client is not counted as a second instance
+      // of the app's session client.
+      storageKey: 'ifa:otp-request',
+    },
+  })
   return otpClient
 }

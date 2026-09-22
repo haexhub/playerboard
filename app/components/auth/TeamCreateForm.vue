@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { z } from 'zod'
+import { errorMessage, isUniqueViolation } from '~/utils/errors'
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Bitte Team-Name eingeben.').max(80),
@@ -39,11 +40,10 @@ const submit = async () => {
     const res = await createTeam(parsed.data)
     await navigateTo(`/t/${res.slug}`)
   } catch (err) {
-    const e = err as { statusCode?: number; statusMessage?: string; message?: string }
-    if (e.statusCode === 409) {
+    if (isUniqueViolation(err)) {
       fieldErrors.value.slug = 'Dieser Slug ist bereits vergeben.'
     } else {
-      submitError.value = e.statusMessage ?? e.message ?? 'Team konnte nicht angelegt werden.'
+      submitError.value = errorMessage(err, 'Team konnte nicht angelegt werden.')
     }
   } finally {
     loading.value = false

@@ -8,6 +8,9 @@ import TrainingPointGrid from '~/components/trainings/TrainingPointGrid.vue'
 import { useCategories, type ActiveCategory } from '~/composables/useCategories'
 import { usePlayers, type ActivePlayer } from '~/composables/usePlayers'
 import { useTrainings, type TrainingRow } from '~/composables/useTrainings'
+import { useTrainingPhotos, type TrainingPhotoView } from '~/composables/useTrainingPhotos'
+import { isoDate } from '~/utils/dates'
+import { trainingDateSchema } from '~/utils/validators'
 
 definePageMeta({
   middleware: ['team-context', 'trainer-only'],
@@ -20,9 +23,9 @@ const slug = computed(() => currentTeam.value?.slug ?? '')
 const { listActive: listPlayers } = usePlayers()
 const { listActive: listCategories } = useCategories()
 const { createDraft, save } = useTrainings()
+const { list: listPhotos } = useTrainingPhotos()
 
-const today = new Date()
-const isoToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+const isoToday = isoDate(new Date())
 
 const training = ref<TrainingRow | null>(null)
 const players = ref<ActivePlayer[]>([])
@@ -76,6 +79,19 @@ const onPlayerSaved = async () => {
     players.value = await listPlayers(teamId.value)
   } catch (err) {
     playersError.value = err instanceof Error ? err.message : 'Spieler konnten nicht aktualisiert werden'
+  }
+}
+
+const photos = ref<TrainingPhotoView[]>([])
+const photosError = ref<string | null>(null)
+
+const loadPhotos = async () => {
+  if (!training.value) return
+  photosError.value = null
+  try {
+    photos.value = await listPhotos(training.value.id)
+  } catch (err) {
+    photosError.value = err instanceof Error ? err.message : 'Fotos konnten nicht geladen werden'
   }
 }
 
@@ -134,6 +150,11 @@ watch(
 const onSave = async () => {
   if (!training.value) return
   saveError.value = null
+  const parsedDate = trainingDateSchema.safeParse(date.value)
+  if (!parsedDate.success) {
+    saveError.value = parsedDate.error.issues[0]?.message ?? 'Ungültiges Datum'
+    return
+  }
   isSaving.value = true
   try {
     await save(training.value.id, {
@@ -242,7 +263,10 @@ const onSave = async () => {
       v-if="training && teamId"
       :training-id="training.id"
       :team-id="teamId"
+      :photos="photos"
+      @uploaded="loadPhotos"
     />
+    <p v-if="photosError" class="text-sm text-destructive" role="alert">{{ photosError }}</p>
 
     <ShadcnButton :disabled="!canSave" data-testid="training-save-button" @click="onSave">
       {{ isSaving ? 'Speichere…' : 'Speichern' }}

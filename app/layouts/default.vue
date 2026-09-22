@@ -1,23 +1,11 @@
 <script setup lang="ts">
 import { Menu } from '@lucide/vue'
-import { ref } from 'vue'
 import TeamSwitcher from '~/components/team/TeamSwitcher.vue'
 
 const user = useSupabaseUser()
-const client = useSupabaseClient()
-const signOutError = ref<string | null>(null)
+const { signOut, signOutError } = useAuth()
 
 const { currentSlug, isTrainer } = useTeamContext()
-
-const signOut = async () => {
-  signOutError.value = null
-  const { error } = await client.auth.signOut()
-  if (error) {
-    signOutError.value = 'Abmelden fehlgeschlagen. Bitte versuche es erneut.'
-    return
-  }
-  await navigateTo('/login')
-}
 </script>
 
 <template>

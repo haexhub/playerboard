@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import RankingTable from '~/components/stats/RankingTable.vue'
 import TimeframePicker from '~/components/stats/TimeframePicker.vue'
-import { useRanking, type TeamRanking } from '~/composables/useRanking'
-import { useTeamSettings } from '~/composables/useTeamSettings'
-import { useTimeframe } from '~/composables/useTimeframe'
+import { useTimeframedRanking } from '~/composables/useRanking'
 import type { Database } from '~/types/database'
 
 definePageMeta({
@@ -17,62 +15,26 @@ const client = useSupabaseClient<Database>()
 const teamId = computed(() => currentTeam.value?.id ?? '')
 const slug = computed(() => currentSlug.value ?? '')
 
-const { getTeamRanking } = useRanking()
-const { get: getSettings } = useTeamSettings()
-
-const seasonStart = ref<string | null>(null)
-if (teamId.value) {
-  const s = await getSettings(teamId.value)
-  seasonStart.value = s?.season_start ?? null
-}
-
-const timeframe = useTimeframe(slug, seasonStart)
+const { timeframe, seasonStart, ranking, isLoading, loadError } = await useTimeframedRanking(
+  teamId,
+  slug,
+)
 
 const linkedPlayerId = ref<string | null>(null)
-const ranking = ref<TeamRanking | null>(null)
-const isLoading = ref(false)
-const loadError = ref<string | null>(null)
-let latestLoad = 0
 
 const loadLinkedPlayer = async () => {
   if (!teamId.value || !user.value) return
-  const { data } = await client
+  const { data, error } = await client
     .from('players')
     .select('id')
     .eq('team_id', teamId.value)
     .eq('linked_user_id', user.value.sub)
     .maybeSingle()
-  linkedPlayerId.value = (data as { id: string } | null)?.id ?? null
-}
-
-const load = async () => {
-  if (!teamId.value) return
-  const loadId = ++latestLoad
-  isLoading.value = true
-  loadError.value = null
-  try {
-    const nextRanking = await getTeamRanking(
-      teamId.value,
-      timeframe.range.value.from,
-      timeframe.range.value.to,
-    )
-    if (loadId === latestLoad) ranking.value = nextRanking
-  } catch (err) {
-    if (loadId === latestLoad) {
-      loadError.value = err instanceof Error ? err.message : 'Konnte Rangliste nicht laden'
-    }
-  } finally {
-    if (loadId === latestLoad) isLoading.value = false
-  }
+  if (error) throw error
+  linkedPlayerId.value = data?.id ?? null
 }
 
 await loadLinkedPlayer()
-
-watch(
-  () => [teamId.value, timeframe.range.value.from, timeframe.range.value.to],
-  () => void load(),
-  { immediate: true },
-)
 
 const myRow = computed(() =>
   linkedPlayerId.value
@@ -158,7 +120,7 @@ const topThree = computed(() => ranking.value?.rows.slice(0, 3) ?? [])
     </section>
 
     <RankingTable
-      v-if="isTrainer && !loadError"
+      v-if="isTrainer && !isLoading && !loadError"
       :ranking="ranking"
       :slug="slug"
       :link-players="true"

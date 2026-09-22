@@ -34,6 +34,7 @@ if (teamId.value) {
 
 type PlayerInfo = {
   id: string
+  team_id: string
   name: string
   jersey_number: number | null
   position: string | null
@@ -51,41 +52,38 @@ let latestLoad = 0
 const timeframe = useTimeframe(slug, seasonStart)
 
 const loadStatic = async () => {
-  const [{ data: p }, cs, activePlayers] = await Promise.all([
-    client
-      .from('players')
-      .select('id, name, jersey_number, position')
-      .eq('id', playerId)
-      .eq('team_id', teamId.value)
-      .maybeSingle(),
-    teamId.value ? listCategories(teamId.value) : Promise.resolve([]),
-    teamId.value ? listPlayers(teamId.value) : Promise.resolve([]),
-  ])
-  player.value = (p as PlayerInfo) ?? null
+  // Fetch by id only (RLS scopes it) and take team_id from the row: the team
+  // context's membership lookup can still be in flight on a first SSR visit,
+  // and filtering on its empty id would render "nicht gefunden" for a real player.
+  const { data: p, error } = await client
+    .from('players')
+    .select('id, team_id, name, jersey_number, position')
+    .eq('id', playerId)
+    .maybeSingle()
+  if (error) throw error
+  player.value = p
+  if (!p) return
+  const [cs, activePlayers] = await Promise.all([listCategories(p.team_id), listPlayers(p.team_id)])
   categories.value = cs
   activePlayerIds.value = activePlayers.map(({ id }) => id)
 }
 
 const loadTimeframed = async () => {
-  if (!teamId.value || !player.value) return
+  if (!player.value) return
+  const { team_id } = player.value
   const loadId = ++latestLoad
   isLoading.value = true
   loadError.value = null
   try {
     const [s, teamStats, series] = await Promise.all([
-      forPlayer(teamId.value, playerId, timeframe.range.value.from, timeframe.range.value.to),
+      forPlayer(team_id, playerId, timeframe.range.value.from, timeframe.range.value.to),
       teamStatsForActivePlayers(
-        teamId.value,
+        team_id,
         timeframe.range.value.from,
         timeframe.range.value.to,
         activePlayerIds.value,
       ),
-      playerTimeSeries(
-        teamId.value,
-        playerId,
-        timeframe.range.value.from,
-        timeframe.range.value.to,
-      ),
+      playerTimeSeries(team_id, playerId, timeframe.range.value.from, timeframe.range.value.to),
     ])
     if (loadId !== latestLoad) return
     scores.value = s.map((row) => {

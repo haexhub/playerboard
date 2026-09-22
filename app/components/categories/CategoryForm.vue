@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { z } from 'zod'
+import { errorMessage, isUniqueViolation } from '~/utils/errors'
 
 const props = defineProps<{
   teamId: string
@@ -95,11 +96,10 @@ const submit = async () => {
     }
     emit('saved')
   } catch (err) {
-    const e = err as { code?: string; statusCode?: number; statusMessage?: string; message?: string }
-    if (e.code === '23505') {
+    if (isUniqueViolation(err)) {
       submitError.value = 'Eine Kategorie mit diesem Namen existiert in diesem Team bereits.'
     } else {
-      submitError.value = e.statusMessage ?? e.message ?? 'Kategorie konnte nicht gespeichert werden.'
+      submitError.value = errorMessage(err, 'Kategorie konnte nicht gespeichert werden.')
     }
   } finally {
     loading.value = false

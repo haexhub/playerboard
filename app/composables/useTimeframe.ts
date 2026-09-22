@@ -1,4 +1,5 @@
 import { computed, ref, watch, type Ref } from 'vue'
+import { isoDate } from '~/utils/dates'
 
 export type TimeframePreset = 'last-4-weeks' | 'season' | 'custom'
 
@@ -7,9 +8,6 @@ export type TimeframeRange = {
   from: string
   to: string
 }
-
-const isoDate = (d: Date): string =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 const storageKey = (slug: string) => `ifa:timeframe:${slug}`
 
