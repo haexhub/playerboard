@@ -47,7 +47,10 @@ export const captureSessionViaLogin = async (email: string, password: string): P
 
     await Promise.all([
       page
-        .waitForURL((url) => url.hostname === 'app.veo.co', { timeout: LOGIN_TIMEOUT_MS })
+        .waitForURL(
+          (url) => url.hostname === 'app.veo.co' && !url.pathname.startsWith('/accounts/login'),
+          { timeout: LOGIN_TIMEOUT_MS },
+        )
         .catch(() => undefined),
       passwordInput.press('Enter'),
     ])

@@ -14,13 +14,13 @@ NUXT_VEO_SYNC_SECRET=<random shared secret, used by the cron call>
 NUXT_VEO_LINK_TOKEN_SECRET=<random secret, signs the short-lived token between /api/veo/login and /api/veo/link>
 ```
 
-`NUXT_VEO_LINK_TOKEN_SECRET` signs the ~5-minute token that carries the
-freshly captured session cookie from `POST /api/veo/login`'s response to
-`POST /api/veo/link`'s request body, so the raw cookie is never sent to the
-browser in plaintext (see [research.md §9](./research.md#9-interactive-login-headless-browser)).
-Unlike the credential itself, this secret has no confidentiality
-requirement beyond "not guessable" — it never identifies a specific team or
-session on its own.
+`NUXT_VEO_LINK_TOKEN_SECRET` encrypts and signs the ~5-minute token that
+carries the freshly captured session cookie from `POST /api/veo/login`'s
+response to `POST /api/veo/link`'s request body. The browser receives only an
+opaque token and cannot decode the raw cookie (see [research.md §9](./research.md#9-interactive-login-headless-browser)).
+Generate a high-entropy secret and keep it confidential: anyone who obtains it
+could forge a valid token and replace the stored session cookie for a team they
+can otherwise access as a trainer.
 
 ## Local development — no live Veo dependency
 
@@ -49,11 +49,12 @@ team's Veo settings page (`/t/[slug]/team/veo`), enters their own Veo email
 and password, picks the matching club/team from the list the app fetches
 from their real Veo account, and confirms — see spec.md's User Story 4 and
 Clarifications (2026-09-22). This single action does what the two manual
-steps below used to require: it inserts/updates both `veo_team_mappings`
-(club/team slug, `enabled = true`) and `veo_sync_credentials` (the resulting
-session cookie), scoped to that trainer's own team by RLS
-([contracts/rls-policies.md](./contracts/rls-policies.md)). No deployment
-operator, no direct SQL, no platform-admin step.
+steps below used to require: it inserts/updates `veo_team_mappings`
+(club/team slug, `enabled = true`), whose trainer-scoped access is protected by
+RLS, and persists the session cookie in `veo_sync_credentials` through the
+authorized server route (`useAdminDb()` plus `requireTrainer()`). The credential
+table remains deny-all to authenticated clients. No deployment operator, no
+direct SQL, no platform-admin step.
 
 To re-establish a session once `veo_sync_status.consecutive_failures`
 indicates it has stopped renewing, the trainer just repeats the same flow.

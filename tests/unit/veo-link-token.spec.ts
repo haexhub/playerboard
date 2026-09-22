@@ -8,6 +8,10 @@ describe('createLinkToken / verifyLinkToken', () => {
     const payload = { teamId: 'team-1', sessionCookie: 'cookie-value', exp: Date.now() + 60_000 }
     const token = createLinkToken(payload, SECRET)
     expect(verifyLinkToken(token, SECRET)).toEqual(payload)
+    expect(token).not.toContain(payload.sessionCookie)
+    const encodedPayload = token.split('.')[0]
+    expect(encodedPayload).toBeDefined()
+    expect(() => JSON.parse(Buffer.from(encodedPayload!, 'base64url').toString('utf8'))).toThrow()
   })
 
   it('rejects a token signed with a different secret', () => {
@@ -19,13 +23,12 @@ describe('createLinkToken / verifyLinkToken', () => {
   it('rejects a tampered payload even if the signature format still parses', () => {
     const payload = { teamId: 'team-1', sessionCookie: 'cookie-value', exp: Date.now() + 60_000 }
     const token = createLinkToken(payload, SECRET)
-    const [json, signature] = token.split('.')
+    const [, signature] = token.split('.')
     const tamperedPayload = Buffer.from(
       JSON.stringify({ ...payload, teamId: 'team-2' }),
       'utf8',
     ).toString('base64url')
     expect(() => verifyLinkToken(`${tamperedPayload}.${signature}`, SECRET)).toThrow()
-    void json
   })
 
   it('rejects an expired token', () => {

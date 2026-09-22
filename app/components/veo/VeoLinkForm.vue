@@ -20,7 +20,11 @@ const { getCurrentMapping, login, link } = useVeoLink()
 type Step = 'credentials' | 'select' | 'done'
 const step = ref<Step>('credentials')
 
-const currentMapping = ref<{ veo_club_slug: string; veo_team_slug: string; enabled: boolean } | null>(null)
+const currentMapping = ref<{
+  veo_club_slug: string
+  veo_team_slug: string
+  enabled: boolean
+} | null>(null)
 onMounted(async () => {
   currentMapping.value = await getCurrentMapping(props.teamId)
 })
@@ -123,7 +127,9 @@ const startOver = () => {
           autocomplete="username"
           data-testid="veo-link-email-input"
         />
-        <span v-if="fieldErrors.email" class="block text-sm text-destructive">{{ fieldErrors.email }}</span>
+        <span v-if="fieldErrors.email" class="block text-sm text-destructive">{{
+          fieldErrors.email
+        }}</span>
       </ShadcnLabel>
       <ShadcnLabel class="block space-y-1">
         <span>Veo Passwort</span>

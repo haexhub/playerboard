@@ -23,7 +23,11 @@ test.describe('API negative — unauthenticated callers', () => {
     request,
   }) => {
     const login = await request.post('/api/veo/login', {
-      data: { team_id: '00000000-0000-0000-0000-000000000000', email: 'x@example.com', password: 'x' },
+      data: {
+        team_id: '00000000-0000-0000-0000-000000000000',
+        email: 'x@example.com',
+        password: 'x',
+      },
     })
     expect(login.status()).toBe(401)
 

@@ -2,6 +2,8 @@ import { z } from 'zod'
 import { serverSupabaseUser } from '#supabase/server'
 import { requireTrainer, schema, useAdminDb } from '~/server/utils/db'
 import { pgError } from '~/server/utils/pg-error'
+import { exchangeSessionCookieForToken } from '~/server/utils/veo/auth'
+import { listClubTeams, listOwnClubs } from '~/server/utils/veo/client'
 import { verifyLinkToken } from '~/server/utils/veo/linkToken'
 
 const bodySchema = z.object({
@@ -34,6 +36,44 @@ export default defineEventHandler(async (event) => {
   }
 
   const db = useAdminDb()
+  await requireTrainer(db, team_id, user.sub)
+
+  let accessToken: string
+  try {
+    accessToken = await exchangeSessionCookieForToken(payload.sessionCookie)
+  } catch {
+    throw createError({ statusCode: 400, statusMessage: 'Veo session is invalid or expired' })
+  }
+
+  let club: Awaited<ReturnType<typeof listOwnClubs>>[number] | undefined
+  try {
+    club = (await listOwnClubs(accessToken)).find(({ slug }) => slug === veo_club_slug)
+  } catch {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Could not validate the Veo club selection',
+    })
+  }
+  if (!club) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Veo club is not available for this account',
+    })
+  }
+
+  let teams: Awaited<ReturnType<typeof listClubTeams>>
+  try {
+    teams = await listClubTeams(accessToken, club.slug)
+  } catch {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Could not validate the Veo team selection',
+    })
+  }
+  if (!teams.some(({ slug }) => slug === veo_team_slug)) {
+    throw createError({ statusCode: 400, statusMessage: 'Veo team is not available for this club' })
+  }
+
   // Not RLS-enforced: veo_sync_credentials deliberately has no select policy
   // for anyone, so Postgres can't resolve ON CONFLICT DO UPDATE against it
   // under RLS (conflict detection needs row-visibility, which would mean
@@ -45,12 +85,15 @@ export default defineEventHandler(async (event) => {
   // real and still enforced for any other caller (see contracts/rls-policies.md
   // and the rls-negative-*.spec.ts positive/negative controls).
   try {
-    await requireTrainer(db, team_id, user.sub)
-
     await db.transaction(async (tx) => {
       await tx
         .insert(schema.veoTeamMappings)
-        .values({ teamId: team_id, veoClubSlug: veo_club_slug, veoTeamSlug: veo_team_slug, enabled: true })
+        .values({
+          teamId: team_id,
+          veoClubSlug: veo_club_slug,
+          veoTeamSlug: veo_team_slug,
+          enabled: true,
+        })
         .onConflictDoUpdate({
           target: schema.veoTeamMappings.teamId,
           set: {
@@ -66,7 +109,11 @@ export default defineEventHandler(async (event) => {
         .values({ teamId: team_id, sessionCookie: payload.sessionCookie, capturedAt: new Date() })
         .onConflictDoUpdate({
           target: schema.veoSyncCredentials.teamId,
-          set: { sessionCookie: payload.sessionCookie, capturedAt: new Date(), updatedAt: new Date() },
+          set: {
+            sessionCookie: payload.sessionCookie,
+            capturedAt: new Date(),
+            updatedAt: new Date(),
+          },
         })
     })
   } catch (err) {

@@ -21,9 +21,10 @@ Which team is enabled is itself an explicit, authenticated decision
 the original v1 plan below gated both the team-mapping table and the
 credential table behind manual SQL, pending a separate "Platform-Administration"
 feature. That gate has been replaced by trainer self-service instead:
-`is_trainer(team_id)` RLS policies let a trainer manage their own team's
-row directly, through a two-step login+link flow (`POST /api/veo/login`,
-`POST /api/veo/link`) that also adds one new runtime dependency
+`veo_team_mappings` has `is_trainer(team_id)` RLS policies, while the
+credential write is authorized by the server route with `requireTrainer()` and
+`useAdminDb()`. The two-step login+link flow (`POST /api/veo/login`,
+`POST /api/veo/link`) also adds one new runtime dependency
 (Playwright/Chromium, for the interactive login step only — see
 [research.md §9](./research.md#9-interactive-login-headless-browser)). The
 rest of this plan (sync route, schema shape, testing strategy) is
@@ -38,7 +39,7 @@ unchanged.
 **Target Platform**: Existing web app, plus one new server-triggered route invoked by an OS-level cron entry on the production VPS (no new deployment target).
 **Project Type**: Web application — extends the existing single Nuxt project.
 **Performance Goals**: Daily batch sync completes well within its interval; no live-fetch latency on page view since data is pre-stored. No new performance targets beyond the existing app's.
-**Constraints**: RLS mandatory (Principle II) on all five new tables, with at least one policy per table. `veo_matches`/`veo_match_stats`/`veo_sync_status` stay read-only for members, written only by `useAdminDb()`. `veo_team_mappings`/`veo_sync_credentials` are, since 2026-09-22, `is_trainer(team_id)`-gated for `insert`/`update` (and `select` on the mappings table only) — see [contracts/rls-policies.md](./contracts/rls-policies.md). No Veo credentials in `.env`/repo; the trainer's password specifically is never persisted anywhere (see [research.md §4](./research.md#4-credential-storage), [§9](./research.md#9-interactive-login-headless-browser)). The data source is an undocumented, unsupported private API — sync MUST fail closed (never fabricate data, FR-007) and MUST surface staleness within a day (FR-009/SC-003).
+**Constraints**: RLS mandatory (Principle II) on all five new tables, with at least one policy per table. `veo_matches`/`veo_match_stats`/`veo_sync_status` stay read-only for members, written only by `useAdminDb()`. `veo_team_mappings` is `is_trainer(team_id)`-gated for `insert`/`update`/`select`; `veo_sync_credentials` remains deny-all to `authenticated` clients and is written only through the authorized server transaction (`useAdminDb()` plus `requireTrainer()`) — see [contracts/rls-policies.md](./contracts/rls-policies.md). No Veo credentials in `.env`/repo; the trainer's password specifically is never persisted anywhere (see [research.md §4](./research.md#4-credential-storage), [§9](./research.md#9-interactive-login-headless-browser)). The data source is an undocumented, unsupported private API — sync MUST fail closed (never fabricate data, FR-007) and MUST surface staleness within a day (FR-009/SC-003).
 **Scale/Scope**: One team, ~20–60 matches/season, ~28 stat rows/match — negligible data volume.
 
 ## Constitution Check
@@ -50,7 +51,7 @@ Constitution v1.1.0 ([`.specify/memory/constitution.md`](../../.specify/memory/c
 | Principle | Gate | Status |
 |---|---|---|
 | **I. Simplicity First** (NON-NEGOTIABLE) | No new abstraction/service without present-day need; reuse existing patterns. | ✅ Pass. No new dependency, no new deployment target (rejected Supabase Edge Functions and an in-process scheduler in favor of plain OS cron + a Nitro route — [research.md §1](./research.md#1-where-does-the-periodic-sync-run)); team mapping moved from fixed config to a table only because an explicit clarified requirement (admin-controlled enablement) needs it — the admin *UI* for it is explicitly deferred to a later feature rather than built here ([research.md §5](./research.md#5-team-mapping-veo-team--playerboard-team)); season totals are computed on read, not a precomputed table ([research.md §6](./research.md#6-season-aggregation-user-story-2)); the privileged-route shape (`useAdminDb()`, service_role-only writes) is reused as-is from `app/server/api/invitations/issue.post.ts` / `app/server/api/profile/moderate.post.ts`. |
-| **II. Role-Based Access via Supabase RLS** (NON-NEGOTIABLE) | Every table + at least one policy; cross-boundary access denied by policy, not app logic. | ✅ Pass. All five tables have RLS and a policy. `veo_matches`/`veo_match_stats`/`veo_sync_status` get membership- and enabled-mapping-gated read policies with no authenticated write policy (only `service_role` writes); `veo_sync_credentials` and `veo_team_mappings` get explicit deny-all policies for `authenticated`, so they remain service-role-only while satisfying the policy invariant. See [contracts/rls-policies.md](./contracts/rls-policies.md). |
+| **II. Role-Based Access via Supabase RLS** (NON-NEGOTIABLE) | Every table + at least one policy; cross-boundary access denied by policy, not app logic. | ✅ Pass. All five tables have RLS and a policy. `veo_matches`/`veo_match_stats`/`veo_sync_status` get membership- and enabled-mapping-gated read policies with no authenticated write policy (only `service_role` writes); `veo_team_mappings` gets trainer-scoped policies, while `veo_sync_credentials` remains explicitly deny-all for `authenticated` and is written only by the authorized server transaction. See [contracts/rls-policies.md](./contracts/rls-policies.md). |
 | **III. Konfigurierbare Punktekategorien** | N/A — feature does not touch point categories. | ✅ N/A |
 | **IV. Mobile-First UX** | New page usable on ≥360px portrait; ≥44px touch targets. | ✅ Pass. New `/t/[slug]/analytics` page reuses existing layout/typography and touch-target utility classes already used across `/t/[slug]/**`; match cards stack vertically on narrow screens like existing list views (e.g. `players/index.vue`). |
 | **V. Type Safety End-to-End** | Schema change → regenerate + commit Supabase types. | ✅ Pass. Five tables added via Drizzle + `pnpm gen:types`, same as every prior schema change in this project. |
@@ -94,8 +95,8 @@ app/
 └── server/
     ├── api/veo/
     │   ├── sync.post.ts              # shared-secret auth → for each enabled row in veo_team_mappings: refresh Veo session → fetch matches+stats → upsert → update veo_sync_status
-    │   ├── login.post.ts             # Phase 7: trainer session + is_trainer(team_id) check → headless login → club/team list + signed short-lived token
-    │   └── link.post.ts              # Phase 7: verifies the signed token → upserts veo_team_mappings + veo_sync_credentials via useUserDb (RLS-enforced)
+    │   ├── login.post.ts             # Phase 7: trainer session + requireTrainer() check → headless login → club/team list + encrypted/signed short-lived token
+    │   └── link.post.ts              # Phase 7: verifies the encrypted/signed token, revalidates the Veo club/team, then upserts both tables via useAdminDb() + requireTrainer()
     └── utils/veo/
         ├── auth.ts                   # PKCE + auth.veo.co silent-renewal (prompt=none); reads/writes veo_sync_credentials via useAdminDb
         ├── client.ts                 # typed fetch wrappers for GET .../matches/, POST .../analysis/stats/, and (Phase 7) GET .../clubs/, GET .../clubs/{slug}/teams/
@@ -107,7 +108,7 @@ db/schema/index.ts                     # + veoTeamMappings, veoMatches, veoMatch
 supabase/migrations/
 ├── <ts>_veo_tables.sql                    # drizzle-generated: create the 5 tables
 ├── <ts>_veo_tables_rls.sql                # hand-written: RLS enable + read policies (service_role writes only) — original v1 shape
-└── <ts>_veo_trainer_self_service.sql      # Phase 7, hand-written: replaces the deny-all policies on veo_team_mappings/veo_sync_credentials with is_trainer(team_id)-gated ones
+└── <ts>_veo_trainer_self_service.sql      # Phase 7, hand-written: replaces the deny-all policy on veo_team_mappings with is_trainer(team_id)-gated ones; veo_sync_credentials remains deny-all
 
 nuxt.config.ts                         # + runtimeConfig.veoSyncSecret, runtimeConfig.veoLinkTokenSecret (Phase 7) — no team/club config here, that lives in veo_team_mappings
 

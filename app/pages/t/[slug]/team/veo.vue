@@ -15,8 +15,8 @@ const teamId = computed(() => currentTeam.value?.id ?? '')
     <header class="space-y-1">
       <h1 class="text-2xl font-semibold text-neutral-900">Veo-Kamera verknüpfen</h1>
       <p class="text-neutral-600">
-        Verknüpfe {{ currentTeam?.name ?? 'dein Team' }} mit deinem Veo-Account, damit Spielergebnisse
-        und Statistiken automatisch übernommen werden.
+        Verknüpfe {{ currentTeam?.name ?? 'dein Team' }} mit deinem Veo-Account, damit
+        Spielergebnisse und Statistiken automatisch übernommen werden.
       </p>
     </header>
 

@@ -94,21 +94,22 @@ noticed within a day, not silently.
 ## 4. Credential storage
 
 **Decision**: The captured `auth.veo.co` session artifact is stored in a new
-table, `veo_sync_credentials`. **Updated 2026-09-22**: `select` stays closed
-to everyone but `useAdminDb()` (the credential itself is never exposed to
-any client), but `insert`/`update` are now gated to `authenticated` via
-`public.is_trainer(team_id)` instead of being closed entirely — see §9. The
-trainer's Veo *password* never reaches this table (or any table): it lives
-only in the request body and the headless-browser process's memory for the
-duration of `POST /api/veo/login`, then is discarded.
+table, `veo_sync_credentials`. `select`, `insert`, and `update` stay closed to
+`authenticated` clients: the credential is never exposed to a client, and
+Postgres cannot safely support the required upsert without row visibility.
+`POST /api/veo/link` therefore performs the write in an authorized server
+transaction with `useAdminDb()` and `requireTrainer()`, while
+`veo_team_mappings` uses trainer-scoped RLS. The trainer's Veo *password* never
+reaches this table (or any table): it lives only in the request body and the
+headless-browser process's memory for the duration of `POST /api/veo/login`,
+then is discarded.
 
 **Rationale**: Per explicit decision earlier in this project's brainstorming
 session, the credential must never live in `.env`/the repository. A
-service_role-only DB row reuses an access-control mechanism the project
-already has (RLS) instead of introducing a new one (e.g. Supabase Vault,
-external secret manager), and — unlike a static env var — can be rotated by
-re-running the one-time capture step and updating one row, without a
-redeploy.
+server-only DB row reuses the existing `useAdminDb()` route pattern instead of
+introducing a new mechanism (e.g. Supabase Vault or an external secret
+manager), and — unlike a static env var — can be rotated by repeating the
+trainer self-service flow and updating one row, without a redeploy.
 
 **Alternatives considered**: `runtimeConfig` env var — rejected as the
 explicit anti-pattern this plan is meant to avoid (redeploy-to-rotate,
