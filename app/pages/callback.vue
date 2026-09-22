@@ -115,13 +115,17 @@ const consumePkceCode = async (diag: CallbackDiag): Promise<boolean> => {
   return true
 }
 
+// Waits for `user.value`, not just for a session to exist. @nuxtjs/supabase
+// only populates useSupabaseUser() from its onAuthStateChange listener, one
+// getClaims() round trip after the session lands (see supabase.client.ts) --
+// finalize() reads user.value, so returning as soon as getSession() sees a
+// session (as this used to) can fire finalize() before that catches up, and
+// it silently no-ops on `if (!user.value) return`.
 const pollForSession = async () => {
   const deadline = Date.now() + 10_000
   while (Date.now() < deadline) {
     if (user.value) return true
-    const { data } = await client.auth.getSession()
-    if (data.session?.user) return true
-    await new Promise((r) => setTimeout(r, 200))
+    await new Promise((r) => setTimeout(r, 100))
   }
   return false
 }
