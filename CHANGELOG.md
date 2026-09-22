@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.4](https://github.com/haexhub/playerboard/compare/v0.3.3...v0.3.4) (2026-09-22)
+
+
+### Bug Fixes
+
+* **e2e:** make team-settings pending-state assertion reliable ([8772169](https://github.com/haexhub/playerboard/commit/8772169282938da3c73ffb991c9c0bc3ccd614a2))
+* **e2e:** make team-settings pending-state assertion reliable ([aefd6a7](https://github.com/haexhub/playerboard/commit/aefd6a7ab351316b3440d4cfbc6faa13196901c1))
+
 ## [0.3.3](https://github.com/haexhub/playerboard/compare/v0.3.2...v0.3.3) (2026-09-22)
 
 
