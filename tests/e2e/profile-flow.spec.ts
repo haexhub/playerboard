@@ -54,7 +54,11 @@ test.describe('US1 — member edits their own display name', () => {
     await signInWithMagicLink(page, email)
     await foundTeam(page, teamName, teamSlug)
 
-    await page.goto('/profile', { waitUntil: 'networkidle' })
+    // The profile is reachable from the menu, not only by URL.
+    await page.goto(`/t/${teamSlug}/dashboard`, { waitUntil: 'networkidle' })
+    await page.getByRole('button', { name: 'Menü öffnen' }).click()
+    await page.getByRole('link', { name: 'Profil' }).click()
+    await page.waitForURL(/\/profile$/)
     await expect(page.getByTestId('profile-page')).toBeVisible()
 
     // Too-short name is rejected, previous name kept.

@@ -162,4 +162,111 @@ describe('get_team_ranking', () => {
     expect(ranking.rows[0]!.rank_position).toBe(1)
     expect(ranking.rows[0]!.scores[catId]).toBe(0)
   })
+
+  // Two categories may share a sort_order. Without a tie-break the vector's
+  // element order is unspecified and rank() can compare different vectors on
+  // consecutive calls. Category id decides: the lower id is compared first.
+  it('breaks a sort_order tie by category id, in both the header and the rank', async () => {
+    const { ranking, lowId, highId, leader } = await runIsolated(async (tx) => {
+      const userId = crypto.randomUUID()
+      const teamId = crypto.randomUUID()
+      await tx`insert into auth.users (id) values (${userId})`
+      await tx`insert into public.teams (id, name, slug, created_by, last_updated_by)
+               values (${teamId}, 'Tie Team', ${'tie-' + userId.slice(0, 8)}, ${userId}, ${userId})`
+      await tx`insert into public.memberships (user_id, team_id, role)
+               values (${userId}, ${teamId}, 'trainer')`
+      const ids = [crypto.randomUUID(), crypto.randomUUID()].sort()
+      const lowId = ids[0]!
+      const highId = ids[1]!
+      for (const [id, name] of [
+        [highId, 'High'],
+        [lowId, 'Low'],
+      ] as const) {
+        await tx`insert into public.point_categories (id, team_id, name, active, sort_order, value_min, value_max)
+                 values (${id}, ${teamId}, ${name}, true, 1, 0, 10)`
+      }
+      // Each player leads in exactly one of the tied categories.
+      const leader = crypto.randomUUID()
+      const other = crypto.randomUUID()
+      for (const [id, jersey] of [
+        [leader, 1],
+        [other, 2],
+      ] as const) {
+        await tx`insert into public.players (id, team_id, name, jersey_number, active)
+                 values (${id}, ${teamId}, ${'P' + jersey}, ${jersey}, true)`
+      }
+      const today = new Date().toISOString().slice(0, 10)
+      const trainingId = crypto.randomUUID()
+      await tx`insert into public.trainings (id, team_id, date, status)
+               values (${trainingId}, ${teamId}, ${today}, 'saved')`
+      await tx`insert into public.point_entries (training_id, player_id, category_id, value) values
+               (${trainingId}, ${leader}, ${lowId}, 9), (${trainingId}, ${leader}, ${highId}, 1),
+               (${trainingId}, ${other}, ${lowId}, 1), (${trainingId}, ${other}, ${highId}, 9)`
+
+      await tx`select set_config('role', 'authenticated', true)`
+      await tx`select set_config('request.jwt.claims', ${JSON.stringify({ sub: userId, role: 'authenticated' })}, true)`
+      const [row] = await tx<[{ get_team_ranking: RankingResult }]>`
+        select public.get_team_ranking(${teamId}::uuid, ${today}::date, ${today}::date)
+      `
+      return { ranking: row!.get_team_ranking, lowId, highId, leader }
+    })
+
+    expect(ranking.categories.map((c) => c.id)).toEqual([lowId, highId])
+    expect(ranking.rows[0]).toMatchObject({ player_id: leader, rank_position: 1 })
+    expect(ranking.rows[1]!.rank_position).toBe(2)
+  })
+})
+
+describe('get_team_category_stats', () => {
+  // Mirrors what the player page used to compute client-side: the average and
+  // median of per-player sums, counting only players who scored in the category.
+  it('averages per-player sums over participants only', async () => {
+    const { stats, catId } = await runIsolated(async (tx) => {
+      const userId = crypto.randomUUID()
+      const teamId = crypto.randomUUID()
+      await tx`insert into auth.users (id) values (${userId})`
+      await tx`insert into public.teams (id, name, slug)
+               values (${teamId}, 'Stats Team', ${'stats-' + userId.slice(0, 8)})`
+      await tx`insert into public.memberships (user_id, team_id, role)
+               values (${userId}, ${teamId}, 'trainer')`
+      const catId = crypto.randomUUID()
+      await tx`insert into public.point_categories (id, team_id, name, active, sort_order, value_min, value_max)
+               values (${catId}, ${teamId}, 'Einsatz', true, 1, 0, 10)`
+
+      const scorer = crypto.randomUUID()
+      const zero = crypto.randomUUID()
+      const absent = crypto.randomUUID()
+      const inactive = crypto.randomUUID()
+      for (const id of [scorer, zero, absent, inactive]) {
+        await tx`insert into public.players (id, team_id, name, active)
+                 values (${id}, ${teamId}, ${'P-' + id.slice(0, 4)}, true)`
+      }
+      const today = new Date().toISOString().slice(0, 10)
+      const saved = crypto.randomUUID()
+      const draft = crypto.randomUUID()
+      await tx`insert into public.trainings (id, team_id, date, status) values
+               (${saved}, ${teamId}, ${today}, 'saved'), (${draft}, ${teamId}, ${today}, 'draft')`
+      await tx`insert into public.point_entries (training_id, player_id, category_id, value) values
+               (${saved}, ${scorer}, ${catId}, 4),
+               (${saved}, ${zero}, ${catId}, 0),
+               (${draft}, ${absent}, ${catId}, 9),
+               (${saved}, ${inactive}, ${catId}, 10)`
+      // Scored while active, deactivated afterwards: must drop out of the stats.
+      await tx`update public.players set active = false where id = ${inactive}`
+
+      await tx`select set_config('role', 'authenticated', true)`
+      await tx`select set_config('request.jwt.claims', ${JSON.stringify({ sub: userId, role: 'authenticated' })}, true)`
+      const stats = await tx<{ category_id: string; team_avg: string; team_median: number }[]>`
+        select * from public.get_team_category_stats(${teamId}::uuid, ${today}::date, ${today}::date)
+      `
+      return { stats, catId }
+    })
+
+    // Participants: scorer (4) and zero (0). Absent only has a draft entry,
+    // inactive is excluded, so both must not pull the numbers toward 9 or 10.
+    expect(stats).toHaveLength(1)
+    expect(stats[0]!.category_id).toBe(catId)
+    expect(Number(stats[0]!.team_avg)).toBe(2)
+    expect(Number(stats[0]!.team_median)).toBe(2)
+  })
 })

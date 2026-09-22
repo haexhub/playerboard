@@ -10,7 +10,7 @@ export type TrainingPhotoRow = {
   storage_path: string
   content_type: string
   size_bytes: number
-  uploaded_by: string
+  uploaded_by: string | null
   uploaded_at: string
 }
 

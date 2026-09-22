@@ -152,8 +152,12 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     setupPage(pageB)
     await foundTeam(pageB, emailB, `Veo B ${suffix}`, slugB)
 
-    // Team A sees both matches with the seeded stats, own vs. opponent.
-    await pageA.goto(`/t/${slugA}/analytics`, { waitUntil: 'networkidle' })
+    // Team A reaches the page through the menu and sees both matches with the
+    // seeded stats, own vs. opponent.
+    await pageA.goto(`/t/${slugA}/dashboard`, { waitUntil: 'networkidle' })
+    await pageA.getByRole('button', { name: 'Menü öffnen' }).click()
+    await pageA.getByRole('link', { name: 'Veo-Analytics' }).click()
+    await pageA.waitForURL(new RegExp(`/t/${slugA}/analytics$`))
     await expect(pageA.getByTestId('veo-analytics-page')).toBeVisible()
     const cards = pageA.getByTestId('veo-match-card')
     await expect(cards).toHaveCount(2)

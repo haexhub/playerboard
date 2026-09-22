@@ -4,7 +4,6 @@ import PlayerProgressChart from '~/components/stats/PlayerProgressChart.vue'
 import TimeframePicker from '~/components/stats/TimeframePicker.vue'
 import { useCategories, type ActiveCategory } from '~/composables/useCategories'
 import { usePlayerScores, type PlayerScoreWithTeamStats } from '~/composables/usePlayerScores'
-import { usePlayers } from '~/composables/usePlayers'
 import { useTeamSettings } from '~/composables/useTeamSettings'
 import { useTimeframe } from '~/composables/useTimeframe'
 import type { Database } from '~/types/database'
@@ -23,7 +22,6 @@ const slug = computed(() => currentSlug.value ?? '')
 
 const { listActive: listCategories } = useCategories()
 const { forPlayer, teamStatsForActivePlayers, playerTimeSeries } = usePlayerScores()
-const { listActive: listPlayers } = usePlayers()
 const { get: getSettings } = useTeamSettings()
 
 const seasonStart = ref<string | null>(null)
@@ -42,7 +40,6 @@ type PlayerInfo = {
 
 const player = ref<PlayerInfo | null>(null)
 const categories = ref<ActiveCategory[]>([])
-const activePlayerIds = ref<string[]>([])
 const scores = ref<PlayerScoreWithTeamStats[]>([])
 const timeSeries = ref<Map<string, { date: string; value: number }[]>>(new Map())
 const isLoading = ref(false)
@@ -63,9 +60,7 @@ const loadStatic = async () => {
   if (error) throw error
   player.value = p
   if (!p) return
-  const [cs, activePlayers] = await Promise.all([listCategories(p.team_id), listPlayers(p.team_id)])
-  categories.value = cs
-  activePlayerIds.value = activePlayers.map(({ id }) => id)
+  categories.value = await listCategories(p.team_id)
 }
 
 const loadTimeframed = async () => {
@@ -77,12 +72,7 @@ const loadTimeframed = async () => {
   try {
     const [s, teamStats, series] = await Promise.all([
       forPlayer(team_id, playerId, timeframe.range.value.from, timeframe.range.value.to),
-      teamStatsForActivePlayers(
-        team_id,
-        timeframe.range.value.from,
-        timeframe.range.value.to,
-        activePlayerIds.value,
-      ),
+      teamStatsForActivePlayers(team_id, timeframe.range.value.from, timeframe.range.value.to),
       playerTimeSeries(team_id, playerId, timeframe.range.value.from, timeframe.range.value.to),
     ])
     if (loadId !== latestLoad) return
