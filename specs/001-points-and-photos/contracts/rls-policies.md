@@ -55,12 +55,12 @@ raises if the mutation would leave the team with zero trainers.
 | `invitations_read_team_trainer` | select, authenticated | `public.is_trainer(team_id)` |
 | `invitations_read_own_email` | select, authenticated | `email = auth.jwt() ->> 'email'` |
 | `invitations_write_trainer` | insert/update/delete, authenticated | `public.is_trainer(team_id)` (both) |
-| `invitations_accept_own_email` | update, authenticated | `email = auth.jwt() ->> 'email' AND accepted_at is null` (with check limits update to `accepted_at`) |
 
-Invitation acceptance also inserts a membership; that insert is done
-either by a trigger `after update of accepted_at` (with `security
-definer`) or by the server route `/api/invitations/accept`. The trigger
-approach keeps the RLS story explicit.
+Invitees have no update policy: RLS cannot limit an update to single
+columns, so a self-update policy would let the invitee rewrite `role`,
+`team_id` or `player_id` before accepting. Acceptance (membership insert,
+player link, `accepted_at`) runs exclusively through the service-role
+function `accept_invitation()` called by `/api/invitations/accept`.
 
 ## players, point_categories, trainings, training_photos, point_entries, team_settings
 
@@ -139,6 +139,11 @@ Setup: single team T, trainer TU_T, player PU_T.
 | N4 | PU_T | `select from trainings where team_id=T and status='draft'` | Empty |
 | N5 | PU_T | `insert` into Storage under `<T>/…` | Denied |
 | N6 | PU_T | `update memberships set role='trainer' where user_id=me` | Denied |
+| N7 | PU_T | `update invitations set role='trainer' where email=me and accepted_at is null` | Denied |
+| N8 | PU_T | `insert into point_categories(team_id=T, …)` | Denied |
+| N9 | PU_T | `update user_profiles set display_name=… where id=TU_T` | Denied |
+| N10 | PU_T | `PUT /api/teams/<T>/settings` | 403 |
+| N11 | TU_T | `select from veo_sync_credentials` / `veo_team_mappings` | Empty |
 
 ### `tests/e2e/rls-negative-cross-team.spec.ts` (SC-009)
 

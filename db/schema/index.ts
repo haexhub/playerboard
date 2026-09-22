@@ -18,6 +18,7 @@ import {
 const authSchema = pgSchema('auth')
 export const authUsers = authSchema.table('users', {
   id: uuid('id').primaryKey(),
+  email: text('email'),
 })
 
 export const teams = pgTable('teams', {
@@ -79,7 +80,9 @@ export const invitations = pgTable(
     uniqueIndex('invitations_team_email_open_uniq')
       .on(t.teamId, sql`lower(${t.email})`)
       .where(sql`${t.acceptedAt} is null`),
-    index('invitations_email_open_idx').on(t.email).where(sql`${t.acceptedAt} is null`),
+    index('invitations_email_open_idx')
+      .on(t.email)
+      .where(sql`${t.acceptedAt} is null`),
     index('invitations_token_idx').on(t.token),
     uniqueIndex('invitations_player_open_uniq')
       .on(t.playerId)
@@ -202,10 +205,7 @@ export const trainingPhotos = pgTable(
       'training_photos_content_type_check',
       sql`${t.contentType} in ('image/jpeg','image/png','image/heic','image/heif','image/webp')`,
     ),
-    check(
-      'training_photos_size_check',
-      sql`${t.sizeBytes} > 0 and ${t.sizeBytes} <= 10485760`,
-    ),
+    check('training_photos_size_check', sql`${t.sizeBytes} > 0 and ${t.sizeBytes} <= 10485760`),
     index('training_photos_training_idx').on(t.trainingId),
   ],
 )
@@ -237,6 +237,7 @@ export const pointEntries = pgTable(
     ),
     index('point_entries_training_idx').on(t.trainingId),
     index('point_entries_player_idx').on(t.playerId),
+    index('point_entries_category_idx').on(t.categoryId),
   ],
 )
 
@@ -262,7 +263,7 @@ export const veoMatches = pgTable(
     teamId: uuid('team_id')
       .notNull()
       .references(() => teams.id, { onDelete: 'cascade' }),
-    veoMatchId: text('veo_match_id').notNull().unique(),
+    veoMatchId: text('veo_match_id').notNull(),
     playedAt: timestamp('played_at', { withTimezone: true }).notNull(),
     opponentName: text('opponent_name').notNull(),
     ownScore: integer('own_score').notNull(),
@@ -274,6 +275,7 @@ export const veoMatches = pgTable(
   (t) => [
     check('veo_matches_home_or_away_check', sql`${t.homeOrAway} in ('home','away')`),
     index('veo_matches_team_idx').on(t.teamId),
+    uniqueIndex('veo_matches_team_match_uniq').on(t.teamId, t.veoMatchId),
   ],
 )
 
