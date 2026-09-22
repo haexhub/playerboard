@@ -31,6 +31,23 @@ export const teams = pgTable('teams', {
   lastUpdatedBy: uuid('last_updated_by').references(() => authUsers.id, { onDelete: 'set null' }),
 })
 
+// Deliberately has no foreign key to auth.users: the row must survive the
+// Auth deletion long enough for post-delete team cleanup to be recoverable.
+export const pendingAccountDeletions = pgTable(
+  'pending_account_deletions',
+  {
+    userId: uuid('user_id').notNull(),
+    teamId: uuid('team_id')
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.teamId] }),
+    index('pending_account_deletions_user_idx').on(t.userId),
+  ],
+)
+
 export const memberships = pgTable(
   'memberships',
   {

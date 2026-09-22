@@ -61,8 +61,8 @@ const confirm = async () => {
     <div class="space-y-1">
       <h2 class="font-semibold text-neutral-900">Konto löschen</h2>
       <p class="text-sm text-muted-foreground">
-        Dein Konto wird dauerhaft entfernt. Trainings, Spieler und Punkte deiner Teams bleiben
-        erhalten, nur dein Name daran verschwindet.
+        Dein Konto wird dauerhaft entfernt. Teams mit weiteren Mitgliedern bleiben erhalten, nur
+        dein Name daran verschwindet. Ein Team, in dem du allein bist, wird mitgelöscht.
       </p>
     </div>
     <p v-if="error" class="text-sm text-destructive" role="alert">{{ error }}</p>

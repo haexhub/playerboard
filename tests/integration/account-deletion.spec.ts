@@ -84,4 +84,16 @@ describe('deleting an account is refused while a team would lose its last traine
     })
     expect(teamsLeft).toHaveLength(0)
   })
+
+  it('allows the Auth cascade for a team recorded as pending deletion', async () => {
+    const remaining = await runIsolated(sql, async (tx) => {
+      const userId = await createAuthUser(tx)
+      const teamId = await foundTeam(tx, userId)
+      await tx`insert into public.pending_account_deletions (user_id, team_id)
+               values (${userId}, ${teamId})`
+      await tx`delete from auth.users where id = ${userId}`
+      return tx<{ id: string }[]>`select id from public.teams where id = ${teamId}`
+    })
+    expect(remaining).toHaveLength(1)
+  })
 })
