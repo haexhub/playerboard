@@ -4,7 +4,11 @@ import { useProfile } from '~/composables/useProfile'
 
 const { getOwnProfile } = useProfile()
 
-const { data: profile, error: loadError, refresh } = await useAsyncData('own-profile', getOwnProfile)
+const {
+  data: profile,
+  error: loadError,
+  refresh,
+} = await useAsyncData('own-profile', getOwnProfile)
 </script>
 
 <template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { errorMessage } from '~/utils/errors'
 
 const props = defineProps<{
   teamId: string
@@ -19,7 +20,7 @@ const load = async () => {
   try {
     invitations.value = await listOpenByTeam(props.teamId)
   } catch (err) {
-    error.value = (err as Error).message
+    error.value = errorMessage(err, 'Einladungen konnten nicht geladen werden.')
   } finally {
     loading.value = false
   }
@@ -32,7 +33,7 @@ const remove = async (id: string) => {
     await revoke(id)
     invitations.value = invitations.value.filter((i) => i.id !== id)
   } catch (err) {
-    error.value = (err as Error).message
+    error.value = errorMessage(err, 'Einladung konnte nicht widerrufen werden.')
   }
 }
 
@@ -50,7 +51,9 @@ defineExpose({ reload: load })
     <ul v-else class="space-y-2">
       <li v-for="inv in invitations" :key="inv.id">
         <ShadcnCard class="py-3">
-          <ShadcnCardContent class="flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between px-3">
+          <ShadcnCardContent
+            class="flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between px-3"
+          >
             <div class="text-sm">
               <p class="font-medium text-foreground">{{ inv.email }}</p>
               <p class="text-muted-foreground">

@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { and, eq } from 'drizzle-orm'
 import { serverSupabaseServiceRole, serverSupabaseUser } from '#supabase/server'
 import type { Database } from '~/types/database'
-import { useAdminDb, schema } from '~/server/utils/db'
+import { requireTrainer, useAdminDb, schema } from '~/server/utils/db'
 import { displayNameSchema } from '~/utils/validators'
 
 const bodySchema = z.object({
@@ -23,15 +23,7 @@ export default defineEventHandler(async (event) => {
   const { target_user_id, team_id, field } = parsed.data
 
   const db = useAdminDb()
-
-  const [caller] = await db
-    .select({ role: schema.memberships.role })
-    .from(schema.memberships)
-    .where(and(eq(schema.memberships.teamId, team_id), eq(schema.memberships.userId, userId)))
-    .limit(1)
-  if (!caller || caller.role !== 'trainer') {
-    throw createError({ statusCode: 403, statusMessage: 'Only trainers of the team may moderate' })
-  }
+  await requireTrainer(db, team_id, userId)
 
   const [target] = await db
     .select({ userId: schema.memberships.userId })
@@ -47,14 +39,11 @@ export default defineEventHandler(async (event) => {
   const admin = serverSupabaseServiceRole<Database>(event)
 
   if (field === 'name') {
-    const { data: targetUser, error: getUserErr } = await admin.auth.admin.getUserById(
-      target_user_id,
-    )
+    const { data: targetUser, error: getUserErr } =
+      await admin.auth.admin.getUserById(target_user_id)
     if (getUserErr || !targetUser.user?.email) {
-      throw createError({
-        statusCode: 500,
-        statusMessage: getUserErr?.message ?? 'Target user not found',
-      })
+      console.error('[profile/moderate] target user lookup failed', getUserErr?.message)
+      throw createError({ statusCode: 500, statusMessage: 'Target user not found' })
     }
     const parsedDefaultName = displayNameSchema.safeParse(targetUser.user.email.split('@')[0])
     const defaultName = parsedDefaultName.success ? parsedDefaultName.data : target_user_id
@@ -74,10 +63,12 @@ export default defineEventHandler(async (event) => {
         .update(schema.userProfiles)
         .set({ avatarPath: null })
         .where(eq(schema.userProfiles.id, target_user_id))
-      await admin.storage
-        .from('avatars')
-        .remove([path])
-        .catch(() => undefined)
+      // The profile no longer points at the object; a failed removal only
+      // leaves an orphaned file behind, so log it instead of failing the request.
+      const { error: removeErr } = await admin.storage.from('avatars').remove([path])
+      if (removeErr) {
+        console.error('[profile/moderate] avatar removal failed', path, removeErr.message)
+      }
     }
   }
 

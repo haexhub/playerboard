@@ -69,8 +69,7 @@ export const usePlayerScores = () => {
       const sorted = [...values].sort((a, b) => a - b)
       const avg = values.reduce((s, v) => s + v, 0) / values.length
       const mid = Math.floor(sorted.length / 2)
-      const median =
-        sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!
+      const median = sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!
       out.set(cat, { avg, median })
     }
     return out

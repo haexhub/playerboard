@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useTrainings, type TrainingRow } from '~/composables/useTrainings'
+import { formatDate } from '~/utils/dates'
 
 definePageMeta({
   middleware: ['team-context'],
@@ -23,13 +24,6 @@ await load()
 const visible = computed(() =>
   isTrainer.value ? trainings.value : trainings.value.filter((t) => t.status === 'saved'),
 )
-
-const formatDate = (iso: string) =>
-  new Date(`${iso}T00:00:00`).toLocaleDateString('de-DE', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
 </script>
 
 <template>

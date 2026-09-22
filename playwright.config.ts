@@ -21,6 +21,9 @@ export default defineConfig({
     {
       name: 'mobile-chrome',
       use: { ...devices['Pixel 5'] },
+      // These drive PostgREST/Nitro directly, so a second viewport only
+      // doubles their runtime.
+      testIgnore: /rls-negative|invitation-mail|api-negative/,
     },
     {
       name: 'chromium',

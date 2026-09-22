@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { z } from 'zod'
+import { errorMessage, pgErrorCode } from '~/utils/errors'
 
 const props = defineProps<{
   teamId: string
@@ -24,7 +25,7 @@ const role = ref<'trainer' | 'player'>(props.defaultRole ?? 'player')
 const playerName = ref('')
 const jerseyNumber = ref<number | null>(null)
 const position = ref('')
-const fieldErrors = ref<{ email?: string; name?: string; jersey_number?: string }>({})
+const fieldErrors = ref<{ email?: string; jersey_number?: string }>({})
 const submitError = ref<string | null>(null)
 const loading = ref(false)
 
@@ -86,12 +87,12 @@ const submit = async () => {
         // Keep the original invitation error visible; cleanup can be retried manually.
       }
     }
-    const e = err as { code?: string; statusCode?: number; statusMessage?: string; message?: string }
-    if (e.code === '23505') {
+    // SQLSTATE only: a 409 from issue() means a duplicate invitation, not a jersey clash.
+    if (pgErrorCode(err) === '23505') {
       submitError.value =
         'Trikotnummer ist im aktiven Kader bereits vergeben. Zuerst den bisherigen Spieler deaktivieren.'
     } else {
-      submitError.value = e.statusMessage ?? e.message ?? 'Einladung konnte nicht erstellt werden.'
+      submitError.value = errorMessage(err, 'Einladung konnte nicht erstellt werden.')
     }
   } finally {
     loading.value = false
@@ -105,7 +106,9 @@ const submit = async () => {
       <ShadcnLabel class="flex-1 block space-y-1">
         <span>E-Mail</span>
         <ShadcnInput v-model="email" type="email" required />
-        <span v-if="fieldErrors.email" class="block text-sm text-destructive">{{ fieldErrors.email }}</span>
+        <span v-if="fieldErrors.email" class="block text-sm text-destructive">{{
+          fieldErrors.email
+        }}</span>
       </ShadcnLabel>
       <label class="block">
         <span class="text-sm font-medium text-foreground">Rolle</span>
@@ -122,13 +125,14 @@ const submit = async () => {
       <ShadcnLabel class="block space-y-1">
         <span>Name (optional)</span>
         <ShadcnInput v-model="playerName" type="text" />
-        <span v-if="fieldErrors.name" class="block text-sm text-destructive">{{ fieldErrors.name }}</span>
       </ShadcnLabel>
       <div class="flex gap-3">
         <ShadcnLabel class="flex-1 block space-y-1">
           <span>Trikotnummer (optional)</span>
           <ShadcnInput v-model="jerseyNumberModel" type="number" min="0" />
-          <span v-if="fieldErrors.jersey_number" class="block text-sm text-destructive">{{ fieldErrors.jersey_number }}</span>
+          <span v-if="fieldErrors.jersey_number" class="block text-sm text-destructive">{{
+            fieldErrors.jersey_number
+          }}</span>
         </ShadcnLabel>
         <ShadcnLabel class="flex-1 block space-y-1">
           <span>Position (optional)</span>
@@ -137,7 +141,9 @@ const submit = async () => {
       </div>
     </div>
     <div class="flex items-center justify-end gap-3 border-t pt-4">
-      <p v-if="submitError" class="text-sm text-destructive mr-auto" role="alert">{{ submitError }}</p>
+      <p v-if="submitError" class="text-sm text-destructive mr-auto" role="alert">
+        {{ submitError }}
+      </p>
       <ShadcnButton type="submit" :disabled="loading">
         {{ loading ? 'Sende…' : 'Einladen' }}
       </ShadcnButton>

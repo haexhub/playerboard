@@ -19,12 +19,10 @@ const label = (p: ActivePlayer) => {
     class="rounded-md border border-red-300 bg-red-50 text-red-900 px-4 py-3"
     data-testid="consent-warning-banner"
   >
-    <p class="font-semibold text-sm mb-1">
-      Foto-Einwilligung fehlt ({{ withoutConsent.length }})
-    </p>
+    <p class="font-semibold text-sm mb-1">Foto-Einwilligung fehlt ({{ withoutConsent.length }})</p>
     <p class="text-sm">
-      Für folgende aktive Spieler:innen liegt keine Foto-Einwilligung vor. Bitte
-      keine erkennbaren Aufnahmen dieser Personen hochladen:
+      Für folgende aktive Spieler:innen liegt keine Foto-Einwilligung vor. Bitte keine erkennbaren
+      Aufnahmen dieser Personen hochladen:
     </p>
     <ul class="mt-2 text-sm list-disc list-inside space-y-0.5">
       <li v-for="p in withoutConsent" :key="p.id">{{ label(p) }}</li>

@@ -5,9 +5,7 @@ import { statLabel } from '~/utils/veoStatLabels'
 
 const props = defineProps<{ summary: VeoSeasonSummary }>()
 
-const totalGames = computed(
-  () => props.summary.wins + props.summary.draws + props.summary.losses,
-)
+const totalGames = computed(() => props.summary.wins + props.summary.draws + props.summary.losses)
 const categoryEntries = computed(() => Object.entries(props.summary.categoryTotals))
 </script>
 

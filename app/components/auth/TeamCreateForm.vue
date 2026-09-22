@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { z } from 'zod'
+import { errorMessage, isUniqueViolation } from '~/utils/errors'
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Bitte Team-Name eingeben.').max(80),
@@ -39,11 +40,10 @@ const submit = async () => {
     const res = await createTeam(parsed.data)
     await navigateTo(`/t/${res.slug}`)
   } catch (err) {
-    const e = err as { statusCode?: number; statusMessage?: string; message?: string }
-    if (e.statusCode === 409) {
+    if (isUniqueViolation(err)) {
       fieldErrors.value.slug = 'Dieser Slug ist bereits vergeben.'
     } else {
-      submitError.value = e.statusMessage ?? e.message ?? 'Team konnte nicht angelegt werden.'
+      submitError.value = errorMessage(err, 'Team konnte nicht angelegt werden.')
     }
   } finally {
     loading.value = false
@@ -56,7 +56,9 @@ const submit = async () => {
     <ShadcnLabel class="block space-y-1">
       <span>Team-Name</span>
       <ShadcnInput v-model="name" type="text" required maxlength="80" />
-      <span v-if="fieldErrors.name" class="block text-sm text-destructive">{{ fieldErrors.name }}</span>
+      <span v-if="fieldErrors.name" class="block text-sm text-destructive">{{
+        fieldErrors.name
+      }}</span>
     </ShadcnLabel>
     <ShadcnLabel class="block space-y-1">
       <span>Slug <span class="text-muted-foreground font-normal">(optional)</span></span>
@@ -66,7 +68,9 @@ const submit = async () => {
         maxlength="64"
         placeholder="wird aus dem Namen abgeleitet"
       />
-      <span v-if="fieldErrors.slug" class="block text-sm text-destructive">{{ fieldErrors.slug }}</span>
+      <span v-if="fieldErrors.slug" class="block text-sm text-destructive">{{
+        fieldErrors.slug
+      }}</span>
     </ShadcnLabel>
     <ShadcnButton type="submit" :disabled="loading" class="w-full">
       {{ loading ? 'Lege an…' : 'Team gründen' }}

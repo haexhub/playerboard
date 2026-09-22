@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import type { Database } from '~/types/database'
+import type { LinkCandidate } from '~/composables/usePlayers'
+import { errorMessage } from '~/utils/errors'
 
 const props = defineProps<{
   teamId: string
@@ -11,42 +12,16 @@ const emit = defineEmits<{
   (e: 'invite'): void
 }>()
 
-const client = useSupabaseClient<Database>()
-const { list, setActive, setConsent, linkUser } = usePlayers()
+const { list, setActive, setConsent, linkUser, listLinkCandidates } = usePlayers()
 
 type PlayerRow = Awaited<ReturnType<typeof list>>[number]
-type Candidate = { user_id: string; display_name: string | null }
 
 const players = ref<PlayerRow[]>([])
-const candidates = ref<Candidate[]>([])
+const candidates = ref<LinkCandidate[]>([])
 const linkSelection = ref<Record<string, string>>({})
 const loading = ref(false)
 const error = ref<string | null>(null)
 let latestLoad = 0
-
-const loadCandidates = async (teamId: string, rows: PlayerRow[]): Promise<Candidate[]> => {
-  const { data: memberships, error: memErr } = await client
-    .from('memberships')
-    .select('user_id')
-    .eq('team_id', teamId)
-    .eq('role', 'player')
-  if (memErr) throw memErr
-
-  const linkedIds = new Set(
-    rows.map((p) => p.linked_user_id).filter((id): id is string => !!id),
-  )
-  const unlinkedIds = (memberships ?? []).map((m) => m.user_id).filter((id) => !linkedIds.has(id))
-  if (unlinkedIds.length === 0) {
-    return []
-  }
-
-  const { data: profiles, error: profErr } = await client
-    .from('user_profiles')
-    .select('id, display_name')
-    .in('id', unlinkedIds)
-  if (profErr) throw profErr
-  return (profiles ?? []).map((p) => ({ user_id: p.id, display_name: p.display_name }))
-}
 
 const load = async () => {
   const loadId = ++latestLoad
@@ -60,11 +35,13 @@ const load = async () => {
     const rows = await list(teamId)
     if (loadId !== latestLoad || props.teamId !== teamId) return
     players.value = rows
-    const nextCandidates = await loadCandidates(teamId, rows)
+    const nextCandidates = await listLinkCandidates(teamId)
     if (loadId !== latestLoad || props.teamId !== teamId) return
     candidates.value = nextCandidates
   } catch (err) {
-    if (loadId === latestLoad) error.value = (err as Error).message
+    if (loadId === latestLoad) {
+      error.value = errorMessage(err, 'Spieler:innen konnten nicht geladen werden.')
+    }
   } finally {
     if (loadId === latestLoad) loading.value = false
   }
@@ -78,7 +55,7 @@ const onToggleConsent = async (row: PlayerRow) => {
     await setConsent(row.id, next)
     row.photo_consent = next
   } catch (err) {
-    error.value = (err as Error).message
+    error.value = errorMessage(err, 'Foto-Einwilligung konnte nicht geändert werden.')
   }
 }
 
@@ -87,7 +64,7 @@ const onDeactivate = async (row: PlayerRow) => {
     await setActive(row.id, false)
     row.active = false
   } catch (err) {
-    error.value = (err as Error).message
+    error.value = errorMessage(err, 'Spieler:in konnte nicht deaktiviert werden.')
   }
 }
 
@@ -98,7 +75,7 @@ const onLink = async (row: PlayerRow) => {
     await linkUser(row.id, userId)
     await load()
   } catch (err) {
-    error.value = (err as Error).message
+    error.value = errorMessage(err, 'Konto konnte nicht verknüpft werden.')
   }
 }
 
@@ -140,13 +117,15 @@ defineExpose({ reload: load })
             {{ row.position ?? '—' }}
           </ShadcnTableCell>
           <ShadcnTableCell>
-            <input
-              type="checkbox"
-              :checked="row.photo_consent"
-              :aria-label="`Foto-Einwilligung ${row.name}`"
-              class="h-5 w-5"
-              @change="onToggleConsent(row)"
-            />
+            <label class="inline-flex min-h-touch min-w-touch items-center justify-center">
+              <input
+                type="checkbox"
+                :checked="row.photo_consent"
+                :aria-label="`Foto-Einwilligung ${row.name}`"
+                class="h-5 w-5"
+                @change="onToggleConsent(row)"
+              />
+            </label>
           </ShadcnTableCell>
           <ShadcnTableCell>
             <ShadcnBadge :variant="row.active ? 'default' : 'secondary'">

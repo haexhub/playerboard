@@ -4,5 +4,5 @@
   "trailingComma": "all",
   "printWidth": 100,
   "arrowParens": "always",
-  "vueIndentScriptAndStyle": true
+  "vueIndentScriptAndStyle": false
 }

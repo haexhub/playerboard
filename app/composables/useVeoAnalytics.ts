@@ -45,7 +45,8 @@ export const computeSeasonSummary = (matches: VeoMatch[]): VeoSeasonSummary => {
     }
     for (const stat of match.stats) {
       if (stat.team_association !== 'own') continue
-      summary.categoryTotals[stat.stat_type] = (summary.categoryTotals[stat.stat_type] ?? 0) + stat.value
+      summary.categoryTotals[stat.stat_type] =
+        (summary.categoryTotals[stat.stat_type] ?? 0) + stat.value
     }
   }
   return summary

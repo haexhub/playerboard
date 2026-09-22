@@ -1,33 +1,13 @@
 import { expect, test, type Page } from '@playwright/test'
 import { fetchLatestMagicLink, signInWithMagicLink } from './helpers/magic-link'
-
-const SUPABASE_URL = process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321'
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY ?? ''
-const SUPABASE_ANON_KEY =
-  process.env.NUXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_KEY ?? ''
-
-const restHeaders = () => ({
-  apikey: SUPABASE_SERVICE_KEY,
-  Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-  'Content-Type': 'application/json',
-  Prefer: 'return=representation',
-})
-
-const restGet = async <T>(path: string): Promise<T[]> => {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: restHeaders() })
-  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status} ${await res.text()}`)
-  return (await res.json()) as T[]
-}
-
-const restInsert = async <T>(table: string, rows: unknown[]): Promise<T[]> => {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
-    method: 'POST',
-    headers: restHeaders(),
-    body: JSON.stringify(rows),
-  })
-  if (!res.ok) throw new Error(`INSERT ${table} failed: ${res.status} ${await res.text()}`)
-  return (await res.json()) as T[]
-}
+import {
+  anonHeaders,
+  SUPABASE_SERVICE_KEY,
+  SUPABASE_URL,
+  restGet,
+  restHeaders,
+  restInsert,
+} from './helpers/supabase-rest'
 
 const restPatch = async (path: string, body: unknown): Promise<void> => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -162,7 +142,7 @@ test.describe('US6 — training photo gallery with consent gating', () => {
     expect(photoRow).toBeTruthy()
     const anonRes = await trainerCtx.request.get(
       `${SUPABASE_URL}/storage/v1/object/training-photos/${photoRow!.storage_path}`,
-      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } },
+      { headers: anonHeaders() },
     )
     expect(anonRes.ok()).toBe(false)
 

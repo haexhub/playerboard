@@ -7,7 +7,8 @@ const statPeriodSchema = z.object({
 
 const statEntrySchema = z.object({
   category: z.object({ id: z.string() }),
-  value: z.number(),
+  // veo_match_stats.value is an integer column.
+  value: z.number().int(),
   periods: z.array(statPeriodSchema),
   type: z.string(),
 })

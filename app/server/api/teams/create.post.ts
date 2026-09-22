@@ -56,6 +56,7 @@ export default defineEventHandler(async (event) => {
     if (e.code === '23505') {
       throw createError({ statusCode: 409, statusMessage: 'Slug already taken' })
     }
-    throw createError({ statusCode: 500, statusMessage: e.message ?? 'Team creation failed' })
+    console.error('[teams/create] failed', e.code, e.constraint_name, e.message)
+    throw createError({ statusCode: 500, statusMessage: 'Team creation failed' })
   }
 })

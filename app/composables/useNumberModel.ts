@@ -1,8 +1,6 @@
 import { computed, type Ref, type WritableComputedRef } from 'vue'
 
-export const useNumberModel = (
-  source: Ref<number | ''>,
-): WritableComputedRef<string | number> =>
+export const useNumberModel = (source: Ref<number | ''>): WritableComputedRef<string | number> =>
   computed({
     get: () => source.value,
     set: (v) => {

@@ -1,4 +1,5 @@
 import type { Database } from '~/types/database'
+import { assertRowsAffected } from '~/utils/errors'
 import { displayNameSchema, extensionForMime, photoFileSchema } from '~/utils/validators'
 
 export type OwnProfile = {
@@ -18,16 +19,18 @@ export const useProfile = () => {
     if (!parsed.success) {
       throw new Error(parsed.error.issues[0]?.message ?? 'Name muss mindestens 2 Zeichen haben.')
     }
-    const { error } = await client
+    const { data, error } = await client
       .from('user_profiles')
       .update({ display_name: parsed.data })
       .eq('id', uid)
+      .select('id')
     if (error) {
       if (error.code === '23514') {
         throw new Error('Name muss mindestens 2 Zeichen haben.')
       }
       throw error
     }
+    assertRowsAffected(data)
   }
 
   const uploadAvatar = async (file: File): Promise<void> => {
@@ -101,10 +104,8 @@ export const useProfile = () => {
       .eq('id', uid)
     if (updateError) throw updateError
 
-    await client.storage
-      .from('avatars')
-      .remove([previousPath])
-      .catch(() => undefined)
+    const { error: removeError } = await client.storage.from('avatars').remove([previousPath])
+    if (removeError) throw removeError
   }
 
   const getOwnProfile = async (): Promise<OwnProfile> => {

@@ -79,3 +79,17 @@ the request must carry a bearer header matching
 `runtimeConfig.veoSyncSecret` (`NUXT_VEO_SYNC_SECRET`), checked before any
 DB or Veo call. See
 [research.md §2](../research.md#2-authenticating-the-cron-caller).
+
+## Negative-test matrix
+
+Constitution Principle II requires every policy in this contract to be
+covered by a test that would fail if the policy were dropped. The two
+`service_role`-only tables are the sensitive ones: a permissive policy there
+exposes the club's Veo login.
+
+| # | Actor | Attempt | Expected | Covered by |
+|---|---|---|---|---|
+| V1 | Trainer of the mapped team | `select from veo_sync_credentials` | Empty | `rls-negative-single-team.spec.ts` (N11) |
+| V2 | Trainer of the mapped team | `select from veo_team_mappings` | Empty | `rls-negative-single-team.spec.ts` (N11) |
+| V3 | Member of a team with no enabled mapping | `select from veo_matches` | Empty | `veo-analytics-flow.spec.ts` |
+| V4 | Unauthenticated caller | `POST /api/veo/sync` without/with a wrong bearer | 401 | `api-negative.spec.ts` |

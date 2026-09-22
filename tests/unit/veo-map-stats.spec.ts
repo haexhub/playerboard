@@ -2,9 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { mapAnalysisStatsToRows } from '~/server/utils/veo/mapStats'
 
-const fixture = JSON.parse(
-  readFileSync('tests/fixtures/veo/analysis-stats-response.json', 'utf-8'),
-)
+const fixture = JSON.parse(readFileSync('tests/fixtures/veo/analysis-stats-response.json', 'utf-8'))
 
 const MATCH_ID = 'a1b2c3d4-0000-0000-0000-000000000000'
 
@@ -54,6 +52,12 @@ describe('mapAnalysisStatsToRows', () => {
 
     expect(rows).toHaveLength(1)
     expect(rows.some((r) => r.statType === 'football_corner_total')).toBe(false)
+  })
+
+  // A team with no analysed match yields an empty item list; that is a valid
+  // response, not a malformed one, and must not abort the sync.
+  it('maps an empty item list to no rows', () => {
+    expect(mapAnalysisStatsToRows({ items: [] }, MATCH_ID)).toEqual([])
   })
 
   it('throws on a malformed/unexpected payload shape', () => {

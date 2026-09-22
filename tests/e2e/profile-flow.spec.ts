@@ -1,8 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { fetchLatestMagicLink, signInWithMagicLink } from './helpers/magic-link'
-
-const SUPABASE_URL = process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321'
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY ?? ''
+import { SUPABASE_SERVICE_KEY, SUPABASE_URL } from './helpers/supabase-rest'
 
 const restGet = async <T>(path: string): Promise<T[]> => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {

@@ -5,7 +5,7 @@ import InviteList from '~/components/team/InviteList.vue'
 import MembershipTable from '~/components/team/MembershipTable.vue'
 
 definePageMeta({
-  middleware: ['team-context', 'trainer-only'],
+  middleware: ['trainer-only'],
 })
 
 const { currentTeam, isTrainer } = useTeamContext()

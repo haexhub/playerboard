@@ -1,31 +1,31 @@
 <script setup lang="ts">
-  import { computed } from 'vue'
-  import TeamSettingsForm from '~/components/team/TeamSettingsForm.vue'
+import { computed } from 'vue'
+import TeamSettingsForm from '~/components/team/TeamSettingsForm.vue'
 
-  definePageMeta({
-    middleware: ['team-context', 'trainer-only'],
-  })
+definePageMeta({
+  middleware: ['trainer-only'],
+})
 
-  const { currentTeam, refresh: refreshTeamContext } = useTeamContext()
-  const teamId = computed(() => currentTeam.value?.id ?? '')
+const { currentTeam, refresh: refreshTeamContext } = useTeamContext()
+const teamId = computed(() => currentTeam.value?.id ?? '')
 
-  const { get: getSettings } = useTeamSettings()
+const { get: getSettings } = useTeamSettings()
 
-  const { data: settings } = useAsyncData(
-    () => `team-settings-${teamId.value}`,
-    async () => {
-      if (!teamId.value) return null
-      return await getSettings(teamId.value)
-    },
-    { watch: [teamId] },
-  )
+const { data: settings } = useAsyncData(
+  () => `team-settings-${teamId.value}`,
+  async () => {
+    if (!teamId.value) return null
+    return await getSettings(teamId.value)
+  },
+  { watch: [teamId] },
+)
 
-  const onSaved = async ({ slug }: { slug: string }) => {
-    await refreshTeamContext()
-    if (slug !== currentTeam.value?.slug) {
-      await navigateTo(`/t/${slug}/team/settings`)
-    }
+const onSaved = async ({ slug }: { slug: string }) => {
+  await refreshTeamContext()
+  if (slug !== currentTeam.value?.slug) {
+    await navigateTo(`/t/${slug}/team/settings`)
   }
+}
 </script>
 
 <template>

@@ -89,6 +89,11 @@ describe('trainingDateSchema', () => {
     expect(trainingDateSchema.safeParse('12/04/2026').success).toBe(false)
     expect(trainingDateSchema.safeParse('2026-4-5').success).toBe(false)
   })
+
+  it('rejects impossible calendar dates', () => {
+    expect(trainingDateSchema.safeParse('2026-01-99').success).toBe(false)
+    expect(trainingDateSchema.safeParse('2025-02-30').success).toBe(false)
+  })
 })
 
 describe('displayNameSchema', () => {

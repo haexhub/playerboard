@@ -26,7 +26,11 @@ const load = async () => {
   isLoading.value = true
   loadError.value = null
   try {
-    const next = await getPublicRanking(slug.value, timeframe.range.value.from, timeframe.range.value.to)
+    const next = await getPublicRanking(
+      slug.value,
+      timeframe.range.value.from,
+      timeframe.range.value.to,
+    )
     if (loadId !== latestLoad) return
     ranking.value = next
   } catch (err) {
@@ -54,6 +58,17 @@ watch(
       <p class="text-neutral-600">Öffentliche Rangliste</p>
     </header>
 
+    <TimeframePicker
+      v-if="!ranking?.not_found"
+      :preset="timeframe.preset.value"
+      :range="timeframe.range.value"
+      :custom-from="timeframe.customFrom.value"
+      :custom-to="timeframe.customTo.value"
+      :season-available="false"
+      @update:preset="timeframe.setPreset"
+      @update:custom="(v) => timeframe.setCustom(v.from, v.to)"
+    />
+
     <p v-if="isLoading" class="text-sm text-neutral-500">Lade…</p>
     <p v-else-if="loadError" class="text-sm text-red-700" role="alert">{{ loadError }}</p>
     <p
@@ -63,17 +78,6 @@ watch(
     >
       Kein Team unter dieser Adresse gefunden.
     </p>
-    <template v-else>
-      <TimeframePicker
-        :preset="timeframe.preset.value"
-        :range="timeframe.range.value"
-        :custom-from="timeframe.customFrom.value"
-        :custom-to="timeframe.customTo.value"
-        :season-available="false"
-        @update:preset="timeframe.setPreset"
-        @update:custom="(v) => timeframe.setCustom(v.from, v.to)"
-      />
-      <PublicRankingTable :ranking="ranking" />
-    </template>
+    <PublicRankingTable v-else :ranking="ranking" />
   </section>
 </template>

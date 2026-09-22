@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import type { ActiveCategory } from '~/composables/useCategories'
 import type { ActivePlayer } from '~/composables/usePlayers'
 import { useTrainings } from '~/composables/useTrainings'
@@ -38,17 +38,21 @@ const initialMap = computed(() => {
   return m
 })
 
-for (const p of props.players) {
-  for (const c of props.categories) {
-    const k = key(p.id, c.id)
-    cells[k] = { value: initialMap.value.get(k) ?? null, status: 'idle' }
+// Seeds only the cells that do not exist yet, so rows/columns added later by
+// the parent (new player/category) become editable without resetting the rest.
+const ensureCells = () => {
+  for (const p of props.players) {
+    for (const c of props.categories) {
+      const k = key(p.id, c.id)
+      if (!cells[k]) cells[k] = { value: initialMap.value.get(k) ?? null, status: 'idle' }
+    }
   }
 }
 
+watch(() => [props.players, props.categories], ensureCells, { immediate: true })
+
 const jerseyLabel = (p: ActivePlayer) => (p.jersey_number !== null ? `#${p.jersey_number}` : '')
 
-const savingCount = ref(0)
-const dirtyCount = ref(0)
 const cellRevisions = new Map<CellKey, number>()
 const cellQueues = new Map<CellKey, Promise<void>>()
 
@@ -70,7 +74,6 @@ const commitCell = (playerId: string, categoryId: string, category: ActiveCatego
 
   state.status = 'saving'
   state.error = undefined
-  savingCount.value += 1
 
   const previous = cellQueues.get(k) ?? Promise.resolve()
   const current = previous
@@ -98,8 +101,6 @@ const commitCell = (playerId: string, categoryId: string, category: ActiveCatego
           state.status = 'error'
           state.error = err instanceof Error ? err.message : 'Speichern fehlgeschlagen'
         }
-      } finally {
-        savingCount.value -= 1
       }
     })
 
@@ -127,7 +128,6 @@ const onInput = (playerId: string, categoryId: string, evt: Event) => {
     const n = Number(target.value)
     cell.value = Number.isNaN(n) ? null : n
   }
-  dirtyCount.value += 1
 }
 
 const onBlur = (player: ActivePlayer, category: ActiveCategory) => {
@@ -146,7 +146,6 @@ const onSliderInput = (playerId: string, categoryId: string, values: number[] | 
   cellRevisions.set(k, (cellRevisions.get(k) ?? 0) + 1)
   cell.status = 'idle'
   cell.value = values?.[0] ?? null
-  dirtyCount.value += 1
 }
 
 const onSliderCommit = (player: ActivePlayer, category: ActiveCategory) => {
@@ -160,11 +159,8 @@ const resetCell = (player: ActivePlayer, category: ActiveCategory) => {
   cellRevisions.set(k, (cellRevisions.get(k) ?? 0) + 1)
   cell.status = 'idle'
   cell.value = null
-  dirtyCount.value += 1
   void commitCell(player.id, category.id, category)
 }
-
-defineExpose({ savingCount, dirtyCount })
 </script>
 
 <template>
@@ -201,10 +197,7 @@ defineExpose({ savingCount, dirtyCount })
               {{ c.value_min }}–{{ c.value_max }}
             </span>
           </th>
-          <th
-            scope="col"
-            class="border-b border-neutral-200 px-2 py-2 text-left font-semibold"
-          >
+          <th scope="col" class="border-b border-neutral-200 px-2 py-2 text-left font-semibold">
             <button
               type="button"
               aria-label="Kategorie hinzufügen"

@@ -1,14 +1,11 @@
-import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { fetchLatestMagicLink, signInWithMagicLink } from './helpers/magic-link'
+import { SUPABASE_ANON_KEY, SUPABASE_URL, restGet, restInsert } from './helpers/supabase-rest'
+import { asUser, decodeJwtSub, getAccessToken } from './helpers/session'
 
 // SC-003: a player must not be able to perform trainer-only writes, even by
 // calling PostgREST/Storage directly — bypassing the UI entirely. See
-// contracts/rls-policies.md rows N1..N6.
-
-const SUPABASE_URL = process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321'
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY ?? ''
-const SUPABASE_ANON_KEY =
-  process.env.NUXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_KEY ?? ''
+// contracts/rls-policies.md rows N1..N7.
 
 const uniqueSuffix = () => Math.random().toString(36).slice(2, 8)
 
@@ -19,55 +16,9 @@ const setupPage = (page: Page) => {
   })
 }
 
-const restHeaders = () => ({
-  apikey: SUPABASE_SERVICE_KEY,
-  Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-  'Content-Type': 'application/json',
-  Prefer: 'return=representation',
-})
-
-const restGet = async <T>(path: string): Promise<T[]> => {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: restHeaders() })
-  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status} ${await res.text()}`)
-  return (await res.json()) as T[]
-}
-
-const restInsert = async <T>(table: string, rows: unknown[]): Promise<T[]> => {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
-    method: 'POST',
-    headers: restHeaders(),
-    body: JSON.stringify(rows),
-  })
-  if (!res.ok) throw new Error(`INSERT ${table} failed: ${res.status} ${await res.text()}`)
-  return (await res.json()) as T[]
-}
-
 // @nuxtjs/supabase persists the session in a non-httpOnly cookie
 // `sb-<host>-auth-token` as `base64-<base64(JSON session)>` — read it directly
 // rather than re-deriving a session via a second sign-in.
-const getAccessToken = async (ctx: BrowserContext): Promise<string> => {
-  const cookies = await ctx.cookies()
-  const authCookie = cookies.find(
-    (c) => /^sb-.+-auth-token$/.test(c.name) && !c.name.includes('code-verifier'),
-  )
-  if (!authCookie) throw new Error('No Supabase session cookie found — is the user signed in?')
-  const raw = authCookie.value.startsWith('base64-')
-    ? Buffer.from(authCookie.value.slice('base64-'.length), 'base64').toString('utf-8')
-    : authCookie.value
-  return (JSON.parse(raw) as { access_token: string }).access_token
-}
-
-const decodeJwtSub = (token: string): string => {
-  const payload = token.split('.')[1]!
-  const json = Buffer.from(payload, 'base64url').toString('utf-8')
-  return (JSON.parse(json) as { sub: string }).sub
-}
-
-const asUser = (token: string) => ({
-  apikey: SUPABASE_ANON_KEY,
-  Authorization: `Bearer ${token}`,
-  'Content-Type': 'application/json',
-})
 
 test.describe('RLS negative — single team (SC-003)', () => {
   test('a player cannot perform trainer-only writes or see draft trainings', async ({
@@ -206,6 +157,71 @@ test.describe('RLS negative — single team (SC-003)', () => {
       `memberships?user_id=eq.${playerUserId}&team_id=eq.${teamId}&select=role`,
     )
     expect(refetchedMembership!.role).toBe('player')
+
+    // N7 — escalate a pending invitation to my own e-mail before accepting it.
+    // Acceptance runs only through the service-role accept_invitation(); an
+    // invitee has no update policy on invitations at all.
+    const [trainerMembership] = await restGet<{ user_id: string }>(
+      `memberships?team_id=eq.${teamId}&role=eq.trainer&select=user_id`,
+    )
+    const [pendingInvitation] = await restInsert<{ id: string }>('invitations', [
+      {
+        team_id: teamId,
+        email: playerEmail,
+        role: 'player',
+        token: `n7-${suffix}-${'0'.repeat(24)}`,
+        invited_by: trainerMembership!.user_id,
+      },
+    ])
+    const n7 = await playerCtx.request.patch(
+      `${SUPABASE_URL}/rest/v1/invitations?id=eq.${pendingInvitation!.id}`,
+      {
+        headers: { ...asUser(playerToken), Prefer: 'return=representation' },
+        data: { role: 'trainer' },
+      },
+    )
+    const n7Body = n7.ok() ? ((await n7.json()) as unknown[]) : []
+    expect(n7Body).toHaveLength(0)
+    const [refetchedInvitation] = await restGet<{ role: string }>(
+      `invitations?id=eq.${pendingInvitation!.id}&select=role`,
+    )
+    expect(refetchedInvitation!.role).toBe('player')
+
+    // N8 — create a point category as the player (pc_write_trainer).
+    const n8 = await playerCtx.request.post(`${SUPABASE_URL}/rest/v1/point_categories`, {
+      headers: asUser(playerToken),
+      data: [{ team_id: teamId, name: 'Selbstlob', sort_order: 99, value_min: 0, value_max: 5 }],
+    })
+    expect(n8.ok()).toBe(false)
+
+    // N9 — rename a team-mate's profile (user_profiles_update_self is self-only).
+    const trainerToken = await getAccessToken(trainerCtx)
+    const trainerUserId = decodeJwtSub(trainerToken)
+    const n9 = await playerCtx.request.patch(
+      `${SUPABASE_URL}/rest/v1/user_profiles?id=eq.${trainerUserId}`,
+      {
+        headers: { ...asUser(playerToken), Prefer: 'return=representation' },
+        data: { display_name: 'Gekapert' },
+      },
+    )
+    const n9Body = n9.ok() ? ((await n9.json()) as unknown[]) : []
+    expect(n9Body).toHaveLength(0)
+
+    // N10 — change team settings through the privileged route as the player.
+    const n10 = await playerPage.request.put(`/api/teams/${teamId}/settings`, {
+      data: { name: 'Gekapert', slug: `${teamSlug}-hijacked`, season_start: '2026-07-01' },
+    })
+    expect(n10.status()).toBe(403)
+
+    // N11 — the service-role-only Veo tables stay closed even for a trainer.
+    // A permissive policy here would hand out the club's Veo login.
+    for (const table of ['veo_sync_credentials', 'veo_team_mappings']) {
+      const res = await trainerCtx.request.get(`${SUPABASE_URL}/rest/v1/${table}?select=*`, {
+        headers: asUser(trainerToken),
+      })
+      expect(res.ok()).toBe(true)
+      expect(await res.json()).toEqual([])
+    }
 
     await trainerCtx.close()
     await playerCtx.close()

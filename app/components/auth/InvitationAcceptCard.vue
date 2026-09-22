@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { errorMessage } from '~/utils/errors'
 
 type Invitation = {
   token: string
@@ -47,8 +48,7 @@ const submit = async () => {
       await navigateTo('/')
     }
   } catch (err) {
-    const e = err as { statusCode?: number; statusMessage?: string; message?: string }
-    error.value = e.statusMessage ?? e.message ?? 'Einladung konnte nicht angenommen werden.'
+    error.value = errorMessage(err, 'Einladung konnte nicht angenommen werden.')
   } finally {
     loading.value = false
   }
@@ -66,7 +66,10 @@ const submit = async () => {
       <p class="text-sm text-neutral-500">Gültig bis {{ expiresLabel }}</p>
     </div>
 
-    <p v-if="emailMismatch" class="rounded bg-amber-50 border border-amber-200 text-amber-900 text-sm p-3">
+    <p
+      v-if="emailMismatch"
+      class="rounded bg-amber-50 border border-amber-200 text-amber-900 text-sm p-3"
+    >
       Diese Einladung ist an <strong>{{ invitation.email }}</strong> adressiert. Du bist derzeit als
       <strong>{{ callerEmail }}</strong> angemeldet und kannst sie so nicht annehmen. Bitte melde
       dich mit der eingeladenen Adresse an.

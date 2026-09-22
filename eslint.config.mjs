@@ -5,39 +5,28 @@ import vue from 'eslint-plugin-vue'
 import prettier from 'eslint-config-prettier'
 import globals from 'globals'
 
-const nuxtGlobals = {
-  $fetch: 'readonly',
-  defineNuxtConfig: 'readonly',
-  defineNuxtRouteMiddleware: 'readonly',
-  navigateTo: 'readonly',
-  useAsyncData: 'readonly',
-  useRequestURL: 'readonly',
-  useRoute: 'readonly',
-  useSupabaseClient: 'readonly',
-  useSupabaseUser: 'readonly',
-  definePageMeta: 'readonly',
-  useTeamContext: 'readonly',
-  usePlayers: 'readonly',
-  useAuth: 'readonly',
-  useCategories: 'readonly',
-  useInvitations: 'readonly',
-  useProfile: 'readonly',
-  useTeams: 'readonly',
-  useTeamSettings: 'readonly',
-  useNumberModel: 'readonly',
-  useNullableNumberModel: 'readonly',
-}
-
 export default [
   {
-    ignores: ['.output/**', '.nuxt/**', 'dist/**', 'node_modules/**', 'supabase/**', 'playwright-report/**', 'coverage/**', 'app/types/database.ts'],
+    ignores: [
+      '.output/**',
+      '.nuxt/**',
+      '.worktrees/**',
+      'dist/**',
+      'node_modules/**',
+      'supabase/**',
+      'playwright-report/**',
+      'coverage/**',
+      'graphify-out/**',
+      'test-results/**',
+      'app/types/database.ts',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   ...vue.configs['flat/recommended'],
   {
     languageOptions: {
-      globals: { ...globals.browser, ...nuxtGlobals },
+      globals: globals.browser,
       parserOptions: {
         parser: tseslint.parser,
       },
@@ -46,6 +35,14 @@ export default [
       'vue/multi-word-component-names': 'off',
       '@typescript-eslint/no-explicit-any': 'error',
     },
+  },
+  {
+    // Every SFC is `lang="ts"`, and `nuxt typecheck` resolves auto-imported
+    // identifiers against the generated import map. `no-undef` would only
+    // re-check them against a hand-maintained globals list that goes stale
+    // with each new composable.
+    files: ['**/*.vue'],
+    rules: { 'no-undef': 'off' },
   },
   prettier,
 ]

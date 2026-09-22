@@ -16,14 +16,14 @@ export const useTeamContext = () => {
     'my-memberships',
     async () => {
       if (!user.value) return []
-      const query = client
-        .from('memberships')
-        .select('team_id, role, teams (id, name, slug)')
+      const query = client.from('memberships').select('team_id, role, teams (id, name, slug)')
       const { data, error } = await query.eq('user_id', user.value.sub)
       if (error) throw error
       return data ?? []
     },
-    { watch: [user] },
+    // Watch the user id, not the ref: @nuxtjs/supabase assigns a fresh claims
+    // object on every page:start, which would refetch on each navigation.
+    { watch: [() => user.value?.sub] },
   )
 
   const currentMembership = computed(() => {

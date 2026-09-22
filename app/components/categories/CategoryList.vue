@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { errorMessage } from '~/utils/errors'
 
 const props = defineProps<{
   teamId: string
@@ -33,7 +34,9 @@ const load = async () => {
     categories.value = nextCategories
     deletable.value = Object.fromEntries(nextCategories.map((c, i) => [c.id, !checks[i]]))
   } catch (err) {
-    if (loadId === latestLoad) error.value = (err as Error).message
+    if (loadId === latestLoad) {
+      error.value = errorMessage(err, 'Kategorien konnten nicht geladen werden.')
+    }
   } finally {
     if (loadId === latestLoad) loading.value = false
   }
@@ -53,7 +56,7 @@ const move = async (index: number, direction: -1 | 1) => {
     ])
     await load()
   } catch (err) {
-    error.value = (err as Error).message
+    error.value = errorMessage(err, 'Reihenfolge konnte nicht geändert werden.')
   }
 }
 
@@ -62,7 +65,7 @@ const onDeactivate = async (id: string) => {
     await deactivate(id)
     await load()
   } catch (err) {
-    error.value = (err as Error).message
+    error.value = errorMessage(err, 'Kategorie konnte nicht deaktiviert werden.')
   }
 }
 
@@ -71,13 +74,14 @@ const onDelete = async (id: string) => {
     await remove(id)
     categories.value = categories.value.filter((c) => c.id !== id)
   } catch (err) {
-    error.value = (err as Error).message
+    error.value = errorMessage(err, 'Kategorie konnte nicht gelöscht werden.')
   }
 }
 
 defineExpose({
   reload: load,
-  maxSortOrder: () => categories.value.reduce((max, category) => Math.max(max, category.sort_order), 0),
+  maxSortOrder: () =>
+    categories.value.reduce((max, category) => Math.max(max, category.sort_order), 0),
 })
 </script>
 

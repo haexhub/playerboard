@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { z } from 'zod'
+import { errorMessage, isUniqueViolation } from '~/utils/errors'
 
 const props = defineProps<{
   teamId: string
@@ -55,16 +56,10 @@ const submit = async () => {
     await updateWithSettings(props.teamId, parsed.data)
     emit('saved', { slug: parsed.data.slug })
   } catch (err) {
-    const e = err as {
-      code?: string
-      statusCode?: number
-      statusMessage?: string
-      message?: string
-    }
-    if (e.code === '23505' || e.statusCode === 409) {
+    if (isUniqueViolation(err)) {
       fieldErrors.value.slug = 'Dieser Slug ist bereits vergeben.'
     } else {
-      submitError.value = e.statusMessage ?? e.message ?? 'Einstellungen konnten nicht gespeichert werden.'
+      submitError.value = errorMessage(err, 'Einstellungen konnten nicht gespeichert werden.')
     }
   } finally {
     loading.value = false
@@ -83,7 +78,9 @@ const submit = async () => {
         maxlength="80"
         data-testid="team-settings-name-input"
       />
-      <span v-if="fieldErrors.name" class="block text-sm text-destructive">{{ fieldErrors.name }}</span>
+      <span v-if="fieldErrors.name" class="block text-sm text-destructive">{{
+        fieldErrors.name
+      }}</span>
     </ShadcnLabel>
     <ShadcnLabel class="block space-y-1">
       <span>Slug</span>
@@ -94,10 +91,12 @@ const submit = async () => {
         maxlength="64"
         data-testid="team-settings-slug-input"
       />
-      <span v-if="fieldErrors.slug" class="block text-sm text-destructive">{{ fieldErrors.slug }}</span>
+      <span v-if="fieldErrors.slug" class="block text-sm text-destructive">{{
+        fieldErrors.slug
+      }}</span>
       <p class="text-sm text-warning">
-        Achtung: Öffentliche Links (z. B. die Rangliste) und Lesezeichen verweisen auf den
-        aktuellen Slug. Eine Änderung macht alte Links ungültig.
+        Achtung: Öffentliche Links (z. B. die Rangliste) und Lesezeichen verweisen auf den aktuellen
+        Slug. Eine Änderung macht alte Links ungültig.
       </p>
     </ShadcnLabel>
     <ShadcnLabel class="block space-y-1">

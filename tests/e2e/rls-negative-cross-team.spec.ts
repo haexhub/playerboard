@@ -1,13 +1,16 @@
-import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { fetchLatestMagicLink, signInWithMagicLink } from './helpers/magic-link'
+import {
+  SUPABASE_ANON_KEY,
+  SUPABASE_SERVICE_KEY,
+  SUPABASE_URL,
+  restGet,
+  restInsert,
+} from './helpers/supabase-rest'
+import { asUser, decodeJwtSub, getAccessToken } from './helpers/session'
 
 // SC-008/SC-009: no cross-team leak, even by calling PostgREST/Storage
 // directly. See contracts/rls-policies.md rows X1..X10.
-
-const SUPABASE_URL = process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321'
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY ?? ''
-const SUPABASE_ANON_KEY =
-  process.env.NUXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_KEY ?? ''
 
 const uniqueSuffix = () => Math.random().toString(36).slice(2, 8)
 
@@ -26,54 +29,8 @@ const foundTeam = async (page: Page, teamName: string, teamSlug: string) => {
   await page.waitForURL(new RegExp(`/t/${teamSlug}(/|$)`), { timeout: 15_000 })
 }
 
-const restHeaders = () => ({
-  apikey: SUPABASE_SERVICE_KEY,
-  Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-  'Content-Type': 'application/json',
-  Prefer: 'return=representation',
-})
-
-const restGet = async <T>(path: string): Promise<T[]> => {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: restHeaders() })
-  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status} ${await res.text()}`)
-  return (await res.json()) as T[]
-}
-
-const restInsert = async <T>(table: string, rows: unknown[]): Promise<T[]> => {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
-    method: 'POST',
-    headers: restHeaders(),
-    body: JSON.stringify(rows),
-  })
-  if (!res.ok) throw new Error(`INSERT ${table} failed: ${res.status} ${await res.text()}`)
-  return (await res.json()) as T[]
-}
-
 // @nuxtjs/supabase persists the session in a non-httpOnly cookie
 // `sb-<host>-auth-token` as `base64-<base64(JSON session)>`.
-const getAccessToken = async (ctx: BrowserContext): Promise<string> => {
-  const cookies = await ctx.cookies()
-  const authCookie = cookies.find(
-    (c) => /^sb-.+-auth-token$/.test(c.name) && !c.name.includes('code-verifier'),
-  )
-  if (!authCookie) throw new Error('No Supabase session cookie found — is the user signed in?')
-  const raw = authCookie.value.startsWith('base64-')
-    ? Buffer.from(authCookie.value.slice('base64-'.length), 'base64').toString('utf-8')
-    : authCookie.value
-  return (JSON.parse(raw) as { access_token: string }).access_token
-}
-
-const decodeJwtSub = (token: string): string => {
-  const payload = token.split('.')[1]!
-  const json = Buffer.from(payload, 'base64url').toString('utf-8')
-  return (JSON.parse(json) as { sub: string }).sub
-}
-
-const asUser = (token: string) => ({
-  apikey: SUPABASE_ANON_KEY,
-  Authorization: `Bearer ${token}`,
-  'Content-Type': 'application/json',
-})
 
 const asAnon = () => ({
   apikey: SUPABASE_ANON_KEY,

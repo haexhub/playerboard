@@ -9,7 +9,12 @@ import TrainingPointGrid from '~/components/trainings/TrainingPointGrid.vue'
 import { useCategories, type ActiveCategory } from '~/composables/useCategories'
 import { usePlayers, type ActivePlayer } from '~/composables/usePlayers'
 import { useTrainings, type PointEntryRow, type TrainingRow } from '~/composables/useTrainings'
-import { useTrainingPhotos, type ConsentStatus, type TrainingPhotoView } from '~/composables/useTrainingPhotos'
+import {
+  useTrainingPhotos,
+  type ConsentStatus,
+  type TrainingPhotoView,
+} from '~/composables/useTrainingPhotos'
+import { formatDate } from '~/utils/dates'
 
 definePageMeta({
   middleware: ['team-context'],
@@ -34,6 +39,7 @@ const photos = ref<TrainingPhotoView[]>([])
 const consentStatus = ref<ConsentStatus>('clean')
 const isSaving = ref(false)
 const saveError = ref<string | null>(null)
+const photosError = ref<string | null>(null)
 
 const trainingTeamId = computed(() => training.value?.team_id ?? '')
 
@@ -76,7 +82,8 @@ const onPlayerSaved = async () => {
   try {
     players.value = await listPlayers(trainingTeamId.value)
   } catch (err) {
-    playersError.value = err instanceof Error ? err.message : 'Spieler konnten nicht aktualisiert werden'
+    playersError.value =
+      err instanceof Error ? err.message : 'Spieler konnten nicht aktualisiert werden'
   }
 }
 
@@ -89,9 +96,7 @@ type TrainingDetailData = {
   consentStatus: ConsentStatus
 }
 
-const canSave = computed(
-  () => training.value?.status === 'draft' && !isSaving.value,
-)
+const canSave = computed(() => training.value?.status === 'draft' && !isSaving.value)
 
 const load = async (): Promise<TrainingDetailData> => {
   // Fetch the training first and derive its team_id from the row itself,
@@ -153,7 +158,12 @@ watch(
 )
 
 const loadPhotos = async () => {
-  photos.value = await listPhotos(trainingId)
+  photosError.value = null
+  try {
+    photos.value = await listPhotos(trainingId)
+  } catch (err) {
+    photosError.value = err instanceof Error ? err.message : 'Fotos konnten nicht geladen werden'
+  }
 }
 
 const initialEntries = computed(() =>
@@ -198,7 +208,7 @@ const statusLabel = computed(() => (training.value?.status === 'saved' ? 'Gespei
     <header class="space-y-1">
       <div class="flex items-center gap-2">
         <h1 class="text-2xl font-semibold text-neutral-900">
-          {{ training.title || `Training ${training.date}` }}
+          {{ training.title || `Training ${formatDate(training.date)}` }}
         </h1>
         <span
           class="text-xs px-2 py-0.5 rounded-full border"
@@ -213,7 +223,7 @@ const statusLabel = computed(() => (training.value?.status === 'saved' ? 'Gespei
         </span>
       </div>
       <p class="text-sm text-neutral-600">
-        Datum {{ training.date }} · Zuletzt aktualisiert
+        Datum {{ formatDate(training.date) }} · Zuletzt aktualisiert
         {{ new Date(training.last_updated_at).toLocaleString('de-DE') }}
       </p>
     </header>
@@ -286,8 +296,10 @@ const statusLabel = computed(() => (training.value?.status === 'saved' ? 'Gespei
         v-if="teamId"
         :training-id="training.id"
         :team-id="teamId"
+        :photos="photos"
         @uploaded="loadPhotos"
       />
+      <p v-if="photosError" class="text-sm text-red-700" role="alert">{{ photosError }}</p>
 
       <button
         v-if="training.status === 'draft'"

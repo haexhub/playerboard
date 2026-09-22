@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { PublicRanking, PublicRankingCategory, PublicRankingRow } from '~/composables/usePublicRanking'
+import type {
+  PublicRanking,
+  PublicRankingCategory,
+  PublicRankingRow,
+} from '~/composables/usePublicRanking'
 
 const props = defineProps<{
   ranking: PublicRanking | null
@@ -36,11 +40,7 @@ const totalFor = (row: PublicRankingRow): number =>
       >
         Keine Punkte im gewählten Zeitraum.
       </ShadcnTableEmpty>
-      <ShadcnTableRow
-        v-for="row in rows"
-        :key="`${row.rank_position}-${row.jersey_number ?? 'none'}`"
-        data-testid="public-ranking-row"
-      >
+      <ShadcnTableRow v-for="(row, i) in rows" :key="i" data-testid="public-ranking-row">
         <th scope="row" class="sticky left-0 bg-inherit border-r px-2 py-2 text-left">
           <ShadcnBadge :variant="row.rank_position <= 3 ? 'default' : 'secondary'">
             {{ row.rank_position }}

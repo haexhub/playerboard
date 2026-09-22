@@ -1,15 +1,18 @@
 import { z } from 'zod'
 
+// Unauthenticated endpoint whose payload ends up in the server log: keep the
+// free-text fields bounded so it cannot be used to flood the log.
 const authErrorSchema = z.object({
-  message: z.string(),
+  message: z.string().max(500),
   status: z.number().optional(),
-  code: z.string().optional(),
-  name: z.string(),
+  code: z.string().max(100).optional(),
+  name: z.string().max(100),
 })
 
 const bodySchema = z.object({
   hasHash: z.boolean().optional(),
   hasCode: z.boolean().optional(),
+  hasSession: z.boolean().optional(),
   implicitError: authErrorSchema.optional(),
   pkceError: authErrorSchema.optional(),
 })

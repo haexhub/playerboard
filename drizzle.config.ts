@@ -1,8 +1,7 @@
 import 'dotenv/config'
 import { defineConfig } from 'drizzle-kit'
 
-const url =
-  process.env.SUPABASE_DB_URL ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+const url = process.env.SUPABASE_DB_URL ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 
 export default defineConfig({
   schema: './db/schema/index.ts',

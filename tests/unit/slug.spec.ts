@@ -57,4 +57,9 @@ describe('nextUniqueSlug', () => {
   it('throws on empty base', async () => {
     await expect(nextUniqueSlug('   ', () => false)).rejects.toThrow()
   })
+
+  // Without the bail-out the caller (POST /api/teams/create) would spin forever.
+  it('gives up instead of looping when every candidate is taken', async () => {
+    await expect(nextUniqueSlug('team', () => true)).rejects.toThrow(/exhausted/)
+  })
 })
