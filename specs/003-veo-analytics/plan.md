@@ -13,25 +13,32 @@ public API (its documented partner API is invite-only); this uses the
 private, undocumented API that already powers Veo's own web app,
 authenticated via a one-time interactive login whose session is then
 silently renewed by a new daily server-side sync route. Credentials never
-touch `.env`/the repo; they live in a `service_role`-only Postgres table,
-mirroring this project's existing RLS trust boundaries. Which team is
-enabled is itself an explicit, admin-controlled decision (`veo_team_mappings`,
-also `service_role`-only for v1) — no team gets Veo data by default. The
-full admin role/UI for managing that (appointing further admins, a settings
-screen) is a separate, later feature ("Platform-Administration"); this
-feature ships the enforcement point (the table + RLS boundary) and seeds
-its one row manually, without waiting for that feature.
+touch `.env`/the repo; the trainer's password never touches storage at all.
+Which team is enabled is itself an explicit, authenticated decision
+(`veo_team_mappings`) — no team gets Veo data by default.
+
+**Update 2026-09-22** (see spec.md's Clarifications, research.md §9/§10):
+the original v1 plan below gated both the team-mapping table and the
+credential table behind manual SQL, pending a separate "Platform-Administration"
+feature. That gate has been replaced by trainer self-service instead:
+`is_trainer(team_id)` RLS policies let a trainer manage their own team's
+row directly, through a two-step login+link flow (`POST /api/veo/login`,
+`POST /api/veo/link`) that also adds one new runtime dependency
+(Playwright/Chromium, for the interactive login step only — see
+[research.md §9](./research.md#9-interactive-login-headless-browser)). The
+rest of this plan (sync route, schema shape, testing strategy) is
+unchanged.
 
 ## Technical Context
 
 **Language/Version**: TypeScript 5.6+, strict mode; Node.js 22 LTS — same stack, no new runtime.
-**Primary Dependencies**: Nuxt 3, `@nuxtjs/supabase`, `drizzle-orm` + `drizzle-kit`, `zod` — all already in use. No new npm dependency: the OIDC/PKCE flow and REST calls use native `fetch`/`crypto`, no headless-browser dependency for v1 (see [research.md §3](./research.md#3-veo-authentication-strategy)).
+**Primary Dependencies**: Nuxt 3, `@nuxtjs/supabase`, `drizzle-orm` + `drizzle-kit`, `zod` — all already in use for the sync route itself; the OIDC/PKCE renewal flow and REST calls use native `fetch`/`crypto`, no headless-browser dependency there (see [research.md §3](./research.md#3-veo-authentication-strategy)). **Since 2026-09-22**: one new dependency, `playwright` (+ Chromium binary on the VPS), used only by the trainer-initiated interactive login step (see [research.md §9](./research.md#9-interactive-login-headless-browser)) — the daily sync route's own dependency footprint is unchanged.
 **Storage**: PostgreSQL (Supabase-managed); five new tables — `veo_team_mappings`, `veo_matches`, `veo_match_stats`, `veo_sync_status`, `veo_sync_credentials` (see [data-model.md](./data-model.md)).
 **Testing**: Vitest for the pure Veo-payload → schema mapping function (fixture-based, no live Veo call); Playwright e2e for the display pages and sync-status banner, seeded directly via DB (see [research.md §8](./research.md#8-testing-strategy-for-the-external-integration)).
 **Target Platform**: Existing web app, plus one new server-triggered route invoked by an OS-level cron entry on the production VPS (no new deployment target).
 **Project Type**: Web application — extends the existing single Nuxt project.
 **Performance Goals**: Daily batch sync completes well within its interval; no live-fetch latency on page view since data is pre-stored. No new performance targets beyond the existing app's.
-**Constraints**: RLS mandatory (Principle II) on all five new tables, with at least one policy per table. The two service-role-only tables use explicit deny-all policies for `authenticated`; no permissive user policy exists. No Veo credentials in `.env`/repo (explicit decision, see [research.md §4](./research.md#4-credential-storage)). The data source is an undocumented, unsupported private API — sync MUST fail closed (never fabricate data, FR-007) and MUST surface staleness within a day (FR-009/SC-003).
+**Constraints**: RLS mandatory (Principle II) on all five new tables, with at least one policy per table. `veo_matches`/`veo_match_stats`/`veo_sync_status` stay read-only for members, written only by `useAdminDb()`. `veo_team_mappings`/`veo_sync_credentials` are, since 2026-09-22, `is_trainer(team_id)`-gated for `insert`/`update` (and `select` on the mappings table only) — see [contracts/rls-policies.md](./contracts/rls-policies.md). No Veo credentials in `.env`/repo; the trainer's password specifically is never persisted anywhere (see [research.md §4](./research.md#4-credential-storage), [§9](./research.md#9-interactive-login-headless-browser)). The data source is an undocumented, unsupported private API — sync MUST fail closed (never fabricate data, FR-007) and MUST surface staleness within a day (FR-009/SC-003).
 **Scale/Scope**: One team, ~20–60 matches/season, ~28 stat rows/match — negligible data volume.
 
 ## Constitution Check
@@ -73,28 +80,36 @@ specs/003-veo-analytics/
 ```text
 app/
 ├── pages/t/[slug]/
-│   └── analytics.vue                 # US1+US2: match list + season summary; team-context middleware only, no trainer-only restriction
+│   ├── analytics.vue                 # US1+US2: match list + season summary; team-context middleware only, no trainer-only restriction
+│   └── team/
+│       └── veo.vue                   # Phase 7: trainer-only, self-service Veo linking (login → club/team picker → confirm)
 ├── components/veo/
 │   ├── VeoMatchCard.vue              # one match: score, stat categories own vs. opponent, per-half breakdown
 │   ├── VeoSeasonSummary.vue          # aggregated W/D/L + category sums across synced matches
-│   └── VeoSyncStatusBanner.vue       # US3: last successful sync / failure indicator
+│   ├── VeoSyncStatusBanner.vue       # US3: last successful sync / failure indicator
+│   └── VeoLinkForm.vue               # Phase 7: two-step credentials + club/team picker form
 ├── composables/
-│   └── useVeoAnalytics.ts            # reads veo_matches/veo_match_stats/veo_sync_status for the current team via the plain (RLS-gated) Supabase browser client
+│   ├── useVeoAnalytics.ts            # reads veo_matches/veo_match_stats/veo_sync_status for the current team via the plain (RLS-gated) Supabase browser client
+│   └── useVeoLink.ts                 # Phase 7: calls /api/veo/login then /api/veo/link, holds the two-step UI state
 └── server/
     ├── api/veo/
-    │   └── sync.post.ts              # shared-secret auth → for each enabled row in veo_team_mappings: refresh Veo session → fetch matches+stats → upsert → update veo_sync_status
+    │   ├── sync.post.ts              # shared-secret auth → for each enabled row in veo_team_mappings: refresh Veo session → fetch matches+stats → upsert → update veo_sync_status
+    │   ├── login.post.ts             # Phase 7: trainer session + is_trainer(team_id) check → headless login → club/team list + signed short-lived token
+    │   └── link.post.ts              # Phase 7: verifies the signed token → upserts veo_team_mappings + veo_sync_credentials via useUserDb (RLS-enforced)
     └── utils/veo/
         ├── auth.ts                   # PKCE + auth.veo.co silent-renewal (prompt=none); reads/writes veo_sync_credentials via useAdminDb
-        ├── client.ts                 # typed fetch wrappers for GET .../matches/ and POST .../analysis/stats/
+        ├── client.ts                 # typed fetch wrappers for GET .../matches/, POST .../analysis/stats/, and (Phase 7) GET .../clubs/, GET .../clubs/{slug}/teams/
+        ├── login.ts                  # Phase 7: headless-Chromium interactive login → auth.veo.co session cookie (research.md §9)
         └── mapStats.ts                # pure function: Veo analysis/stats payload → veo_match_stats rows (unit-tested)
 
 db/schema/index.ts                     # + veoTeamMappings, veoMatches, veoMatchStats, veoSyncStatus, veoSyncCredentials
 
 supabase/migrations/
 ├── <ts>_veo_tables.sql                    # drizzle-generated: create the 5 tables
-└── <ts>_veo_tables_rls.sql                # hand-written: RLS enable + read policies (service_role writes only)
+├── <ts>_veo_tables_rls.sql                # hand-written: RLS enable + read policies (service_role writes only) — original v1 shape
+└── <ts>_veo_trainer_self_service.sql      # Phase 7, hand-written: replaces the deny-all policies on veo_team_mappings/veo_sync_credentials with is_trainer(team_id)-gated ones
 
-nuxt.config.ts                         # + runtimeConfig.veoSyncSecret only — no team/club config here anymore, that lives in veo_team_mappings
+nuxt.config.ts                         # + runtimeConfig.veoSyncSecret, runtimeConfig.veoLinkTokenSecret (Phase 7) — no team/club config here, that lives in veo_team_mappings
 
 tests/fixtures/veo/
 └── analysis-stats-response.json       # real captured payload shape, used by the unit test below
@@ -103,7 +118,9 @@ tests/unit/
 └── veo-map-stats.spec.ts              # mapStats.ts: full payload, missing-category, malformed-input cases
 
 tests/e2e/
-└── veo-analytics-flow.spec.ts         # seeds veo_matches/veo_match_stats/veo_sync_status directly, verifies analytics page + sync-status banner (no live Veo call)
+├── veo-analytics-flow.spec.ts         # seeds veo_matches/veo_match_stats/veo_sync_status directly, verifies analytics page + sync-status banner (no live Veo call)
+├── rls-negative-single-team.spec.ts   # Phase 7: + trainer cross-team isolation, non-trainer denial on veo_team_mappings/veo_sync_credentials
+└── api-negative.spec.ts               # Phase 7: + POST /api/veo/login and /link without a session / as a non-trainer
 ```
 
 **Structure Decision**: Extends the existing single Nuxt project — no new

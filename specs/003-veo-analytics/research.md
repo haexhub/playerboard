@@ -94,11 +94,13 @@ noticed within a day, not silently.
 ## 4. Credential storage
 
 **Decision**: The captured `auth.veo.co` session artifact is stored in a new
-table, `veo_sync_credentials`, with RLS enabled and **no policies at all**
-for `authenticated`/`anon` — readable/writable only via `useAdminDb()`
-(server-trusted, RLS-bypassing), exactly the same trust boundary already
-used for `teams_insert_via_server` (service_role-only write, no policy for
-any other role).
+table, `veo_sync_credentials`. **Updated 2026-09-22**: `select` stays closed
+to everyone but `useAdminDb()` (the credential itself is never exposed to
+any client), but `insert`/`update` are now gated to `authenticated` via
+`public.is_trainer(team_id)` instead of being closed entirely — see §9. The
+trainer's Veo *password* never reaches this table (or any table): it lives
+only in the request body and the headless-browser process's memory for the
+duration of `POST /api/veo/login`, then is discarded.
 
 **Rationale**: Per explicit decision earlier in this project's brainstorming
 session, the credential must never live in `.env`/the repository. A
@@ -117,12 +119,17 @@ without present-day need beyond what RLS already gives us).
 
 ## 5. Team mapping (Veo team ↔ Playerboard team)
 
-**Decision** (superseded during `/speckit.clarify` — see spec.md's
-Clarifications, FR-011/FR-013, User Story 4): the mapping is a database
-table, `veo_team_mappings`, not fixed `runtimeConfig` values. RLS is enabled
-with an explicit deny-all policy for `authenticated`, the same service-role-
-only boundary as `veo_sync_credentials`; nothing in the client-facing app
-reads or writes it directly.
+**Decision** (superseded twice — first during the original `/speckit.clarify`
+that introduced the table, then again on 2026-09-22 when the platform-admin
+gate was replaced by trainer self-service; see spec.md's Clarifications,
+FR-011, User Story 4, and §9/§10 below): the mapping is a database table,
+`veo_team_mappings`, not fixed `runtimeConfig` values. **As of 2026-09-22**,
+RLS grants `select`/`insert`/`update` to `authenticated` gated by
+`public.is_trainer(team_id)` — the trainer of a team manages that team's own
+row directly through the app, no deny-all, no manual SQL. The paragraphs
+below describe the *original* reasoning for introducing the table at all
+(still valid) and the *original* v1 sequencing (superseded — kept for
+history, see §9/§10 for what replaced it).
 
 **Rationale**: A club-internal security requirement emerged during
 clarification: a team MUST NOT see Veo data without an explicit, deliberate
@@ -134,21 +141,19 @@ correct home for an admin-managed, potentially-multi-row setting per
 Principle III's precedent (config lives in data, not code) — this is no
 longer speculative, it's an explicit requirement.
 
-**Platform-admin UI sequencing (important scope boundary)**: this feature
-does **not** build a platform-admin role or a settings UI — that's the
-separate, vorgelagerte feature "Platform-Administration" (spec.md's
-Assumptions). For v1, the one row in `veo_team_mappings` is created directly
-via SQL by the person operating the deployment (documented in
-[quickstart.md](./quickstart.md), same pattern as the one-time credential
-capture in [§4](#4-credential-storage)) — not through any in-app UI or role
-check. This satisfies FR-011's security requirement immediately (no team
-gets an enabled row without a deliberate manual action) without building a
-role system this feature doesn't otherwise need. When
-"Platform-Administration" ships, it adds a `platform_admins` table/role and a
-settings page that reads and writes this *same* table through the app instead
-of raw SQL — the deny-all policy will then be replaced by a narrowly scoped
-write policy for that role; `veo_matches`/`veo_match_stats`/`veo_sync_status`
-and the sync route itself do not change at all.
+**Platform-admin UI sequencing — superseded 2026-09-22, kept for history**:
+this paragraph described the original v1 plan, where the feature built no
+platform-admin role and the one row in `veo_team_mappings` was created
+directly via SQL by the deployment operator. That plan assumed the separate
+"Platform-Administration" feature would eventually add a `platform_admins`
+role and replace the deny-all policy with a role-scoped one. In practice,
+the manual-SQL step turned out to block real usage entirely (no trainer
+could self-serve, and no such platform-admin feature exists yet). The
+2026-09-22 clarification replaced this with trainer self-service instead of
+waiting on "Platform-Administration": `is_trainer(team_id)` — a role this
+app already has — turned out to be the right authority all along, not a
+new cross-team `platform_admins` role. See §9/§10 for the replacement
+mechanism.
 
 **Alternatives considered**: three fixed `runtimeConfig` values (the
 original v1 plan, before this clarification) — rejected once the explicit
@@ -199,3 +204,76 @@ mapping function against captured real-world fixtures gives regression
 coverage for the one part of the integration this project fully controls,
 consistent with the existing repo convention of unit-testing pure
 `~/utils/*` functions only.
+
+## 9. Interactive login (headless browser)
+
+**Decision**: `POST /api/veo/login` performs the trainer's Veo login itself,
+server-side, using a headless Chromium via Playwright: navigate to Veo's
+real login page (`app.veo.co/accounts/login/`), fill the trainer's email and
+password into the actual visible form fields, submit, wait for the redirect
+back to `app.veo.co` that confirms success (or detect the still-on-login-page
+failure state), then read the resulting `auth.veo.co` cookies from the
+browser context and return them as the same `name=value; ...` string
+previously captured by hand from DevTools. Hard timeout (~30s); browser is
+always closed in a `finally`, whether login succeeded or not.
+
+**Rationale**: Veo's login form posts to an internal API whose exact
+contract could not be determined from the public, minified `auth.veo.co`
+Next.js bundle (checked live during this feature's research — no stable
+`/api/login`-shaped REST path or GraphQL operation name was findable by
+static inspection). Driving the real, visible login form through a headless
+browser is robust to Veo changing that internal contract, since it only
+depends on the login page still rendering an email/password form — the same
+assumption a human doing the manual capture already depended on. This is
+the "fallback" approach §3 originally deferred as "not implemented now" for
+the *daily sync's* session renewal — it is not needed there (the existing
+`prompt=none` silent-renewal flow in `auth.ts` is unchanged and still
+handles that). It is now used, on-demand only, for the trainer-initiated
+*initial* login, a different and much less frequent call site.
+
+**Cost accepted**: adds `playwright` + a Chromium binary as a new runtime
+dependency on the VPS (`playwright install chromium`, see
+[quickstart.md](./quickstart.md)). This only runs when a trainer submits the
+linking form (rare, human-triggered), never on the daily cron sync — the
+sync route's own dependency footprint is unchanged.
+
+**Alternatives considered**: reverse-engineering the internal login POST
+endpoint for a plain `fetch()` call, matching the existing `client.ts`/`auth.ts`
+style with zero new runtime dependencies — rejected for the *login* step
+specifically (still the right style for the *already-confirmed* `/clubs/`,
+`/teams/`, `/matches/`, `/analysis/stats/` endpoints used elsewhere, see
+§10) because static analysis of the login bundle didn't yield a stable
+endpoint to call, and guessing at an undocumented credential-submission
+contract carries more risk than the added Chromium dependency.
+
+## 10. Team/club discovery for the linking picker
+
+**Decision**: After a successful login (§9), `POST /api/veo/login` calls two
+already-authenticated Veo endpoints with the fresh session, using the same
+Bearer-token pattern `client.ts` already uses for `/matches/`:
+
+- `GET /api/app/clubs/?filter=own&fields=slug&fields=name&fields=team_count&fields=is_club_admin` —
+  every club the logged-in Veo user belongs to.
+- `GET /api/app/clubs/{club_slug}/teams/?fields=slug&fields=name&fields=match_count` —
+  every team within one of those clubs.
+
+The route calls the second endpoint once per club from the first, and
+returns the combined `{ clubSlug, clubName, teams: [{ teamSlug, teamName }] }[]`
+list to the client for the picker UI (User Story 4, Clarifications
+2026-09-22: "Auswahl aus den tatsächlichen Clubs/Teams", not manual
+slug entry).
+
+**Evidence**: Both endpoints were confirmed live during this feature's
+research (read-only navigation/fetch calls against an already-authenticated
+session, real response bodies observed) — `GET .../teams/` returned real
+data for the club already configured in production
+(`tsv-ifa-chemnitz`, 8 teams including the already-synced
+`c-junioren-cec9ec43`). `GET /api/app/clubs/?filter=own&...` was observed
+succeeding (200) during ordinary page navigation in the same session: the
+exact request shape the real Veo frontend sends when listing "my clubs".
+
+**Rationale**: Matches this feature's existing precedent (§8: undocumented
+private API, used as ordinary reviewed code, no support/versioning
+guarantee) rather than introducing a new integration style. Keeps
+`client.ts`'s plain-`fetch()`-with-Bearer-token shape for everything except
+the one step (§9) that genuinely needs a browser.

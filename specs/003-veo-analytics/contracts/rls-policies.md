@@ -1,17 +1,22 @@
 # RLS Policies: Veo-Kamera-Analytics
 
-Reuses the existing `public.is_member(team_id)` helper from
+Reuses the existing `public.is_member(team_id)` and `public.is_trainer(team_id)`
+helpers from
 [001-points-and-photos/contracts/rls-policies.md](../../001-points-and-photos/contracts/rls-policies.md)
-plus a new `public.is_veo_enabled(team_id)` security-definer helper, because
-authenticated users cannot query `veo_team_mappings` directly. All five tables
-have RLS enabled and at least one policy. No table below gets an
-`is_trainer`-gated write policy: the analytics tables and the two
-service-role-only tables are not writable by any authenticated user. The sync
-route reads/writes the analytics tables and reads the two protected tables via
-`useAdminDb()` (server-trusted, bypasses RLS entirely); the deployment operator
-may seed the protected tables through direct SQL. The two service-role-only
-tables have explicit deny-all policies for `authenticated`, which satisfy the
-policy-per-table invariant without granting any user access.
+plus a new `public.is_veo_enabled(team_id)` security-definer helper (used by
+the read policies below; `veo_team_mappings` itself no longer needs a
+security-definer indirection since trainers can now query it directly under
+their own row). All five tables have RLS enabled and at least one policy.
+
+**Updated 2026-09-22** (see spec.md's Clarifications): `veo_team_mappings`
+and `veo_sync_credentials` are no longer deny-all for `authenticated` — a
+trainer can write their own team's row directly, through
+`POST /api/veo/login` + `POST /api/veo/link`, which call
+`useUserDb(event, ...)` (RLS-enforced, not `useAdminDb()`) so the database
+itself — not application code — is what stops a trainer from touching
+another team's row. `veo_matches`/`veo_match_stats`/`veo_sync_status` are
+unchanged: still read-only for members, written only by the sync route via
+`useAdminDb()`.
 
 ## `veo_matches`, `veo_match_stats`
 
@@ -39,38 +44,58 @@ No write policy for `authenticated` — only the sync route updates it.
 
 ## `veo_sync_credentials`
 
-RLS enabled with an explicit deny-all policy for `authenticated`. Not readable
-or writable by any `authenticated` or `anon` role under any circumstance — only `service_role`
-(via `useAdminDb()`, called exclusively from
-`app/server/utils/veo/auth.ts`) can access it. This is the strictest
-variant of the existing `service_role`-only-write shape: here even `select`
-is service_role-only, since the row contains a live session credential, not
-just system-managed display data.
+| Policy | Operation, Role | Using / With Check |
+|---|---|---|
+| `veo_sync_credentials_write_trainer` | insert, `authenticated` | with check: `public.is_trainer(team_id)` |
+| `veo_sync_credentials_write_trainer` | update, `authenticated` | using/with check: `public.is_trainer(team_id)` |
+
+**No `select` policy for `authenticated`** — not readable by any
+`authenticated` or `anon` role under any circumstance, including the trainer
+who just wrote it; only `service_role` (via `useAdminDb()`, called
+exclusively from `app/server/utils/veo/auth.ts`) can read it. The row
+contains a live session credential, not just system-managed display data, so
+it stays write-only for the app. The trainer-facing write happens through
+`POST /api/veo/link` using `useUserDb(event, ...)`, immediately after
+`POST /api/veo/login` performs the actual Veo login server-side (see
+[research.md §9](../research.md#9-interactive-login-headless-browser)) — the
+trainer's password itself never reaches this or any other table.
 
 ## `veo_team_mappings`
 
-RLS enabled with an explicit deny-all policy for `authenticated` — same
-service-role-only shape as `veo_sync_credentials`, for the same reason: for
-this feature's own scope, only the sync route
-(`useAdminDb()`) reads it, and only a human with direct DB access writes it
-(see [research.md §5](../research.md#5-team-mapping-veo-team--playerboard-team)).
-This is deliberately the enforcement point for FR-011 — a team with no
-enabled row here gets zero Veo data, regardless of what
-`veo_matches`/`veo_match_stats` RLS would otherwise permit.
+| Policy | Operation, Role | Using / With Check |
+|---|---|---|
+| `veo_team_mappings_read_trainer` | select, `authenticated` | `public.is_trainer(team_id)` |
+| `veo_team_mappings_write_trainer` | insert, `authenticated` | with check: `public.is_trainer(team_id)` |
+| `veo_team_mappings_write_trainer` | update, `authenticated` | using/with check: `public.is_trainer(team_id)` |
 
-When `enabled` is set to false or the mapping row is deleted, the three read
-policies immediately hide the team's retained analytics and sync status. The
-rows remain stored so re-enabling the mapping makes them visible again; this
-does not delete historical data. A Veo match deleted or made private in Veo
-remains visible while the Playerboard mapping itself remains enabled, per the
-feature's retention rule.
+This is deliberately the enforcement point for FR-011 — a team with no row
+here gets zero Veo data, regardless of what `veo_matches`/`veo_match_stats`
+RLS would otherwise permit. `select` is safe to expose (no secret in this
+row — just slugs) and lets the trainer's own settings page show the current
+link status. No `delete` policy — re-running the linking flow upserts
+instead.
 
-**Follow-up, out of scope for this feature**: once the separate
-"Platform-Administration" feature adds a `platform_admins` table/role, it
-will add an `authenticated`-scoped write policy here (`using`/`with check`
-against that role) so its settings UI can manage this table through the app
-instead of raw SQL. No other table in this contract needs to change when
-that happens.
+Re-linking a team to a different Veo team overwrites `veo_club_slug`/
+`veo_team_slug` in place; there is no separate disable action in this
+feature. A Veo match deleted or made private in Veo remains visible while
+the Playerboard mapping itself still exists, per the feature's retention
+rule.
+
+## `POST /api/veo/login` and `POST /api/veo/link` caller authentication
+
+Both require a real Supabase session (`serverSupabaseUser(event)`) and a
+`team_id` in the request body. `POST /api/veo/link` writes
+`veo_team_mappings`/`veo_sync_credentials` via `useUserDb(event, ...)`, so
+the `is_trainer(team_id)` RLS policies above are the actual enforcement
+there — a non-trainer or a trainer of a different team gets a rejected
+write, not a 403 the route code decided on its own. `POST /api/veo/login`
+writes nothing (no row exists yet at that point, so RLS has nothing to
+enforce against), so it runs the existing `requireTrainer(useAdminDb(),
+teamId, userId)` helper (`app/server/utils/db.ts`, already used by
+`app/server/api/invitations/issue.post.ts`) before starting the (expensive)
+headless login — this is the one place in this feature with an
+application-level authorization check instead of a table-level RLS policy,
+precisely because there is no table write to attach the check to.
 
 ## `POST /api/veo/sync` caller authentication
 
@@ -83,13 +108,16 @@ DB or Veo call. See
 ## Negative-test matrix
 
 Constitution Principle II requires every policy in this contract to be
-covered by a test that would fail if the policy were dropped. The two
-`service_role`-only tables are the sensitive ones: a permissive policy there
-exposes the club's Veo login.
+covered by a test that would fail if the policy were dropped. `veo_sync_credentials`
+stays the most sensitive one: a permissive `select` policy there would expose
+the club's live Veo session to any authenticated user.
 
 | # | Actor | Attempt | Expected | Covered by |
 |---|---|---|---|---|
-| V1 | Trainer of the mapped team | `select from veo_sync_credentials` | Empty | `rls-negative-single-team.spec.ts` (N11) |
-| V2 | Trainer of the mapped team | `select from veo_team_mappings` | Empty | `rls-negative-single-team.spec.ts` (N11) |
-| V3 | Member of a team with no enabled mapping | `select from veo_matches` | Empty | `veo-analytics-flow.spec.ts` |
-| V4 | Unauthenticated caller | `POST /api/veo/sync` without/with a wrong bearer | 401 | `api-negative.spec.ts` |
+| V1 | Trainer of the mapped team | `select from veo_sync_credentials` | Empty (no `select` policy exists for anyone) | `rls-negative-single-team.spec.ts` |
+| V2 | Trainer of team A | `insert`/`update veo_sync_credentials` for team B's `team_id` | Denied | `rls-negative-cross-team.spec.ts` |
+| V3 | Trainer of team A | `insert`/`update veo_team_mappings` for team B's `team_id` | Denied | `rls-negative-cross-team.spec.ts` |
+| V4 | Player (non-trainer) of the mapped team | `insert`/`update` on either table for their own team | Denied | `rls-negative-single-team.spec.ts` |
+| V5 | Member of a team with no `veo_team_mappings` row | `select from veo_matches` | Empty | `veo-analytics-flow.spec.ts` |
+| V6 | Unauthenticated caller | `POST /api/veo/sync` without/with a wrong bearer | 401 | `api-negative.spec.ts` |
+| V7 | Player (non-trainer) of a team | `POST /api/veo/login` / `POST /api/veo/link` for that team | 403 | `api-negative.spec.ts` |

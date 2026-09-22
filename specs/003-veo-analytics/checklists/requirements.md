@@ -49,3 +49,9 @@
 - Technische Umsetzungsdetails (OAuth/PKCE-Flow, konkrete Veo-Endpunkte,
   Silent-Renewal vs. Headless-Login, Speicherort der Zugangsdaten) sind
   bewusst nicht Teil dieser Spec, sondern gehören in plan.md/research.md.
+- **2026-09-22**: Der oben beschriebene manuelle Deployment-Operator-/
+  Platform-Admin-Prozess wurde durch Trainer-Self-Service ersetzt (neue
+  Clarifications-Session in spec.md). Alle Checkliste-Punkte oben bleiben
+  gültig — die Spec ist weiterhin vollständig, testbar und
+  technologieneutral formuliert, nur der konkrete Freischaltungs-Mechanismus
+  hat sich geändert.
