@@ -44,7 +44,7 @@ jobs:
           echo "SUPABASE_URL=$(echo "$STATUS" | grep '^API_URL=' | cut -d= -f2-)" >> .env
           echo "SUPABASE_KEY=$(echo "$STATUS" | grep '^ANON_KEY=' | cut -d= -f2-)" >> .env
           echo "SUPABASE_SERVICE_KEY=$(echo "$STATUS" | grep '^SERVICE_ROLE_KEY=' | cut -d= -f2-)" >> .env
-          echo "NUXT_SUPABASE_SERVICE_ROLE_KEY=$(echo "$STATUS" | grep '^SERVICE_ROLE_KEY=' | cut -d= -f2-)" >> .env
+          echo "NUXT_SUPABASE_SECRET_KEY=$(echo "$STATUS" | grep '^SERVICE_ROLE_KEY=' | cut -d= -f2-)" >> .env
           echo "NUXT_SUPABASE_DB_URL=$(echo "$STATUS" | grep '^DB_URL=' | cut -d= -f2-)" >> .env
 
       - run: pnpm typecheck
