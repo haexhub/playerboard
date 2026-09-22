@@ -56,6 +56,12 @@ describe('mapAnalysisStatsToRows', () => {
     expect(rows.some((r) => r.statType === 'football_corner_total')).toBe(false)
   })
 
+  // A team with no analysed match yields an empty item list; that is a valid
+  // response, not a malformed one, and must not abort the sync.
+  it('maps an empty item list to no rows', () => {
+    expect(mapAnalysisStatsToRows({ items: [] }, MATCH_ID)).toEqual([])
+  })
+
   it('throws on a malformed/unexpected payload shape', () => {
     expect(() => mapAnalysisStatsToRows({ unexpected: true }, MATCH_ID)).toThrow()
     expect(() => mapAnalysisStatsToRows(null, MATCH_ID)).toThrow()

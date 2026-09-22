@@ -1,13 +1,11 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { countMailsTo, fetchLatestMagicLink, signInWithMagicLink } from './helpers/magic-link'
+import { SUPABASE_SERVICE_KEY, SUPABASE_URL } from './helpers/supabase-rest'
 
 // Invitation mails against the local Supabase stack + Mailpit. Guards the
 // invitation endpoints: DB failures must map to their intended HTTP status
 // (409/404/410/403) and the UI must always show the outcome instead of
 // staying silent.
-
-const SUPABASE_URL = process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321'
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY ?? ''
 
 const DUPLICATE_MESSAGE = 'An open invitation for this email already exists'
 

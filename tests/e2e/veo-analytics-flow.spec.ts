@@ -1,31 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { signInWithMagicLink } from './helpers/magic-link'
-
-const SUPABASE_URL = process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321'
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY ?? ''
-
-const restHeaders = () => ({
-  apikey: SUPABASE_SERVICE_KEY,
-  Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-  'Content-Type': 'application/json',
-  Prefer: 'return=representation',
-})
-
-const restGet = async <T>(path: string): Promise<T[]> => {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: restHeaders() })
-  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status} ${await res.text()}`)
-  return (await res.json()) as T[]
-}
-
-const restInsert = async <T>(table: string, rows: unknown[]): Promise<T[]> => {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
-    method: 'POST',
-    headers: restHeaders(),
-    body: JSON.stringify(rows),
-  })
-  if (!res.ok) throw new Error(`INSERT ${table} failed: ${res.status} ${await res.text()}`)
-  return (await res.json()) as T[]
-}
+import { SUPABASE_URL, restGet, restHeaders, restInsert } from './helpers/supabase-rest'
 
 const restUpsert = async (table: string, onConflict: string, row: unknown): Promise<void> => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=${onConflict}`, {
