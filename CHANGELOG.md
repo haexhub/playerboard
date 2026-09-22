@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.5](https://github.com/haexhub/playerboard/compare/v0.3.4...v0.3.5) (2026-09-22)
+
+
+### Bug Fixes
+
+* **api:** stop leaking driver errors and make the Veo sync fail closed ([68f6685](https://github.com/haexhub/playerboard/commit/68f66857b7d1e5fc4124de35574b65c84eedea13))
+* **db:** generate structural migrations with drizzle-kit ([7088c53](https://github.com/haexhub/playerboard/commit/7088c53558b35198a9651d08e0f16d6050527119))
+* **invitations:** correct the invite-mail secret-key env var name ([0fcf86d](https://github.com/haexhub/playerboard/commit/0fcf86d67ac5b469a8dba6e60dc24cf6b72c628b))
+* **invitations:** document NUXT_SUPABASE_SECRET_KEY instead of the dead service-role name ([9b16dcf](https://github.com/haexhub/playerboard/commit/9b16dcffebe3e602bd3b77ef484cbfd95276caf5))
+* **rls:** close invitation escalation and harden schema guards ([f55a63a](https://github.com/haexhub/playerboard/commit/f55a63a2521b2b23f66fcee92579620cdab4b768))
+
 ## [0.3.4](https://github.com/haexhub/playerboard/compare/v0.3.3...v0.3.4) (2026-09-22)
 
 
