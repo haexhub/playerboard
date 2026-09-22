@@ -38,41 +38,27 @@ export const usePlayerScores = () => {
     }))
   }
 
-  // Derives team average / median per category from every active player's
-  // point_entries in the timeframe. Skips nulls (players with no entries
-  // in that category simply don't contribute).
+  // Team average / median per category across the active players' per-player
+  // sums in the timeframe. Aggregated in SQL (get_team_category_stats): only
+  // players with an entry in a category contribute; a category nobody scored
+  // in is absent from the map.
   const teamStatsForActivePlayers = async (
     team_id: string,
     from: string,
     to: string,
-    active_player_ids: string[],
-  ): Promise<Map<string, { avg: number | null; median: number | null }>> => {
-    const perCategory = new Map<string, number[]>()
-    await Promise.all(
-      active_player_ids.map(async (pid) => {
-        const rows = await forPlayer(team_id, pid, from, to)
-        for (const r of rows) {
-          if (r.sum_value === 0 && r.avg_value === null) continue
-          const arr = perCategory.get(r.category_id) ?? []
-          arr.push(r.sum_value)
-          perCategory.set(r.category_id, arr)
-        }
-      }),
+  ): Promise<Map<string, { avg: number; median: number }>> => {
+    const { data, error } = await client.rpc('get_team_category_stats', {
+      p_team: team_id,
+      p_from: from,
+      p_to: to,
+    })
+    if (error) throw error
+    return new Map(
+      (data ?? []).map((row) => [
+        row.category_id,
+        { avg: Number(row.team_avg), median: Number(row.team_median) },
+      ]),
     )
-
-    const out = new Map<string, { avg: number | null; median: number | null }>()
-    for (const [cat, values] of perCategory.entries()) {
-      if (values.length === 0) {
-        out.set(cat, { avg: null, median: null })
-        continue
-      }
-      const sorted = [...values].sort((a, b) => a - b)
-      const avg = values.reduce((s, v) => s + v, 0) / values.length
-      const mid = Math.floor(sorted.length / 2)
-      const median = sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!
-      out.set(cat, { avg, median })
-    }
-    return out
   }
 
   // Time-series data for one player: point_entries in the timeframe joined

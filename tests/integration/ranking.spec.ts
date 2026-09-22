@@ -216,3 +216,57 @@ describe('get_team_ranking', () => {
     expect(ranking.rows[1]!.rank_position).toBe(2)
   })
 })
+
+describe('get_team_category_stats', () => {
+  // Mirrors what the player page used to compute client-side: the average and
+  // median of per-player sums, counting only players who scored in the category.
+  it('averages per-player sums over participants only', async () => {
+    const { stats, catId } = await runIsolated(async (tx) => {
+      const userId = crypto.randomUUID()
+      const teamId = crypto.randomUUID()
+      await tx`insert into auth.users (id) values (${userId})`
+      await tx`insert into public.teams (id, name, slug)
+               values (${teamId}, 'Stats Team', ${'stats-' + userId.slice(0, 8)})`
+      await tx`insert into public.memberships (user_id, team_id, role)
+               values (${userId}, ${teamId}, 'trainer')`
+      const catId = crypto.randomUUID()
+      await tx`insert into public.point_categories (id, team_id, name, active, sort_order, value_min, value_max)
+               values (${catId}, ${teamId}, 'Einsatz', true, 1, 0, 10)`
+
+      const scorer = crypto.randomUUID()
+      const zero = crypto.randomUUID()
+      const absent = crypto.randomUUID()
+      const inactive = crypto.randomUUID()
+      for (const id of [scorer, zero, absent, inactive]) {
+        await tx`insert into public.players (id, team_id, name, active)
+                 values (${id}, ${teamId}, ${'P-' + id.slice(0, 4)}, true)`
+      }
+      const today = new Date().toISOString().slice(0, 10)
+      const saved = crypto.randomUUID()
+      const draft = crypto.randomUUID()
+      await tx`insert into public.trainings (id, team_id, date, status) values
+               (${saved}, ${teamId}, ${today}, 'saved'), (${draft}, ${teamId}, ${today}, 'draft')`
+      await tx`insert into public.point_entries (training_id, player_id, category_id, value) values
+               (${saved}, ${scorer}, ${catId}, 4),
+               (${saved}, ${zero}, ${catId}, 0),
+               (${draft}, ${absent}, ${catId}, 9),
+               (${saved}, ${inactive}, ${catId}, 10)`
+      // Scored while active, deactivated afterwards: must drop out of the stats.
+      await tx`update public.players set active = false where id = ${inactive}`
+
+      await tx`select set_config('role', 'authenticated', true)`
+      await tx`select set_config('request.jwt.claims', ${JSON.stringify({ sub: userId, role: 'authenticated' })}, true)`
+      const stats = await tx<{ category_id: string; team_avg: string; team_median: number }[]>`
+        select * from public.get_team_category_stats(${teamId}::uuid, ${today}::date, ${today}::date)
+      `
+      return { stats, catId }
+    })
+
+    // Participants: scorer (4) and zero (0). Absent only has a draft entry,
+    // inactive is excluded, so both must not pull the numbers toward 9 or 10.
+    expect(stats).toHaveLength(1)
+    expect(stats[0]!.category_id).toBe(catId)
+    expect(Number(stats[0]!.team_avg)).toBe(2)
+    expect(Number(stats[0]!.team_median)).toBe(2)
+  })
+})
