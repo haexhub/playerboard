@@ -36,12 +36,16 @@ export default defineEventHandler(async (event) => {
   // accept_invitation() keeps an existing membership untouched, so inviting a
   // current member (e.g. to change their role) would be accepted and then
   // silently do nothing. Roles are changed on the members page instead.
+  // auth.users is Supabase-owned and deliberately not modelled beyond its key
+  // in the Drizzle schema, so its e-mail is read through a raw subquery.
   const [existingMember] = await db
     .select({ userId: schema.memberships.userId })
     .from(schema.memberships)
-    .innerJoin(schema.authUsers, eq(schema.authUsers.id, schema.memberships.userId))
     .where(
-      and(eq(schema.memberships.teamId, team_id), sql`lower(${schema.authUsers.email}) = ${email}`),
+      and(
+        eq(schema.memberships.teamId, team_id),
+        sql`${schema.memberships.userId} in (select id from auth.users where lower(email) = ${email})`,
+      ),
     )
     .limit(1)
   if (existingMember) {
