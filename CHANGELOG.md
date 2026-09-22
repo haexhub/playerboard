@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.3](https://github.com/haexhub/playerboard/compare/v0.3.2...v0.3.3) (2026-09-22)
+
+
+### Bug Fixes
+
+* **auth:** log why the callback could not establish a session ([8099ce2](https://github.com/haexhub/playerboard/commit/8099ce2a232fedadd1e60ebe5b52c9fd9dc93283))
+* **auth:** make the login link work across devices ([919686f](https://github.com/haexhub/playerboard/commit/919686f2c22cf1528a02d708309116aee74c0516))
+* **auth:** request the login mail with the implicit flow so links work across devices ([a53e264](https://github.com/haexhub/playerboard/commit/a53e26497c30ab38e42a5a2fc37fcf7b4a761b73))
+* **auth:** stop pollForSession from racing ahead of the reactive user ref ([f3a60f4](https://github.com/haexhub/playerboard/commit/f3a60f45c38d6b449805797e2354ada69c56aeda))
+
 ## [0.3.2](https://github.com/haexhub/playerboard/compare/v0.3.1...v0.3.2) (2026-09-21)
 
 
