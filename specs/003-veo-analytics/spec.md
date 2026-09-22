@@ -14,8 +14,16 @@
 - Q: Wie zeitnah müssen neue Match-Stats nach einem Spiel in Playerboard sichtbar sein? → A: Täglicher Batch reicht — einmal pro Nacht synchronisieren ist ausreichend.
 - Q: Wer soll den Sync-Status (letzter erfolgreicher Sync / Fehler-Hinweis) aus User Story 3 sehen können? → A: Alle Team-Mitglieder (Trainer und Spieler), nicht nur Trainer/Admin — der Status selbst ist keine sensible Information.
 - Q: Was passiert mit bereits übernommenen Spieldaten, wenn das zugehörige Spiel in Veo nachträglich gelöscht oder auf privat gestellt wird? → A: Sie bleiben dauerhaft sichtbar; es gibt keinen aktiven Abgleich/Löschmechanismus gegen den Veo-Bestand.
-- Q: Wie wird festgelegt, welches Playerboard-Team Veo-Daten sehen darf, und wer darf das ändern? → A: Die Freischaltung ist eine Platform-Admin-Entscheidung und wird in v1 über einen geschützten direkten Datenbankeintrag des Deployment-Operators umgesetzt; die Einstellungs-Oberfläche folgt im separaten Feature "Platform-Administration". Sie wird nicht automatisch aus einer festen Konfiguration abgeleitet — kein Team hat ohne diese Freischaltung Zugriff.
-- Q: Soll die Platform-Admin-Rolle (inkl. Ernennen/Entfernen weiterer Admins) Teil dieser Spec sein? → A: Nein — eigenes, vorgelagertes Feature ("Platform-Administration"); diese Spec setzt darauf auf und liefert nur die Veo-spezifische Team-Zuordnung innerhalb dieser Verwaltung.
+- Q: Wie wird festgelegt, welches Playerboard-Team Veo-Daten sehen darf, und wer darf das ändern? → A: Die Freischaltung ist eine Platform-Admin-Entscheidung und wird in v1 über einen geschützten direkten Datenbankeintrag des Deployment-Operators umgesetzt; die Einstellungs-Oberfläche folgt im separaten Feature "Platform-Administration". Sie wird nicht automatisch aus einer festen Konfiguration abgeleitet — kein Team hat ohne diese Freischaltung Zugriff. **Superseded 2026-09-22, siehe unten.**
+- Q: Soll die Platform-Admin-Rolle (inkl. Ernennen/Entfernen weiterer Admins) Teil dieser Spec sein? → A: Nein — eigenes, vorgelagertes Feature ("Platform-Administration"); diese Spec setzt darauf auf und liefert nur die Veo-spezifische Team-Zuordnung innerhalb dieser Verwaltung. **Superseded 2026-09-22, siehe unten.**
+
+### Session 2026-09-22
+
+- Q: Der Platform-Admin-gebundene Freischaltungsprozess (manuelles SQL durch den Deployment-Operator) blockiert praktisch jede Nutzung durch echte Trainer. Soll das durch einen Trainer-Self-Service ersetzt werden? → A: Ja, vollständig — der Platform-Admin-Teil aus User Story 4 entfällt ersatzlos. Jeder Trainer eines Teams richtet Veo für sein eigenes Team selbst ein, ohne fremde Freigabe.
+- Q: Wie sollen die Veo-Zugangsdaten erfasst werden? → A: Der Trainer gibt seine echte Veo-E-Mail/Passwort in einem Formular ein; das System loggt sich damit einmalig bei Veo ein und speichert ausschließlich das daraus resultierende Session-Cookie (wie bisher in `veo_sync_credentials`). Das Passwort selbst wird nie persistiert, nicht geloggt, nur für die Dauer des Login-Vorgangs im Speicher gehalten.
+- Q: Ein Trainer kann mehrere Teams sowohl in Veo als auch in Playerboard haben — wie wird zugeordnet? → A: Nach dem Login zeigt das System die tatsächlichen Clubs/Teams des eingeloggten Veo-Accounts zur Auswahl (kein manuelles Eintippen von Kürzeln). Die Auswahl wird gegen genau das eine Playerboard-Team gespeichert, von dessen Einstellungsseite aus der Trainer den Vorgang gestartet hat. Ein Trainer mit mehreren Playerboard-Teams wiederholt den Vorgang pro Team.
+
+**Diese Session hebt den Platform-Admin-Teil von User Story 4 sowie FR-010/FR-011/FR-013 in ihrer bisherigen Form auf — Details in den entsprechenden Abschnitten unten.**
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -106,39 +114,50 @@ bzw. veralteten Sync, ohne falsche oder widersprüchliche Daten anzuzeigen.
 
 ---
 
-### User Story 4 - Veo-Zugriff wird explizit für ein Team freigeschaltet (Priority: P1)
+### User Story 4 - Trainer verknüpft sein Team selbst mit Veo (Priority: P1)
 
-In v1 setzt der Deployment-Operator die Freischaltungsentscheidung des
-Platform-Admins über einen geschützten direkten Datenbankeintrag um und
-hinterlegt dort das zugehörige Veo-Club-/Team-Kürzel. Die Einstellungs-
-Oberfläche gehört zum separaten Feature "Platform-Administration". Ohne diese
-explizite Freischaltung sieht kein Team Veo-Daten — auch nicht versehentlich
-durch eine falsche oder fehlende Konfiguration.
+*(Ersetzt seit 2026-09-22 die ursprüngliche, Platform-Admin-gebundene Fassung
+dieser User Story — siehe Clarifications.)*
 
-**Why this priority**: User Story 1-3 dürfen aus Sicherheitsgründen nicht
-ohne diese Freischaltung ausgeliefert werden — ein Team darf niemals
-automatisch Zugriff auf Veo-Daten bekommen. Die spätere Platform-Admin-
-Oberfläche baut auf dem vorgelagerten Feature "Platform-Administration" auf;
-bis dahin ist die manuelle, dokumentierte Ops-Aktion der einzige v1-Weg.
+Ein Trainer öffnet die Veo-Einstellungsseite seines Teams, gibt seine
+Veo-E-Mail-Adresse und sein Veo-Passwort ein, wählt aus seinen tatsächlichen
+Veo-Clubs/-Teams das passende aus und bestätigt. Ab diesem Moment ist genau
+dieses Playerboard-Team für den Veo-Sync freigeschaltet und dem gewählten
+Veo-Team zugeordnet. Kein Platform-Admin, kein Deployment-Operator und keine
+manuelle Datenbank-Aktion sind dafür nötig. Ein Trainer mit mehreren
+Playerboard-Teams wiederholt den Vorgang für jedes Team einzeln.
 
-**Independent Test**: Der Deployment-Operator legt die dokumentierte
-`veo_team_mappings`-Zeile für ein Team mit Club-/Team-Kürzel an; nur dieses
-Team hat danach Zugriff. Ein Team ohne aktivierte Zeile sieht weiterhin
-nichts.
+**Why this priority**: User Story 1-3 setzen voraus, dass ein Team überhaupt
+Veo-Daten sehen darf — ohne diesen Selbstbedienungs-Weg bleibt das Feature für
+echte Trainer unbenutzbar. Gleichzeitig bleibt die Kernanforderung aus der
+Vorgängerfassung erhalten: kein Team bekommt automatisch oder versehentlich
+Zugriff — die Freischaltung erfordert weiterhin eine explizite,
+authentifizierte Aktion, nur jetzt durch den Trainer selbst statt durch einen
+Platform-Admin.
+
+**Independent Test**: Ein Trainer durchläuft den Verknüpfungs-Dialog für sein
+Team mit echten Veo-Zugangsdaten; danach zeigt `/t/[slug]/analytics` Daten für
+das gewählte Veo-Team. Ein anderes Team, dessen Trainer den Dialog nie
+durchlaufen hat, sieht weiterhin nichts.
 
 **Acceptance Scenarios**:
 
-1. **Given** der Platform-Admin hat die Freischaltung entschieden, **When** der
-   Deployment-Operator die Mapping-Zeile mit `enabled = true` und dem
-   Club-/Team-Kürzel direkt in der Datenbank anlegt, **Then** kann dieses Team
-   ab dem nächsten Sync-Lauf Veo-Daten sehen.
-2. **Given** für ein Team wurde keine Mapping-Zeile aktiviert, **When** ein Mitglied
-   dieses Teams die Analytics-Seite öffnet, **Then** sieht es keine
-   Veo-Daten.
-3. **Given** der Deployment-Operator setzt `enabled = false` oder löscht die
-   Mapping-Zeile, **When** ein Mitglied die Analytics-Seite öffnet, **Then**
-   sieht es weder neue noch bereits gespeicherte Veo-Daten; die Daten bleiben
-   für eine spätere Reaktivierung gespeichert.
+1. **Given** ein Trainer ist bei seinem Team angemeldet, **When** er im
+   Verknüpfungs-Dialog gültige Veo-Zugangsdaten eingibt, **Then** zeigt das
+   System die tatsächlichen Clubs/Teams seines Veo-Accounts zur Auswahl.
+2. **Given** der Trainer hat ein Veo-Team aus der Liste ausgewählt und
+   bestätigt, **When** der nächste Sync-Lauf läuft, **Then** kann dieses
+   Playerboard-Team ab sofort Veo-Daten für das gewählte Veo-Team sehen.
+3. **Given** für ein Team wurde der Verknüpfungs-Dialog nie durchlaufen,
+   **When** ein Mitglied dieses Teams die Analytics-Seite öffnet, **Then**
+   sieht es keine Veo-Daten.
+4. **Given** ein Trainer gibt falsche Veo-Zugangsdaten ein, **When** der Login
+   fehlschlägt, **Then** zeigt das System einen klaren Fehlerhinweis und
+   speichert nichts.
+5. **Given** ein Trainer verwaltet mehrere Playerboard-Teams, **When** er den
+   Dialog für Team A durchläuft, **Then** bleibt Team B unverändert — die
+   Verknüpfung gilt immer nur für das Team, von dessen Einstellungsseite aus
+   der Trainer den Vorgang gestartet hat.
 
 ---
 
@@ -148,15 +167,14 @@ nichts.
   gelöscht oder auf privat gestellt: Playerboard zeigt die zuletzt
   synchronisierten Daten dauerhaft weiter an; es gibt keinen aktiven
   Abgleich, der Spiele wieder entfernt, die in Veo verschwunden sind.
-- Ein Team wurde nicht für Veo freigeschaltet (keine aktivierte Zeile in der
-  Team-Zuordnung): Playerboard zeigt für dieses Team keine Veo-Daten und
-  keinen Sync-Status an, nicht die Daten eines anderen Teams. Wird eine
-  bestehende Zuordnung deaktiviert, bleiben die Daten gespeichert, sind aber
-  bis zur Reaktivierung nicht lesbar.
-- Der Veo-Zugang des Vereins läuft ab (z. B. Session ungültig): Sync-Läufe
+- Ein Team wurde nicht für Veo freigeschaltet (der Trainer hat den
+  Verknüpfungs-Dialog nie durchlaufen): Playerboard zeigt für dieses Team
+  keine Veo-Daten und keinen Sync-Status an, nicht die Daten eines anderen
+  Teams.
+- Der Veo-Zugang des Trainers läuft ab (z. B. Session ungültig): Sync-Läufe
   schlagen fehl, bestehende Daten bleiben unverändert sichtbar, der Hinweis
-  aus User Story 3 macht den Zustand sichtbar; ein Mensch muss den Zugang
-  manuell erneuern.
+  aus User Story 3 macht den Zustand sichtbar; der Trainer durchläuft den
+  Verknüpfungs-Dialog erneut, um die Session zu erneuern.
 - Ein Spiel hat in Veo keine oder nur unvollständige Statistik-Kategorien
   (z. B. weil die KI-Auswertung bestimmte Ereignisse nicht erkannt hat):
   Playerboard zeigt genau die Kategorien, die Veo liefert, keine
@@ -196,38 +214,33 @@ nichts.
   sichtbar machen, wann der letzte erfolgreiche Sync stattgefunden hat, und
   MUST erkennbar machen, wenn mehrere Sync-Läufe in Folge fehlgeschlagen
   sind.
-- **FR-010**: System MUST den Zugang zum Veo-Account des Vereins so
-  speichern, dass er ausschließlich dem automatischen Sync zur Verfügung
-  steht — niemals für normale Mitglieder oder Spieler-Accounts einsehbar oder
-  nutzbar.
-- **FR-011**: In v1 MUST die Zuordnung eines Veo-Club-/Team-Kürzels zu einem
-  Playerboard-Team als explizite, dokumentierte direkte SQL-Aktion des
-  Deployment-Operators angelegt, geändert oder deaktiviert werden — nicht fest
-  im Code oder Deployment verdrahtet. Diese Aktion setzt die Entscheidung des
-  Platform-Admins um; die dafür vorgesehene Einstellungs-Oberfläche gehört zum
-  separaten Feature "Platform-Administration". Ein Team MUST erst nach einer
-  aktivierten Zuordnung Veo-Daten synchronisieren oder anzeigen können; ohne
-  aktivierte Zuordnung darf ein Team keinerlei Veo-Daten sehen.
+- **FR-010**: System MUST das Ergebnis des Veo-Logins (das Session-Cookie) so
+  speichern, dass es ausschließlich dem automatischen Sync zur Verfügung
+  steht — niemals für irgendeinen authentifizierten Client, auch nicht den
+  Trainer selbst, auslesbar. Das Veo-Passwort selbst MUST System nie
+  persistieren oder loggen; es MUST nur für die Dauer des einmaligen
+  Login-Vorgangs im Arbeitsspeicher gehalten werden.
+- **FR-011**: System MUST es dem Trainer eines Teams ermöglichen, sein Team
+  selbst für Veo-Sync freizuschalten: Login mit eigenen Veo-Zugangsdaten,
+  Auswahl aus den tatsächlichen Clubs/Teams seines Veo-Accounts, Speicherung
+  der Zuordnung für genau das Playerboard-Team, von dem aus der Vorgang
+  gestartet wurde. Keine Platform-Admin- oder Deployment-Operator-Aktion MUST
+  dafür nötig sein. Ein Team MUST erst nach einer erfolgreich abgeschlossenen
+  Verknüpfung Veo-Daten synchronisieren oder anzeigen können; ohne
+  abgeschlossene Verknüpfung darf ein Team keinerlei Veo-Daten sehen.
 - **FR-012**: Spieler-individuelle Statistiken (pro Person statt pro Team)
   sind expliziter Nicht-Teil dieses Features.
-- **FR-013**: Dieses Feature MUST keine eigene Administratoren-Verwaltung
-  bauen. Sobald das vorgelagerte Feature "Platform-Administration" seine
-  Platform-Admin-Rolle und Einstellungs-Oberfläche bereitstellt, MUST nur diese
-  Rolle die Veo-Team-Zuordnung aus FR-011 ändern dürfen; bis dahin erfolgt die
-  Änderung ausschließlich über den dokumentierten Deployment-Operator-
-  Prozess.
+- **FR-013**: *(entfällt seit 2026-09-22 — es gibt keine Platform-Admin-Rolle
+  mehr, gegen die die Veo-Team-Zuordnung geprüft werden müsste; FR-011 regelt
+  die Berechtigung jetzt direkt als "Trainer des betroffenen Teams".)*
 
 ### Key Entities
 
 - **Team-Zuordnung**: Verknüpft ein Playerboard-Team mit dem entsprechenden
-  Team im Veo-Account des Vereins (Club-/Team-Kürzel); in v1 über eine
-  dokumentierte direkte SQL-Aktion des Deployment-Operators angelegt,
-  geändert oder deaktiviert. Grundlage dafür, ob und welche Spiele für ein
-  Team synchronisiert und gelesen werden — ohne aktivierte Zuordnung kein
-  Zugriff.
-- **Platform-Admin**: Eine teamübergreifende Berechtigung, definiert im
-  vorgelagerten Feature "Platform-Administration"; hier nur als
-  Voraussetzung referenziert, um die Team-Zuordnung zu verwalten.
+  Team im Veo-Account des Trainers (Club-/Team-Kürzel); vom Trainer des
+  betroffenen Teams selbst über den Verknüpfungs-Dialog angelegt oder
+  geändert. Grundlage dafür, ob und welche Spiele für ein Team synchronisiert
+  und gelesen werden — ohne abgeschlossene Verknüpfung kein Zugriff.
 - **Spiel (Match)**: Ein einzelnes, von Veo aufgezeichnetes und ausgewertetes
   Spiel mit Ergebnis, Datum/Gegner und den zugehörigen Statistik-Kategorien
   für eigenes Team und Gegner.
@@ -255,15 +268,11 @@ nichts.
 
 ## Assumptions
 
-- Der Verein hat einen eigenen, aktiven Veo-Account mit mindestens einem
-  Team, dessen Spiele mit aktivierter Analyse aufgezeichnet werden.
-- Die Platform-Admin-Rolle und ihre Einstellungs-Oberfläche gehören zum
-  vorgelagerten, separaten Feature "Platform-Administration". Bis dieses
-  Feature existiert, wird die Freischaltungsentscheidung über den
-  dokumentierten Deployment-Operator-Prozess umgesetzt.
-- Für den aktuellen Bedarf des Vereins wird zum Start genau ein
-  Playerboard-Team über eine direkte SQL-Aktion freigeschaltet; das System
-  schränkt die Anzahl möglicher Zuordnungen nicht künstlich ein.
+- Trainer haben einen eigenen, aktiven Veo-Account mit mindestens einem Team,
+  dessen Spiele mit aktivierter Analyse aufgezeichnet werden.
+- Ein Trainer kann mehrere Playerboard-Teams und mehrere Veo-Teams verwalten;
+  das System schränkt die Anzahl möglicher Zuordnungen nicht künstlich ein —
+  der Verknüpfungs-Dialog wird pro Playerboard-Team einzeln durchlaufen.
 - Täglicher Sync ist ausreichend zeitnah; ein Bedarf an Beinahe-Echtzeit-
   Updates direkt nach Spielende besteht nicht.
 - Das erneute Herstellen des Veo-Zugangs, falls dieser abläuft oder ungültig

@@ -90,3 +90,46 @@ export const fetchAnalysisStats = async (
       group_by: 'team_association',
     }),
   })
+
+// Shapes confirmed live during Phase 7 research (research.md §10) against a
+// real, already-authenticated session — not from Veo's own documentation
+// (there is none for this private API).
+const veoClubSchema = z.object({
+  slug: z.string(),
+  name: z.string(),
+})
+
+const veoTeamSchema = z.object({
+  slug: z.string(),
+  name: z.string(),
+})
+
+export type VeoClub = z.infer<typeof veoClubSchema>
+export type VeoTeam = z.infer<typeof veoTeamSchema>
+
+/** GET .../api/app/clubs/?filter=own — every club the token's Veo user
+ * belongs to. Used only by the trainer-initiated linking flow
+ * (`POST /api/veo/login`), never by the daily sync. */
+export const listOwnClubs = async (accessToken: string): Promise<VeoClub[]> => {
+  const query = new URLSearchParams({ page_size: '500', filter: 'own' })
+  for (const field of ['slug', 'name', 'team_count', 'is_club_admin']) query.append('fields', field)
+  const json = await veoFetch<unknown>(accessToken, `/clubs/?${query.toString()}`)
+  const parsed = z.array(veoClubSchema).safeParse(json)
+  if (!parsed.success) {
+    throw new Error('Unexpected Veo clubs response shape')
+  }
+  return parsed.data
+}
+
+/** GET .../api/app/clubs/{club_slug}/teams/ — every team within one club.
+ * Used only by the trainer-initiated linking flow. */
+export const listClubTeams = async (accessToken: string, clubSlug: string): Promise<VeoTeam[]> => {
+  const query = new URLSearchParams()
+  for (const field of ['slug', 'name', 'match_count']) query.append('fields', field)
+  const json = await veoFetch<unknown>(accessToken, `/clubs/${clubSlug}/teams/?${query.toString()}`)
+  const parsed = z.array(veoTeamSchema).safeParse(json)
+  if (!parsed.success) {
+    throw new Error('Unexpected Veo teams response shape')
+  }
+  return parsed.data
+}

@@ -193,6 +193,20 @@ test.describe('RLS negative — cross team (SC-008, SC-009)', () => {
       )
       expect(x6.ok()).toBe(true)
       expect(await x6.json()).toEqual([])
+
+      // X11 — link team B to Veo from team A's side (contracts/rls-policies.md V3).
+      const x11 = await trainerACtx.request.post(`${SUPABASE_URL}/rest/v1/veo_team_mappings`, {
+        headers: asUser(token),
+        data: [{ team_id: teamBId, veo_club_slug: 'x', veo_team_slug: 'y' }],
+      })
+      expect(x11.ok()).toBe(false)
+
+      // X12 — write team B's Veo session credentials from team A's side (V2).
+      const x12 = await trainerACtx.request.post(`${SUPABASE_URL}/rest/v1/veo_sync_credentials`, {
+        headers: asUser(token),
+        data: [{ team_id: teamBId, session_cookie: 'x', captured_at: new Date().toISOString() }],
+      })
+      expect(x12.ok()).toBe(false)
     }
 
     // X1..X6 as TU_A.

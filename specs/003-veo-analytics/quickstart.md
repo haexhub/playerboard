@@ -11,7 +11,16 @@ Veo password or session value itself (see
 
 ```
 NUXT_VEO_SYNC_SECRET=<random shared secret, used by the cron call>
+NUXT_VEO_LINK_TOKEN_SECRET=<random secret, signs the short-lived token between /api/veo/login and /api/veo/link>
 ```
+
+`NUXT_VEO_LINK_TOKEN_SECRET` encrypts and signs the ~5-minute token that
+carries the freshly captured session cookie from `POST /api/veo/login`'s
+response to `POST /api/veo/link`'s request body. The browser receives only an
+opaque token and cannot decode the raw cookie (see [research.md §9](./research.md#9-interactive-login-headless-browser)).
+Generate a high-entropy secret and keep it confidential: anyone who obtains it
+could forge a valid token and replace the stored session cookie for a team they
+can otherwise access as a trainer.
 
 ## Local development — no live Veo dependency
 
@@ -28,44 +37,75 @@ real Veo API:
 - `POST /api/veo/sync` itself can be smoke-tested locally only by someone
   with real club credentials, manually, against the real Veo API — not part
   of the automated suite.
+- `POST /api/veo/login` (§9) is tested the same way: the RLS/role gating
+  (V4/V7 in the negative-test matrix) runs against the local Supabase DB
+  without a real login, but an actual successful login against `auth.veo.co`
+  can only be smoke-tested manually, by a trainer with real Veo credentials.
 
-## Enabling a team for Veo sync (manual, outside this repo's automation)
+## Enabling a team for Veo sync (self-service, since 2026-09-22)
 
-Until the separate "Platform-Administration" feature ships a settings UI
-for this, both of the following are done via direct SQL by whoever operates
-the deployment ([research.md §5](./research.md#5-team-mapping-veo-team--playerboard-team)):
+**Superseded the original manual-SQL process below.** A trainer opens their
+team's Veo settings page (`/t/[slug]/team/veo`), enters their own Veo email
+and password, picks the matching club/team from the list the app fetches
+from their real Veo account, and confirms — see spec.md's User Story 4 and
+Clarifications (2026-09-22). This single action does what the two manual
+steps below used to require: it inserts/updates `veo_team_mappings`
+(club/team slug, `enabled = true`), whose trainer-scoped access is protected by
+RLS, and persists the session cookie in `veo_sync_credentials` through the
+authorized server route (`useAdminDb()` plus `requireTrainer()`). The credential
+table remains deny-all to authenticated clients. No deployment operator, no
+direct SQL, no platform-admin step.
+
+To re-establish a session once `veo_sync_status.consecutive_failures`
+indicates it has stopped renewing, the trainer just repeats the same flow.
+
+<details>
+<summary>Original v1 process (manual SQL) — kept for history, no longer used</summary>
+
+Until 2026-09-22, both of the following were done via direct SQL by whoever
+operated the deployment
+([research.md §5](./research.md#5-team-mapping-veo-team--playerboard-team)):
 
 1. Insert one row into `veo_team_mappings` for the team being enabled:
    `team_id` (the Playerboard team's uuid), `veo_club_slug` (e.g.
    `tsv-ifa-chemnitz`), `veo_team_slug` (e.g. `c-junioren-cec9ec43`),
-   `enabled = true`. No row for a team means no Veo access for it — this is
-   the actual security boundary (FR-011), not a convenience default.
-2. To revoke access, set that row's `enabled = false` (or delete it) — the
-   sync route skips it on the next run and the RLS read policies hide the
-   team's retained data and sync status; the rows remain stored for a later
-   re-enable. This is separate from the retention rule for a match deleted or
-   made private in Veo, which remains visible while the Playerboard mapping is
-   enabled.
+   `enabled = true`.
+2. A trainer/admin logs into `app.veo.co` with the club account in a normal
+   browser, copies the `auth.veo.co` cookies from DevTools as one
+   `name=value; name2=value2` string, and inserts it into
+   `veo_sync_credentials` for the team via a direct DB write.
 
-## One-time credential capture (manual, outside this repo's automation)
+</details>
 
-1. A trainer/admin logs into `app.veo.co` with the club account in a normal
-   browser.
-2. In DevTools → Application/Storage → Cookies for `https://auth.veo.co`,
-   copy every cookie as one `name=value; name2=value2` string (this is what
-   `app/server/utils/veo/auth.ts` sends as the `Cookie` header for the
-   silent-renewal request).
-3. Insert it into `veo_sync_credentials` for the team via a direct DB write
-   (e.g. `psql`/Supabase SQL editor) — not through any app UI in v1
-   ([research.md §3](./research.md#3-veo-authentication-strategy)):
-   ```sql
-   insert into veo_sync_credentials (team_id, session_cookie, captured_at)
-   values ('<team uuid>', '<cookie string from step 2>', now())
-   on conflict (team_id) do update
-     set session_cookie = excluded.session_cookie, captured_at = excluded.captured_at;
-   ```
-3. This step is repeated whenever `veo_sync_status.consecutive_failures`
-   indicates the session has stopped renewing.
+## New runtime dependency: Chromium
+
+`POST /api/veo/login` ([research.md §9](./research.md#9-interactive-login-headless-browser))
+drives a real headless Chromium to perform the trainer's Veo login. This
+only runs on-demand when a trainer submits the linking form, never on the
+daily cron sync — `POST /api/veo/sync` itself has no new dependency.
+
+Production runs as a prebuilt Docker image
+(`ghcr.io/haexhub/playerboard`, built by `.github/workflows/ci.yml`), not a
+bare VPS process — the deployment Ansible role (`Projekte/ansible`,
+`roles/playerboard/`) only pulls and runs that image, it doesn't build it.
+So the Chromium dependency lives in the **Dockerfile** itself, not in any
+manual VPS/Ansible step:
+
+- Playwright's own bundled Chromium download doesn't support Alpine's musl
+  libc (the app's base image, `node:22-alpine`), so the `deps` stage sets
+  `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` before `pnpm install`, and the
+  `runner` stage installs Alpine's own `chromium` package instead
+  (`apk add chromium`), pointing at it via
+  `NUXT_VEO_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium`
+  (`runtimeConfig.veoChromiumExecutablePath` in `nuxt.config.ts`, read by
+  `app/server/utils/veo/login.ts`). Verified working end-to-end in a
+  `node:22-alpine` container during this change.
+- `--no-sandbox` is passed when launching (required to run Chromium as the
+  container's non-root user); the only page ever navigated to is Veo's own
+  login form, not arbitrary content.
+- Local dev leaves `NUXT_VEO_CHROMIUM_EXECUTABLE_PATH` unset, so Playwright
+  launches its own downloaded browser (`~/.cache/ms-playwright`) as usual —
+  no local Alpine/chromium setup needed.
 
 ## Production scheduling
 

@@ -46,5 +46,11 @@ const onSaved = async ({ slug }: { slug: string }) => {
       :season-start="settings.season_start"
       @saved="onSaved"
     />
+
+    <p v-if="currentTeam" class="text-sm">
+      <NuxtLink :to="`/t/${currentTeam.slug}/team/veo`" class="underline">
+        Veo-Kamera verknüpfen
+      </NuxtLink>
+    </p>
   </section>
 </template>

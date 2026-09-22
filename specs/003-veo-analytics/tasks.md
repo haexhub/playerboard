@@ -47,7 +47,11 @@ security boundary. All user stories below can now start.
 
 ---
 
-## Phase 3: User Story 4 - Platform-Admin schaltet Veo-Zugriff für ein Team frei (Priority: P1)
+## Phase 3: User Story 4 (original) - Platform-Admin schaltet Veo-Zugriff für ein Team frei (Priority: P1)
+
+**Superseded 2026-09-22 by Phase 7** — kept for history; the security
+invariant it tests (no `veo_team_mappings` row ⇒ no data) still holds, only
+who/how creates that row changed. See spec.md's Clarifications.
 
 **Goal**: No team has Veo data without an explicit, deliberate enablement
 row in `veo_team_mappings`. For this feature, "explicit" means a manual,
@@ -62,7 +66,7 @@ data or sync status on `/t/[slug]/analytics`, even if other teams do.
 
 ### Implementation for User Story 4
 
-- [ ] T008 [US4] Per [quickstart.md](./quickstart.md)'s "Enabling a team for Veo sync": insert the real `veo_team_mappings` row for the club's configured team (manual SQL, ops step — not app code; tracked here so it isn't forgotten before anything else in this feature can produce real data)
+- [x] T008 ~~[US4] Per quickstart.md's "Enabling a team for Veo sync": insert the real `veo_team_mappings` row for the club's configured team (manual SQL, ops step)~~ — **superseded 2026-09-22 by Phase 7** (trainer self-service linking flow replaces the manual-SQL process entirely; the one team already enabled this way in production is unaffected, see data-model.md)
 
 **Checkpoint**: The security boundary is real and independently verified —
 US1-US3 below can never accidentally expose a non-enabled team's data.
@@ -147,10 +151,49 @@ successful sync time.
 
 ---
 
+## Phase 7: User Story 4 (revised) - Trainer verknüpft sein Team selbst mit Veo
+
+**Goal**: Replace the manual-SQL onboarding (T008/T028) with a self-service
+flow a trainer can complete without any ops action. See spec.md's
+Clarifications (2026-09-22), the revised User Story 4, FR-010/FR-011, and
+[contracts/rls-policies.md](./contracts/rls-policies.md)'s updated policies
+for `veo_team_mappings`/`veo_sync_credentials`.
+
+**Independent Test**: A trainer with no prior Veo link for their team opens
+`/t/[slug]/team/veo`, logs in with real Veo credentials, picks their club/team
+from the list, confirms — `veo_team_mappings` and `veo_sync_credentials` now
+exist for that team, and the next `POST /api/veo/sync` run picks it up. A
+player (non-trainer) of the same team gets 403 from both new routes.
+
+### Tests for Phase 7 ⚠️ write first, confirm they fail before implementing
+
+- [x] T030 [P] Add RLS negative tests: `rls-negative-single-team.spec.ts` N11 (player write denied, V4) and N13 (`veo_sync_credentials` denies every authenticated operation, even the trainer's own insert, V1); `rls-negative-cross-team.spec.ts` X11/X12 (trainer of team A cannot write team B's mapping/credentials, V2/V3)
+- [x] T031 [P] Add RLS positive test: trainer of team A can `insert`, `update` (upsert), and `select` `veo_team_mappings` for team A — added inline in `rls-negative-single-team.spec.ts`, doubling as the positive control for N11's denial check. No equivalent for `veo_sync_credentials` — it has no working policy to positive-test (see T034).
+- [x] T032 [P] Add API negative tests to `api-negative.spec.ts`: `POST /api/veo/login`/`POST /api/veo/link` without a session → 401 (`api-negative.spec.ts`); a player (non-trainer) → 403 (V7, added as N14 in `rls-negative-single-team.spec.ts`, reusing that test's existing player session)
+
+### Implementation for Phase 7
+
+- [x] T033 Add `veoLinkTokenSecret` to `runtimeConfig` in `nuxt.config.ts`; document `NUXT_VEO_LINK_TOKEN_SECRET` in `.env.example` per [quickstart.md](./quickstart.md)
+- [x] T034 Hand-write the RLS migration `supabase/migrations/20260922200000_veo_trainer_self_service.sql`: drop the deny-all policy on `veo_team_mappings`; add the `is_trainer(team_id)`-gated `select`/`insert`/`update` policies per [contracts/rls-policies.md](./contracts/rls-policies.md). **`veo_sync_credentials` stays fully deny-all** — its first version added `insert`/`update` policies there too, but live testing found Postgres can't resolve `ON CONFLICT DO UPDATE` (or even a plain `UPDATE`) under RLS without a `select` policy, which this table must never have; reverted, see T039.
+- [x] T035 Add `playwright` as a dependency; document the VPS `npx playwright install --with-deps chromium` step in [quickstart.md](./quickstart.md)
+- [x] T036 [P] Implement `app/server/utils/veo/login.ts` — `captureSessionViaLogin(email, password)`: headless Chromium, fill+submit the real `app.veo.co` login form, extract `auth.veo.co` cookies on success, throw a specific error on a detected failure state, hard timeout, `browser.close()` in `finally` (research.md §9). **Live-tested successfully 2026-09-22** end-to-end against the real Veo login form with real credentials (login → club/team picker → link confirmed) — see T039's fix, found by this same test.
+- [x] T037 [P] Extend `app/server/utils/veo/client.ts` with `listOwnClubs(accessToken)`/`listClubTeams(accessToken, clubSlug)` wrapping the two endpoints confirmed live in research.md §10
+- [x] T038 Implement `app/server/api/veo/login.post.ts`: require a session, `requireTrainer(useAdminDb(), team_id, userId)` (no table write to attach RLS to at this step, see contracts/rls-policies.md), call T036 then T037, return the club/team list plus a short-lived encrypted/HMAC-signed token (`veoLinkTokenSecret`) carrying the session cookie
+- [x] T039 Implement `app/server/api/veo/link.post.ts`: require a session (checked first, before body/token parsing), verify+decrypt the signed token from T038, revalidate the selected Veo club/team against the token's session, `requireTrainer(useAdminDb(), team_id, userId)`, then upsert `veo_team_mappings` and `veo_sync_credentials` in one `useAdminDb()` transaction. **Corrected during live testing**: originally used `useUserDb(event, ...)` (RLS-enforced) per the plan, but that broke 403 for a genuine trainer — `veo_sync_credentials` has no `select` policy, so `ON CONFLICT DO UPDATE` can't resolve under RLS (see T034). Switched to the explicit-check pattern `POST /api/veo/login` already uses.
+- [x] T040 [P] Implement `app/composables/useVeoLink.ts` — calls T038/T039, plus `getCurrentMapping` for the settings-page status display
+- [x] T041 [P] Implement `app/components/veo/VeoLinkForm.vue` — step 1 (email/password) → step 2 (club/team picker via ShadcnSelect, flat list labelled "club — team") → confirm; shows the current link status if `veo_team_mappings` already has a row for this team
+- [x] T042 Implement `app/pages/t/[slug]/team/veo.vue` (trainer-only middleware, like `team/settings.vue`) rendering T041; linked from `team/settings.vue`
+
+**Checkpoint**: A trainer can self-serve the entire Veo setup for their team
+without any ops/SQL/platform-admin step; RLS enforces team isolation and
+the trainer/non-trainer boundary at the database level.
+
+---
+
 ## Final Phase: Polish & Cross-Cutting Concerns
 
 - [x] T027 [P] Run `pnpm lint` and `pnpm typecheck`; fix any violations across all files touched by this feature
-- [ ] T028 One-time production step (not a code change, tracked here so it isn't forgotten): capture the real Veo session per [quickstart.md](./quickstart.md)'s "One-time credential capture" and insert the `veo_sync_credentials` row for the team enabled in T008 — `sync.post.ts` cannot do anything in production before this
+- [x] T028 ~~One-time production step: capture the real Veo session per quickstart.md's "One-time credential capture" and insert the `veo_sync_credentials` row~~ — **superseded 2026-09-22 by Phase 7**; the row already captured this way for the production team is unaffected, but re-capture (e.g. after session expiry) now goes through the trainer self-service flow instead
 - [ ] T029 One-time production step: add the crontab line from [quickstart.md](./quickstart.md)'s "Production scheduling" on the VPS
 
 ---
@@ -165,6 +208,7 @@ successful sync time.
 - **User Story 1 (Phase 4)**: depends on Foundational only for its own tests (T009-T011 seed data directly); T028 (real credentials) and a real T008 row are needed before it produces real data in production, but not before it can be built/tested
 - **User Story 2 (Phase 5)**: depends on Foundational; reuses `useVeoAnalytics.ts` from US1 (T016) but adds no new table/route
 - **User Story 3 (Phase 6)**: same relationship to US1 as US2 — reuses T016, no new table/route
+- **Phase 7 (revised US4)**: depends on Foundational (T002-T006) only; independent of Phases 4-6 (no shared files), but functionally supersedes Phase 3/T008/T028 as the way teams get enabled going forward
 - **Polish (Final Phase)**: after whichever user stories are in scope for the release
 
 ### Within Each User Story
@@ -227,5 +271,5 @@ Task: "Implement app/server/utils/veo/client.ts"
 - [P] tasks touch different files with no unfinished dependency between them
 - Every implementation task traces to a file path named in [plan.md](./plan.md)'s Project Structure
 - Commit after each task or logical group, per this repo's normal workflow
-- T008/T028/T029 are the only non-code tasks — deliberately kept in this list so they aren't forgotten before the feature can do anything in production
-- The platform-admin UI for T008 (appointing admins, a settings screen instead of manual SQL) is explicitly out of scope here — tracked as a separate, later feature ("Platform-Administration") per spec.md's Assumptions
+- T029 is the only remaining non-code task. T008/T028 (manual SQL/credential capture) are superseded by Phase 7's self-service flow — see spec.md's Clarifications (2026-09-22) — and no longer block anything; the row they originally produced for the production team stays valid on its own.
+- The "Platform-Administration" feature referenced in the original spec.md Assumptions is no longer a prerequisite for this feature: `is_trainer(team_id)` (an existing role) replaced the planned cross-team `platform_admins` role for this feature's own scope. "Platform-Administration" may still be built later for unrelated reasons, but nothing here depends on it anymore.

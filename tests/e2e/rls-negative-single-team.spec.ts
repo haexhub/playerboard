@@ -213,15 +213,87 @@ test.describe('RLS negative — single team (SC-003)', () => {
     })
     expect(n10.status()).toBe(403)
 
-    // N11 — the service-role-only Veo tables stay closed even for a trainer.
-    // A permissive policy here would hand out the club's Veo login.
-    for (const table of ['veo_sync_credentials', 'veo_team_mappings']) {
-      const res = await trainerCtx.request.get(`${SUPABASE_URL}/rest/v1/${table}?select=*`, {
+    // N11 — a player (non-trainer) cannot link their own team to Veo; only
+    // the trainer can (contracts/rls-policies.md V4).
+    const playerMappingInsert = await playerCtx.request.post(
+      `${SUPABASE_URL}/rest/v1/veo_team_mappings`,
+      {
+        headers: asUser(playerToken),
+        data: [{ team_id: teamId, veo_club_slug: 'x', veo_team_slug: 'y' }],
+      },
+    )
+    expect(playerMappingInsert.ok()).toBe(false)
+
+    const playerCredInsert = await playerCtx.request.post(
+      `${SUPABASE_URL}/rest/v1/veo_sync_credentials`,
+      {
+        headers: asUser(playerToken),
+        data: [{ team_id: teamId, session_cookie: 'x', captured_at: new Date().toISOString() }],
+      },
+    )
+    expect(playerCredInsert.ok()).toBe(false)
+
+    // Positive control for N11 — the trainer of this team really can insert
+    // then update (upsert) veo_team_mappings; a broken/overly-strict policy
+    // would make N11's "denied" a false positive too (denied because writes
+    // are broken for everyone, not because the player specifically lacks
+    // permission).
+    const trainerMappingInsert = await trainerCtx.request.post(
+      `${SUPABASE_URL}/rest/v1/veo_team_mappings`,
+      {
+        headers: { ...asUser(trainerToken), Prefer: 'return=representation' },
+        data: [{ team_id: teamId, veo_club_slug: 'club-x', veo_team_slug: 'team-y' }],
+      },
+    )
+    expect(trainerMappingInsert.ok()).toBe(true)
+
+    const trainerMappingUpdate = await trainerCtx.request.patch(
+      `${SUPABASE_URL}/rest/v1/veo_team_mappings?team_id=eq.${teamId}`,
+      {
+        headers: { ...asUser(trainerToken), Prefer: 'return=representation' },
+        data: { veo_team_slug: 'team-z' },
+      },
+    )
+    expect(trainerMappingUpdate.ok()).toBe(true)
+    expect(await trainerMappingUpdate.json()).toEqual([
+      expect.objectContaining({ veo_team_slug: 'team-z' }),
+    ])
+
+    const trainerMappingSelect = await trainerCtx.request.get(
+      `${SUPABASE_URL}/rest/v1/veo_team_mappings?team_id=eq.${teamId}&select=veo_team_slug`,
+      { headers: asUser(trainerToken) },
+    )
+    expect(await trainerMappingSelect.json()).toEqual([{ veo_team_slug: 'team-z' }])
+
+    // N13 — veo_sync_credentials denies every authenticated-role operation,
+    // even for the trainer of this exact team: it has no policy at all (not
+    // even insert/update) since Postgres can't resolve ON CONFLICT/UPDATE
+    // row-matching under RLS without a select policy, and adding one just to
+    // make writes "work" would defeat the point of this table (see
+    // contracts/rls-policies.md). Only useAdminDb() — auth.ts's read,
+    // link.post.ts's write — ever touches it.
+    const trainerCredInsert = await trainerCtx.request.post(
+      `${SUPABASE_URL}/rest/v1/veo_sync_credentials`,
+      {
         headers: asUser(trainerToken),
-      })
-      expect(res.ok()).toBe(true)
-      expect(await res.json()).toEqual([])
-    }
+        data: [{ team_id: teamId, session_cookie: 'x', captured_at: new Date().toISOString() }],
+      },
+    )
+    expect(trainerCredInsert.ok()).toBe(false)
+
+    const credRes = await trainerCtx.request.get(
+      `${SUPABASE_URL}/rest/v1/veo_sync_credentials?team_id=eq.${teamId}&select=*`,
+      { headers: asUser(trainerToken) },
+    )
+    expect(credRes.ok()).toBe(true)
+    expect(await credRes.json()).toEqual([])
+
+    // N14 — a player (non-trainer) cannot even start the Veo linking flow
+    // for their own team through the route itself (contracts/rls-policies.md V7).
+    const n14 = await playerPage.request.post('/api/veo/login', {
+      data: { team_id: teamId, email: 'player@example.com', password: 'whatever' },
+    })
+    expect(n14.status()).toBe(403)
 
     await trainerCtx.close()
     await playerCtx.close()

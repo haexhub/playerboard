@@ -2,39 +2,49 @@
 
 Five new tables, following this repo's existing Drizzle conventions (uuid or
 natural-key PK per shape, `team_id` FK + index on team-scoped tables,
-`timestamp with time zone` columns). None of these tables are ever written
-by an authenticated user. The sync route uses `useAdminDb()` for application
-access, while protected operational rows may be seeded through direct SQL, so
-none carry `created_by`/`last_updated_by` audit columns (there is no app-level
-author to record).
+`timestamp with time zone` columns). The sync route uses `useAdminDb()` for
+read access to all five. Since 2026-09-22 (see spec.md's Clarifications), a
+trainer can self-serve linking their team to Veo via
+`POST /api/veo/login` + `POST /api/veo/link`, instead of a deployment
+operator seeding rows by hand. `veo_team_mappings` gets `is_trainer`-gated
+RLS policies for this (`select`/`insert`/`update`, genuinely used by direct
+PostgREST callers and enforced as such). `veo_sync_credentials` stays fully
+`useAdminDb()`-only — its RLS can't cover an upsert without a `select`
+policy, which this table must never have (see
+[contracts/rls-policies.md](./contracts/rls-policies.md)) — so
+`POST /api/veo/link` writes it via an explicit trainer-role check instead.
+None of the five carry `created_by`/`last_updated_by` audit columns: the
+analytics/status tables have no app-level author, and `veo_team_mappings`
+records "who" implicitly through `team_id` + RLS rather than a column.
 
 ## `veo_team_mappings`
 
 One row per Playerboard team explicitly enabled for Veo sync (User Story 4 /
-FR-011). In v1, the deployment operator applies this mapping by direct SQL
-after the platform-admin decision; the settings UI belongs to the separate
-Platform-Administration feature. Absence of an enabled row for a team means
-that team has no Veo access at all — this is the enforcement point for "no
-team sees Veo data without explicit enablement." See
+FR-011). Since 2026-09-22, the trainer of the team creates/updates this row
+themselves via `POST /api/veo/link`, after picking their real Veo club/team
+from the list `POST /api/veo/login` returns — no manual SQL, no
+platform-admin step. Absence of a row for a team means that team has no Veo
+access at all — this remains the enforcement point for "no team sees Veo
+data without an explicit, authenticated action." See
 [research.md §5](./research.md#5-team-mapping-veo-team--playerboard-team)
-for why this is a table now (not `runtimeConfig`) and for the v1 sequencing
-(row created manually via SQL, not through a UI, until the separate
-"Platform-Administration" feature adds one).
+for why this is a table (not `runtimeConfig`) and for how the self-service
+flow superseded the original manual-SQL sequencing.
 
 | Column | Type | Notes |
 |---|---|---|
 | `team_id` | `uuid` PK, FK → `teams.id`, `on delete cascade` | the Playerboard team being granted access |
-| `veo_club_slug` | `text`, not null | e.g. `tsv-ifa-chemnitz` |
-| `veo_team_slug` | `text`, not null | e.g. `c-junioren-cec9ec43` |
-| `enabled` | `boolean`, not null, `default true` | the sync route skips disabled rows entirely, but keeps them (vs. deleting) so re-enabling doesn't require re-typing the slugs |
+| `veo_club_slug` | `text`, not null | e.g. `tsv-ifa-chemnitz` — chosen from the picker, never typed |
+| `veo_team_slug` | `text`, not null | e.g. `c-junioren-cec9ec43` — chosen from the picker, never typed |
+| `enabled` | `boolean`, not null, `default true` | the sync route skips disabled rows entirely; always `true` on write from the linking flow (there is no in-app disable action yet — re-linking overwrites the row instead) |
 | `created_at` | `timestamptz`, `defaultNow()` | |
 | `updated_at` | `timestamptz`, `defaultNow()` | |
 
-**RLS**: enabled with an explicit deny-all policy for `authenticated`.
-Nothing in this feature's own UI reads or writes this table; only the sync
-route (`useAdminDb()`) reads it, and only a human with direct DB access
-writes it, for now. The three analytics-table read policies also require an
-enabled mapping through the `public.is_veo_enabled` security-definer helper.
+**RLS**: `select`, `insert`, `update` for `authenticated` gated by
+`public.is_trainer(team_id)` — a trainer can read/write only their own
+team's row, never another team's. No `delete` policy (re-linking upserts
+instead of deleting). The three analytics-table read policies still also
+require an enabled mapping through the `public.is_veo_enabled`
+security-definer helper.
 
 ## `veo_matches`
 
@@ -108,19 +118,27 @@ User Story 3's "last successful sync" must never regress.
 ## `veo_sync_credentials`
 
 One row per team, holding the captured Veo session artifact needed for
-silent auth renewal (see [research.md](./research.md) §3–4). **RLS enabled
-with an explicit deny-all policy for `authenticated`** — unreachable by any
-`authenticated`/`anon` client, only by `useAdminDb()`.
+silent auth renewal (see [research.md](./research.md) §3–4, §9). Written by
+`POST /api/veo/link` right after `POST /api/veo/login` performs the actual
+Veo login (see [research.md §9](./research.md#9-interactive-login-headless-browser)) —
+the trainer's password is never part of this row or any other.
 
 | Column | Type | Notes |
 |---|---|---|
 | `team_id` | `uuid` PK, FK → `teams.id`, `on delete cascade` | |
-| `session_cookie` | `text`, not null | the `auth.veo.co` session artifact captured during one-time interactive login |
+| `session_cookie` | `text`, not null | the `auth.veo.co` session artifact captured during login (one-time interactive, now trainer-initiated instead of manually copied from DevTools) |
 | `captured_at` | `timestamptz`, not null | when the session artifact was (re)captured |
 | `updated_at` | `timestamptz`, `defaultNow()` | |
 
-**Note**: never selected by any client-facing code path; only referenced
-from `app/server/utils/veo/auth.ts` inside the sync route.
+**RLS**: no policy at all for `authenticated`/`anon`, for any operation —
+unchanged from before this feature. `POST /api/veo/link` writes this table
+via `useAdminDb()` with an explicit `requireTrainer()` check (not RLS): a
+`select` policy would be needed for `INSERT ... ON CONFLICT DO UPDATE` to
+resolve under RLS at all (confirmed by direct testing — without one, both
+`ON CONFLICT DO UPDATE` and a plain `UPDATE` silently fail to find the row),
+and this table must never have one. See
+[contracts/rls-policies.md](./contracts/rls-policies.md) for the full
+reasoning.
 
 ## Relationships
 
@@ -131,7 +149,8 @@ teams (existing) 1──1 veo_sync_status
 teams (existing) 1──1 veo_sync_credentials
 ```
 
-No relationship to `players`/`memberships` — this feature is team-level
-only (Player-level stats are explicitly out of scope, FR-012). No
-relationship to a `platform_admins` table — that table doesn't exist yet;
-it belongs to the separate "Platform-Administration" feature.
+No relationship to `players` — this feature is team-level only (Player-level
+stats are explicitly out of scope, FR-012). `veo_team_mappings` and
+`veo_sync_credentials` are authorized against `memberships` indirectly, via
+the existing `public.is_trainer(team_id)` helper (same one `team_settings`
+already uses) — no new role table.
