@@ -20,7 +20,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Invalid payload' })
   }
 
-  console.error('[auth-callback] session could not be established')
+  // The payload is only flags plus AuthError name/code/status/message — no
+  // tokens — so it is safe to log and is the only way to see WHY the browser
+  // could not establish a session.
+  console.error('[auth-callback] session could not be established', JSON.stringify(parsed.data))
 
   return { ok: true }
 })
