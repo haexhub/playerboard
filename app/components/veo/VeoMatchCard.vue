@@ -28,7 +28,8 @@ const statPairs = computed<StatPair[]>(() => {
 })
 
 const categories = computed(() => [...new Set(statPairs.value.map((s) => s.category))])
-const statsForCategory = (category: string) => statPairs.value.filter((s) => s.category === category)
+const statsForCategory = (category: string) =>
+  statPairs.value.filter((s) => s.category === category)
 
 const dateLabel = computed(() =>
   new Date(props.match.played_at).toLocaleDateString('de-DE', {
@@ -44,10 +45,15 @@ const hasScore = computed(
 </script>
 
 <template>
-  <div class="rounded border border-neutral-200 bg-white p-4 space-y-4" data-testid="veo-match-card">
+  <div
+    class="rounded border border-neutral-200 bg-white p-4 space-y-4"
+    data-testid="veo-match-card"
+  >
     <header class="flex items-start justify-between gap-3">
       <div>
-        <p class="text-sm text-neutral-500">{{ dateLabel }} · {{ match.home_or_away === 'home' ? 'Heim' : 'Auswärts' }}</p>
+        <p class="text-sm text-neutral-500">
+          {{ dateLabel }} · {{ match.home_or_away === 'home' ? 'Heim' : 'Auswärts' }}
+        </p>
         <p class="text-lg font-semibold text-neutral-900">vs. {{ match.opponent_name }}</p>
       </div>
       <p class="text-2xl font-bold tabular-nums" data-testid="veo-match-score">

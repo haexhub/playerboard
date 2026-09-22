@@ -1,6 +1,6 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "@haex-space/ui/assets/css/theme.css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import '@haex-space/ui/assets/css/theme.css';
 
 @source "../../components";
 @source "../../layouts";

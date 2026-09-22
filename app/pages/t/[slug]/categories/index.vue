@@ -48,7 +48,9 @@ const onSaved = () => {
   <section class="space-y-8" data-testid="categories-page">
     <header class="space-y-1">
       <h1 class="text-2xl font-semibold text-foreground">Punktekategorien</h1>
-      <p class="text-muted-foreground">Kategorien für {{ currentTeam?.name ?? 'Team' }} verwalten.</p>
+      <p class="text-muted-foreground">
+        Kategorien für {{ currentTeam?.name ?? 'Team' }} verwalten.
+      </p>
     </header>
 
     <ShadcnButton type="button" data-testid="category-new-button" @click="openCreateDialog">

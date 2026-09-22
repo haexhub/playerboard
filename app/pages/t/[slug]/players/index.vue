@@ -64,7 +64,13 @@ const onInvited = () => {
       Neuer Spieler
     </ShadcnButton>
 
-    <PlayerList v-if="teamId" ref="playerList" :team-id="teamId" @edit="openEditDialog" @invite="openInviteDialog" />
+    <PlayerList
+      v-if="teamId"
+      ref="playerList"
+      :team-id="teamId"
+      @edit="openEditDialog"
+      @invite="openInviteDialog"
+    />
 
     <ShadcnDialog v-model:open="isPlayerDialogOpen">
       <ShadcnDialogContent>

@@ -43,7 +43,11 @@ const load = async () => {
   }
 }
 
-watch(() => currentTeam.value?.id, () => void load(), { immediate: true })
+watch(
+  () => currentTeam.value?.id,
+  () => void load(),
+  { immediate: true },
+)
 
 const seasonSummary = computed(() => computeSeasonSummary(matches.value))
 </script>
@@ -61,7 +65,11 @@ const seasonSummary = computed(() => computeSeasonSummary(matches.value))
 
     <p v-if="isLoading" class="text-sm text-neutral-500">Lade Veo-Daten…</p>
     <p v-else-if="loadError" class="text-sm text-red-700" role="alert">{{ loadError }}</p>
-    <p v-else-if="!matches.length" class="text-sm text-neutral-500" data-testid="veo-analytics-empty">
+    <p
+      v-else-if="!matches.length"
+      class="text-sm text-neutral-500"
+      data-testid="veo-analytics-empty"
+    >
       Noch keine Veo-Daten für dieses Team.
     </p>
     <div v-else class="space-y-4">

@@ -24,7 +24,10 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 const humanize = (key: string) =>
-  key.replace(/^football_/, '').replace(/_total$/, '').replace(/_/g, ' ')
+  key
+    .replace(/^football_/, '')
+    .replace(/_total$/, '')
+    .replace(/_/g, ' ')
 
 export const statLabel = (statType: string) => STAT_LABELS[statType] ?? humanize(statType)
 export const categoryLabel = (category: string) => CATEGORY_LABELS[category] ?? category

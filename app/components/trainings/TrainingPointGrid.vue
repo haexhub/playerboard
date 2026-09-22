@@ -197,10 +197,7 @@ const resetCell = (player: ActivePlayer, category: ActiveCategory) => {
               {{ c.value_min }}–{{ c.value_max }}
             </span>
           </th>
-          <th
-            scope="col"
-            class="border-b border-neutral-200 px-2 py-2 text-left font-semibold"
-          >
+          <th scope="col" class="border-b border-neutral-200 px-2 py-2 text-left font-semibold">
             <button
               type="button"
               aria-label="Kategorie hinzufügen"

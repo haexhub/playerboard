@@ -7,7 +7,19 @@ import globals from 'globals'
 
 export default [
   {
-    ignores: ['.output/**', '.nuxt/**', '.worktrees/**', 'dist/**', 'node_modules/**', 'supabase/**', 'playwright-report/**', 'coverage/**', 'graphify-out/**', 'test-results/**', 'app/types/database.ts'],
+    ignores: [
+      '.output/**',
+      '.nuxt/**',
+      '.worktrees/**',
+      'dist/**',
+      'node_modules/**',
+      'supabase/**',
+      'playwright-report/**',
+      'coverage/**',
+      'graphify-out/**',
+      'test-results/**',
+      'app/types/database.ts',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

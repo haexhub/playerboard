@@ -51,7 +51,9 @@ defineExpose({ reload: load })
     <ul v-else class="space-y-2">
       <li v-for="inv in invitations" :key="inv.id">
         <ShadcnCard class="py-3">
-          <ShadcnCardContent class="flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between px-3">
+          <ShadcnCardContent
+            class="flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between px-3"
+          >
             <div class="text-sm">
               <p class="font-medium text-foreground">{{ inv.email }}</p>
               <p class="text-muted-foreground">

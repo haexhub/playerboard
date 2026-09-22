@@ -78,7 +78,9 @@ const submit = async () => {
         maxlength="80"
         data-testid="team-settings-name-input"
       />
-      <span v-if="fieldErrors.name" class="block text-sm text-destructive">{{ fieldErrors.name }}</span>
+      <span v-if="fieldErrors.name" class="block text-sm text-destructive">{{
+        fieldErrors.name
+      }}</span>
     </ShadcnLabel>
     <ShadcnLabel class="block space-y-1">
       <span>Slug</span>
@@ -89,10 +91,12 @@ const submit = async () => {
         maxlength="64"
         data-testid="team-settings-slug-input"
       />
-      <span v-if="fieldErrors.slug" class="block text-sm text-destructive">{{ fieldErrors.slug }}</span>
+      <span v-if="fieldErrors.slug" class="block text-sm text-destructive">{{
+        fieldErrors.slug
+      }}</span>
       <p class="text-sm text-warning">
-        Achtung: Öffentliche Links (z. B. die Rangliste) und Lesezeichen verweisen auf den
-        aktuellen Slug. Eine Änderung macht alte Links ungültig.
+        Achtung: Öffentliche Links (z. B. die Rangliste) und Lesezeichen verweisen auf den aktuellen
+        Slug. Eine Änderung macht alte Links ungültig.
       </p>
     </ShadcnLabel>
     <ShadcnLabel class="block space-y-1">

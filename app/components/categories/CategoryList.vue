@@ -80,7 +80,8 @@ const onDelete = async (id: string) => {
 
 defineExpose({
   reload: load,
-  maxSortOrder: () => categories.value.reduce((max, category) => Math.max(max, category.sort_order), 0),
+  maxSortOrder: () =>
+    categories.value.reduce((max, category) => Math.max(max, category.sort_order), 0),
 })
 </script>
 

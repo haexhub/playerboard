@@ -30,7 +30,11 @@ export type PublicRanking = z.infer<typeof publicRankingSchema>
 export const usePublicRanking = () => {
   const client = useSupabaseClient<Database>()
 
-  const getPublicRanking = async (slug: string, from: string, to: string): Promise<PublicRanking> => {
+  const getPublicRanking = async (
+    slug: string,
+    from: string,
+    to: string,
+  ): Promise<PublicRanking> => {
     const { data, error } = await client.rpc('get_public_ranking', {
       p_slug: slug,
       p_from: from,

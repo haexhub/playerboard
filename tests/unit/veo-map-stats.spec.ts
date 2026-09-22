@@ -2,9 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { mapAnalysisStatsToRows } from '~/server/utils/veo/mapStats'
 
-const fixture = JSON.parse(
-  readFileSync('tests/fixtures/veo/analysis-stats-response.json', 'utf-8'),
-)
+const fixture = JSON.parse(readFileSync('tests/fixtures/veo/analysis-stats-response.json', 'utf-8'))
 
 const MATCH_ID = 'a1b2c3d4-0000-0000-0000-000000000000'
 

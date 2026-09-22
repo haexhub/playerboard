@@ -145,8 +145,7 @@ onMounted(async () => {
     // never caught up" (the getClaims() round trip failed or timed out).
     diag.hasSession = Boolean((await client.auth.getSession()).data.session)
     reportAuthError(diag)
-    error.value =
-      'Anmeldung konnte nicht abgeschlossen werden. Bitte fordere einen neuen Link an.'
+    error.value = 'Anmeldung konnte nicht abgeschlossen werden. Bitte fordere einen neuen Link an.'
     return
   }
   await finalize()

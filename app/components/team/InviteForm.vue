@@ -106,7 +106,9 @@ const submit = async () => {
       <ShadcnLabel class="flex-1 block space-y-1">
         <span>E-Mail</span>
         <ShadcnInput v-model="email" type="email" required />
-        <span v-if="fieldErrors.email" class="block text-sm text-destructive">{{ fieldErrors.email }}</span>
+        <span v-if="fieldErrors.email" class="block text-sm text-destructive">{{
+          fieldErrors.email
+        }}</span>
       </ShadcnLabel>
       <label class="block">
         <span class="text-sm font-medium text-foreground">Rolle</span>
@@ -128,7 +130,9 @@ const submit = async () => {
         <ShadcnLabel class="flex-1 block space-y-1">
           <span>Trikotnummer (optional)</span>
           <ShadcnInput v-model="jerseyNumberModel" type="number" min="0" />
-          <span v-if="fieldErrors.jersey_number" class="block text-sm text-destructive">{{ fieldErrors.jersey_number }}</span>
+          <span v-if="fieldErrors.jersey_number" class="block text-sm text-destructive">{{
+            fieldErrors.jersey_number
+          }}</span>
         </ShadcnLabel>
         <ShadcnLabel class="flex-1 block space-y-1">
           <span>Position (optional)</span>
@@ -137,7 +141,9 @@ const submit = async () => {
       </div>
     </div>
     <div class="flex items-center justify-end gap-3 border-t pt-4">
-      <p v-if="submitError" class="text-sm text-destructive mr-auto" role="alert">{{ submitError }}</p>
+      <p v-if="submitError" class="text-sm text-destructive mr-auto" role="alert">
+        {{ submitError }}
+      </p>
       <ShadcnButton type="submit" :disabled="loading">
         {{ loading ? 'Sende…' : 'Einladen' }}
       </ShadcnButton>

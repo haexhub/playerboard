@@ -161,5 +161,15 @@ export const usePlayers = () => {
     assertRowsAffected(data)
   }
 
-  return { listActive, list, create, update, remove, setActive, setConsent, linkUser, listLinkCandidates }
+  return {
+    listActive,
+    list,
+    create,
+    update,
+    remove,
+    setActive,
+    setConsent,
+    linkUser,
+    listLinkCandidates,
+  }
 }

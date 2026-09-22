@@ -23,7 +23,9 @@ type Invite = {
 }
 
 const invite = ref<Invite | null>(null)
-const status = ref<'loading' | 'ok' | 'not-found' | 'expired' | 'accepted' | 'not-permitted'>('loading')
+const status = ref<'loading' | 'ok' | 'not-found' | 'expired' | 'accepted' | 'not-permitted'>(
+  'loading',
+)
 
 const loadForAuthenticatedUser = async () => {
   status.value = 'loading'
@@ -56,22 +58,35 @@ const loadForAuthenticatedUser = async () => {
   status.value = 'ok'
 }
 
-watch(user, (v) => {
-  if (v) void loadForAuthenticatedUser()
-}, { immediate: true })
+watch(
+  user,
+  (v) => {
+    if (v) void loadForAuthenticatedUser()
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
   <section class="space-y-6 py-6">
     <template v-if="user">
       <p v-if="status === 'loading'" class="text-sm text-neutral-500">Lade Einladung…</p>
-      <div v-else-if="status === 'not-found'" class="rounded border border-red-200 bg-red-50 p-4 text-red-800">
+      <div
+        v-else-if="status === 'not-found'"
+        class="rounded border border-red-200 bg-red-50 p-4 text-red-800"
+      >
         Einladung nicht gefunden.
       </div>
-      <div v-else-if="status === 'expired'" class="rounded border border-amber-200 bg-amber-50 p-4 text-amber-900">
+      <div
+        v-else-if="status === 'expired'"
+        class="rounded border border-amber-200 bg-amber-50 p-4 text-amber-900"
+      >
         Diese Einladung ist abgelaufen. Bitte den einladenden Trainer, eine neue zu schicken.
       </div>
-      <div v-else-if="status === 'accepted'" class="rounded border border-neutral-200 bg-white p-4 text-neutral-700">
+      <div
+        v-else-if="status === 'accepted'"
+        class="rounded border border-neutral-200 bg-white p-4 text-neutral-700"
+      >
         Diese Einladung wurde bereits angenommen.
       </div>
       <InvitationAcceptCard

@@ -31,11 +31,7 @@ const totalFor = (row: RankingRow): number =>
       </ShadcnTableRow>
     </ShadcnTableHeader>
     <ShadcnTableBody>
-      <ShadcnTableEmpty
-        v-if="!rows.length"
-        :colspan="cats.length + 3"
-        data-testid="ranking-empty"
-      >
+      <ShadcnTableEmpty v-if="!rows.length" :colspan="cats.length + 3" data-testid="ranking-empty">
         Keine Punkte im gewählten Zeitraum.
       </ShadcnTableEmpty>
       <ShadcnTableRow

@@ -26,7 +26,11 @@ const load = async () => {
   isLoading.value = true
   loadError.value = null
   try {
-    const next = await getPublicRanking(slug.value, timeframe.range.value.from, timeframe.range.value.to)
+    const next = await getPublicRanking(
+      slug.value,
+      timeframe.range.value.from,
+      timeframe.range.value.to,
+    )
     if (loadId !== latestLoad) return
     ranking.value = next
   } catch (err) {

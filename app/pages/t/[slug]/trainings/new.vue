@@ -78,7 +78,8 @@ const onPlayerSaved = async () => {
   try {
     players.value = await listPlayers(teamId.value)
   } catch (err) {
-    playersError.value = err instanceof Error ? err.message : 'Spieler konnten nicht aktualisiert werden'
+    playersError.value =
+      err instanceof Error ? err.message : 'Spieler konnten nicht aktualisiert werden'
   }
 }
 
@@ -197,7 +198,9 @@ const onSave = async () => {
 
     <ConsentWarningBanner :players="players" />
 
-    <p v-if="categoriesError" class="text-sm text-destructive" role="alert">{{ categoriesError }}</p>
+    <p v-if="categoriesError" class="text-sm text-destructive" role="alert">
+      {{ categoriesError }}
+    </p>
     <p v-if="playersError" class="text-sm text-destructive" role="alert">{{ playersError }}</p>
 
     <TrainingPointGrid

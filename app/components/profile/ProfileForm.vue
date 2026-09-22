@@ -123,7 +123,12 @@ const onAvatarRemove = async () => {
           data-testid="profile-avatar-input"
           @change="onAvatarPick"
         />
-        <p v-if="avatarError" role="alert" class="text-sm text-destructive" data-testid="profile-avatar-error">
+        <p
+          v-if="avatarError"
+          role="alert"
+          class="text-sm text-destructive"
+          data-testid="profile-avatar-error"
+        >
           {{ avatarError }}
         </p>
       </div>
@@ -133,7 +138,9 @@ const onAvatarRemove = async () => {
       <ShadcnLabel class="block space-y-1">
         <span>Name</span>
         <ShadcnInput v-model="name" type="text" required />
-        <span v-if="nameError" role="alert" class="block text-sm text-destructive">{{ nameError }}</span>
+        <span v-if="nameError" role="alert" class="block text-sm text-destructive">{{
+          nameError
+        }}</span>
       </ShadcnLabel>
       <ShadcnButton type="submit" :disabled="nameLoading" data-testid="profile-form-save-name">
         {{ nameLoading ? 'Speichere…' : 'Speichern' }}

@@ -9,7 +9,11 @@ import TrainingPointGrid from '~/components/trainings/TrainingPointGrid.vue'
 import { useCategories, type ActiveCategory } from '~/composables/useCategories'
 import { usePlayers, type ActivePlayer } from '~/composables/usePlayers'
 import { useTrainings, type PointEntryRow, type TrainingRow } from '~/composables/useTrainings'
-import { useTrainingPhotos, type ConsentStatus, type TrainingPhotoView } from '~/composables/useTrainingPhotos'
+import {
+  useTrainingPhotos,
+  type ConsentStatus,
+  type TrainingPhotoView,
+} from '~/composables/useTrainingPhotos'
 import { formatDate } from '~/utils/dates'
 
 definePageMeta({
@@ -78,7 +82,8 @@ const onPlayerSaved = async () => {
   try {
     players.value = await listPlayers(trainingTeamId.value)
   } catch (err) {
-    playersError.value = err instanceof Error ? err.message : 'Spieler konnten nicht aktualisiert werden'
+    playersError.value =
+      err instanceof Error ? err.message : 'Spieler konnten nicht aktualisiert werden'
   }
 }
 
@@ -91,9 +96,7 @@ type TrainingDetailData = {
   consentStatus: ConsentStatus
 }
 
-const canSave = computed(
-  () => training.value?.status === 'draft' && !isSaving.value,
-)
+const canSave = computed(() => training.value?.status === 'draft' && !isSaving.value)
 
 const load = async (): Promise<TrainingDetailData> => {
   // Fetch the training first and derive its team_id from the row itself,

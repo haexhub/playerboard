@@ -60,9 +60,7 @@ const humanSize = (bytes: number) => {
     <div class="flex items-center justify-between gap-3">
       <div>
         <h2 class="text-lg font-semibold text-neutral-900">Fotos</h2>
-        <p class="text-sm text-neutral-600">
-          JPEG, PNG, HEIC/HEIF oder WebP · bis 10 MB.
-        </p>
+        <p class="text-sm text-neutral-600">JPEG, PNG, HEIC/HEIF oder WebP · bis 10 MB.</p>
       </div>
       <button
         type="button"

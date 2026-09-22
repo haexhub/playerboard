@@ -112,24 +112,32 @@ const submit = async () => {
     <ShadcnLabel class="block space-y-1">
       <span>Name</span>
       <ShadcnInput v-model="name" type="text" required />
-      <span v-if="fieldErrors.name" class="block text-sm text-destructive">{{ fieldErrors.name }}</span>
+      <span v-if="fieldErrors.name" class="block text-sm text-destructive">{{
+        fieldErrors.name
+      }}</span>
     </ShadcnLabel>
     <div class="flex gap-3">
       <ShadcnLabel class="flex-1 block space-y-1">
         <span>Min</span>
         <ShadcnInput v-model="valueMinModel" type="number" required />
-        <span v-if="fieldErrors.value_min" class="block text-sm text-destructive">{{ fieldErrors.value_min }}</span>
+        <span v-if="fieldErrors.value_min" class="block text-sm text-destructive">{{
+          fieldErrors.value_min
+        }}</span>
       </ShadcnLabel>
       <ShadcnLabel class="flex-1 block space-y-1">
         <span>Max</span>
         <ShadcnInput v-model="valueMaxModel" type="number" required />
-        <span v-if="fieldErrors.value_max" class="block text-sm text-destructive">{{ fieldErrors.value_max }}</span>
+        <span v-if="fieldErrors.value_max" class="block text-sm text-destructive">{{
+          fieldErrors.value_max
+        }}</span>
       </ShadcnLabel>
     </div>
     <ShadcnLabel class="block space-y-1">
       <span>Reihenfolge</span>
       <ShadcnInput v-model="sortOrderModel" type="number" min="1" required />
-      <span v-if="fieldErrors.sort_order" class="block text-sm text-destructive">{{ fieldErrors.sort_order }}</span>
+      <span v-if="fieldErrors.sort_order" class="block text-sm text-destructive">{{
+        fieldErrors.sort_order
+      }}</span>
     </ShadcnLabel>
     <label class="flex items-center gap-2">
       <ShadcnCheckbox v-model="active" class="min-w-touch" />

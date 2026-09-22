@@ -37,7 +37,13 @@ export const useCategories = () => {
 
   const create = async (
     team_id: string,
-    payload: { name: string; value_min: number; value_max: number; sort_order: number; active: boolean },
+    payload: {
+      name: string
+      value_min: number
+      value_max: number
+      sort_order: number
+      active: boolean
+    },
   ) => {
     const { data, error } = await client
       .from('point_categories')
@@ -50,7 +56,13 @@ export const useCategories = () => {
 
   const update = async (
     id: string,
-    payload: Partial<{ name: string; value_min: number; value_max: number; sort_order: number; active: boolean }>,
+    payload: Partial<{
+      name: string
+      value_min: number
+      value_max: number
+      sort_order: number
+      active: boolean
+    }>,
   ) => {
     const { data, error } = await client
       .from('point_categories')

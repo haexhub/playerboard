@@ -50,9 +50,7 @@ onMounted(load)
   <section class="space-y-8 py-6">
     <header class="space-y-1">
       <h1 class="text-2xl font-semibold text-neutral-900">Willkommen</h1>
-      <p class="text-neutral-600">
-        Gründe ein neues Team oder nimm eine bestehende Einladung an.
-      </p>
+      <p class="text-neutral-600">Gründe ein neues Team oder nimm eine bestehende Einladung an.</p>
     </header>
 
     <div class="rounded border border-neutral-200 bg-white p-5 space-y-4">

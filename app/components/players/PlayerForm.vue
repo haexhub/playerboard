@@ -146,8 +146,19 @@ defineExpose({ loading })
 </script>
 
 <template>
-  <form id="player-form" class="space-y-3" novalidate data-testid="player-form" @submit.prevent="submit">
-    <div v-if="!player" class="flex flex-wrap gap-4 text-sm" role="radiogroup" aria-label="Konto-Zuordnung">
+  <form
+    id="player-form"
+    class="space-y-3"
+    novalidate
+    data-testid="player-form"
+    @submit.prevent="submit"
+  >
+    <div
+      v-if="!player"
+      class="flex flex-wrap gap-4 text-sm"
+      role="radiogroup"
+      aria-label="Konto-Zuordnung"
+    >
       <label class="flex items-center gap-1">
         <input v-model="mode" type="radio" class="accent-primary" value="manual" />
         Manuell
@@ -178,18 +189,24 @@ defineExpose({ loading })
     <ShadcnLabel v-if="!player && mode === 'invite'" class="block space-y-1">
       <span>E-Mail</span>
       <ShadcnInput v-model="inviteEmail" type="email" data-testid="player-form-invite-email" />
-      <span v-if="fieldErrors.email" class="block text-sm text-destructive">{{ fieldErrors.email }}</span>
+      <span v-if="fieldErrors.email" class="block text-sm text-destructive">{{
+        fieldErrors.email
+      }}</span>
     </ShadcnLabel>
     <ShadcnLabel class="block space-y-1">
       <span>Name</span>
       <ShadcnInput v-model="name" type="text" required />
-      <span v-if="fieldErrors.name" class="block text-sm text-destructive">{{ fieldErrors.name }}</span>
+      <span v-if="fieldErrors.name" class="block text-sm text-destructive">{{
+        fieldErrors.name
+      }}</span>
     </ShadcnLabel>
     <div class="flex gap-3">
       <ShadcnLabel class="flex-1 block space-y-1">
         <span>Trikotnummer (optional)</span>
         <ShadcnInput v-model="jerseyNumberModel" type="number" min="0" />
-        <span v-if="fieldErrors.jersey_number" class="block text-sm text-destructive">{{ fieldErrors.jersey_number }}</span>
+        <span v-if="fieldErrors.jersey_number" class="block text-sm text-destructive">{{
+          fieldErrors.jersey_number
+        }}</span>
       </ShadcnLabel>
       <ShadcnLabel class="flex-1 block space-y-1">
         <span>Position (optional)</span>
