@@ -55,6 +55,13 @@ test.describe('T110 — team settings page', () => {
     await expect(trainerPage.getByTestId('team-settings-slug-input')).toHaveValue(teamSlug)
 
     // Rename + change the season start; slug stays the same, no redirect.
+    // The settings PUT resolves near-instantly against local Supabase, so the
+    // disabled state can flip back before an assertion observes it. Delay the
+    // response to make the pending state reliably observable.
+    await trainerPage.route('**/api/teams/*/settings', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      await route.continue()
+    })
     const newName = `Settings Team ${suffix} Renamed`
     await trainerPage.getByTestId('team-settings-name-input').fill(newName)
     await trainerPage.getByTestId('team-settings-season-start-input').fill('2026-03-01')
@@ -62,6 +69,7 @@ test.describe('T110 — team settings page', () => {
     await submitButton.click()
     await expect(submitButton).toBeDisabled()
     await expect(submitButton).toBeEnabled()
+    await trainerPage.unroute('**/api/teams/*/settings')
     await trainerPage.reload({ waitUntil: 'networkidle' })
     await expect(trainerPage.getByTestId('team-settings-name-input')).toHaveValue(newName)
     await expect(trainerPage.getByTestId('team-settings-season-start-input')).toHaveValue(
