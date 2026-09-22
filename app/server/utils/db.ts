@@ -1,5 +1,5 @@
 import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import { sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import postgres from 'postgres'
 import type { H3Event } from 'h3'
 import { serverSupabaseUser } from '#supabase/server'
@@ -28,10 +28,20 @@ const getPool = () => {
 
 export const useAdminDb = (): Db => drizzle(getPool(), { schema })
 
-export const useUserDb = async <T>(
-  event: H3Event,
-  work: (tx: Db) => Promise<T>,
-): Promise<T> => {
+// Privileged routes bypass RLS through useAdminDb(), so they re-check the
+// caller's trainer role themselves; 403 unless `userId` trains `teamId`.
+export const requireTrainer = async (db: Db, teamId: string, userId: string): Promise<void> => {
+  const [caller] = await db
+    .select({ role: schema.memberships.role })
+    .from(schema.memberships)
+    .where(and(eq(schema.memberships.teamId, teamId), eq(schema.memberships.userId, userId)))
+    .limit(1)
+  if (caller?.role !== 'trainer') {
+    throw createError({ statusCode: 403, statusMessage: 'Only trainers of the team may do this' })
+  }
+}
+
+export const useUserDb = async <T>(event: H3Event, work: (tx: Db) => Promise<T>): Promise<T> => {
   const user = await serverSupabaseUser(event)
   const userId = user?.sub
   if (!userId) {
@@ -45,9 +55,7 @@ export const useUserDb = async <T>(
   const db = drizzle(getPool(), { schema })
   return db.transaction(async (tx) => {
     await tx.execute(sql`select set_config('role', 'authenticated', true)`)
-    await tx.execute(
-      sql`select set_config('request.jwt.claims', ${JSON.stringify(claims)}, true)`,
-    )
+    await tx.execute(sql`select set_config('request.jwt.claims', ${JSON.stringify(claims)}, true)`)
     return await work(tx as Db)
   })
 }

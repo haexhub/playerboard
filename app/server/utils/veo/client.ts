@@ -1,15 +1,33 @@
+import { z } from 'zod'
+
 const VEO_API_BASE = 'https://app.veo.co/api/app'
 
-export type VeoMatchListItem = {
-  identifier: string
-  start: string
-  title: string
-  opponent_team_name: string
-  has_analytics_enabled: boolean
-  own_team_home_or_away: 'home' | 'away'
-  team__id: string
-  info: { stats: { score_aggregated: { own: number | null; opponent: number | null } } }
-}
+// Shape of one GET .../matches/ item as far as the sync relies on it. Veo's
+// API is private and undocumented, so anything it stops sending fails the
+// sync here instead of surfacing as a driver error or a bogus row.
+const veoMatchListItemSchema = z.object({
+  identifier: z.string(),
+  start: z.string().refine((value) => !Number.isNaN(Date.parse(value)), 'unparseable start'),
+  title: z.string(),
+  opponent_team_name: z.string(),
+  has_analytics_enabled: z.boolean(),
+  own_team_home_or_away: z.enum(['home', 'away']),
+  team__id: z.string(),
+  info: z
+    .object({
+      stats: z
+        .object({
+          score_aggregated: z.object({
+            own: z.number().nullable(),
+            opponent: z.number().nullable(),
+          }),
+        })
+        .nullable(),
+    })
+    .nullable(),
+})
+
+export type VeoMatchListItem = z.infer<typeof veoMatchListItemSchema>
 
 const veoFetch = async <T>(accessToken: string, path: string, init?: RequestInit): Promise<T> => {
   const res = await fetch(`${VEO_API_BASE}${path}`, {
@@ -50,7 +68,12 @@ export const listMatches = async (
     analytics_version: '2',
   })
   for (const field of MATCH_LIST_FIELDS) query.append('fields', field)
-  return veoFetch<VeoMatchListItem[]>(accessToken, `/matches/?${query.toString()}`)
+  const json = await veoFetch<unknown>(accessToken, `/matches/?${query.toString()}`)
+  const parsed = z.array(veoMatchListItemSchema).safeParse(json)
+  if (!parsed.success) {
+    throw new Error('Unexpected Veo matches response shape')
+  }
+  return parsed.data
 }
 
 /** POST .../api/app/analysis/stats/ for a batch of matches of one Veo team. */

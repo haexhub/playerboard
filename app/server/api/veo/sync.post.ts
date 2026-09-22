@@ -2,18 +2,19 @@ import { eq, sql } from 'drizzle-orm'
 import { schema, useAdminDb } from '~/server/utils/db'
 import { getAccessToken } from '~/server/utils/veo/auth'
 import { fetchAnalysisStats, listMatches, type VeoMatchListItem } from '~/server/utils/veo/client'
-import { mapAnalysisStatsToRows } from '~/server/utils/veo/mapStats'
+import { mapAnalysisStatsToRows, type VeoMatchStatRow } from '~/server/utils/veo/mapStats'
 
 type Db = ReturnType<typeof useAdminDb>
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
 type TeamMapping = typeof schema.veoTeamMappings.$inferSelect
 type AnalyzableVeoMatch = Omit<VeoMatchListItem, 'info'> & {
   info: { stats: { score_aggregated: { own: number; opponent: number } } }
 }
 
-const isAnalyzable = (match: VeoMatchListItem): match is AnalyzableVeoMatch =>
-  match.has_analytics_enabled &&
-  match.info.stats.score_aggregated.own !== null &&
-  match.info.stats.score_aggregated.opponent !== null
+const isAnalyzable = (match: VeoMatchListItem): match is AnalyzableVeoMatch => {
+  const score = match.info?.stats?.score_aggregated
+  return match.has_analytics_enabled && score?.own != null && score.opponent != null
+}
 
 const touchAttempt = (db: Db, teamId: string) =>
   db
@@ -39,7 +40,7 @@ const recordFailure = (db: Db, teamId: string, error: unknown) =>
     })
     .where(eq(schema.veoSyncStatus.teamId, teamId))
 
-const upsertMatch = async (db: Db, teamId: string, match: AnalyzableVeoMatch) => {
+const upsertMatch = async (db: Db | Tx, teamId: string, match: AnalyzableVeoMatch) => {
   const values = {
     teamId,
     veoMatchId: match.identifier,
@@ -53,7 +54,7 @@ const upsertMatch = async (db: Db, teamId: string, match: AnalyzableVeoMatch) =>
     .insert(schema.veoMatches)
     .values(values)
     .onConflictDoUpdate({
-      target: schema.veoMatches.veoMatchId,
+      target: [schema.veoMatches.teamId, schema.veoMatches.veoMatchId],
       set: { ...values, lastSyncedAt: new Date() },
     })
     .returning({ id: schema.veoMatches.id })
@@ -61,20 +62,23 @@ const upsertMatch = async (db: Db, teamId: string, match: AnalyzableVeoMatch) =>
   return row.id
 }
 
-const upsertStats = async (db: Db, rows: ReturnType<typeof mapAnalysisStatsToRows>) => {
-  for (const row of rows) {
-    await db
-      .insert(schema.veoMatchStats)
-      .values(row)
-      .onConflictDoUpdate({
-        target: [
-          schema.veoMatchStats.matchId,
-          schema.veoMatchStats.teamAssociation,
-          schema.veoMatchStats.statType,
-        ],
-        set: { category: row.category, value: row.value, periodValues: row.periodValues },
-      })
-  }
+const upsertStats = async (db: Db | Tx, rows: VeoMatchStatRow[]) => {
+  if (rows.length === 0) return
+  await db
+    .insert(schema.veoMatchStats)
+    .values(rows)
+    .onConflictDoUpdate({
+      target: [
+        schema.veoMatchStats.matchId,
+        schema.veoMatchStats.teamAssociation,
+        schema.veoMatchStats.statType,
+      ],
+      set: {
+        category: sql`excluded.category`,
+        value: sql`excluded.value`,
+        periodValues: sql`excluded.period_values`,
+      },
+    })
 }
 
 const syncTeam = async (db: Db, mapping: TeamMapping) => {
@@ -93,8 +97,13 @@ const syncTeam = async (db: Db, mapping: TeamMapping) => {
         veoTeamId: match.team__id,
         veoMatchIds: [match.identifier],
       })
-      const matchId = await upsertMatch(db, mapping.teamId, match)
-      await upsertStats(db, mapAnalysisStatsToRows(statsPayload, matchId))
+      // One transaction per match: a malformed stats payload or a failure
+      // half-way through must not leave a freshly synced match row next to
+      // stale or partial stats (FR-008, fail closed).
+      await db.transaction(async (tx) => {
+        const matchId = await upsertMatch(tx, mapping.teamId, match)
+        await upsertStats(tx, mapAnalysisStatsToRows(statsPayload, matchId))
+      })
     }
 
     await recordSuccess(db, mapping.teamId)
@@ -121,5 +130,7 @@ export default defineEventHandler(async (event) => {
   for (const mapping of mappings) {
     results.push(await syncTeam(db, mapping))
   }
+  // Let the cron's `curl --fail` notice a failed team sync.
+  if (results.some((result) => !result.ok)) setResponseStatus(event, 502)
   return { synced: results }
 })

@@ -45,6 +45,7 @@ export default defineEventHandler(async (event) => {
         statusMessage: 'Invitation email does not match your account',
       })
     }
-    throw createError({ statusCode: 500, statusMessage: msg || 'Accept failed' })
+    console.error('[invitations/accept] failed', e.code, msg)
+    throw createError({ statusCode: 500, statusMessage: 'Accept failed' })
   }
 })
