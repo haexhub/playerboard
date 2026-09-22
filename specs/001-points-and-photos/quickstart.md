@@ -34,7 +34,7 @@ cp .env.example .env
 #   SUPABASE_URL
 #   SUPABASE_KEY
 #   SUPABASE_SERVICE_KEY
-#   NUXT_SUPABASE_SERVICE_ROLE_KEY   (server-only, mirrors SUPABASE_SERVICE_KEY)
+#   NUXT_SUPABASE_SECRET_KEY   (server-only, mirrors SUPABASE_SERVICE_KEY)
 #   SUPABASE_DB_URL / NUXT_SUPABASE_DB_URL   (Postgres connection for Drizzle)
 
 # 6. Run dev server
@@ -88,7 +88,7 @@ Outline (not part of the MVP task list):
    no extra config needed). Run it on the target VPS (e.g. via
    `systemd` or a process manager) and put it behind a reverse proxy
    (nginx/Caddy) for TLS; set `SUPABASE_URL`, `SUPABASE_KEY`,
-   `NUXT_SUPABASE_SERVICE_ROLE_KEY`, `NUXT_SUPABASE_DB_URL` env vars
+   `NUXT_SUPABASE_SECRET_KEY`, `NUXT_SUPABASE_DB_URL` env vars
    on the host.
 3. Configure Supabase Auth → Email → disable password login, enable
    magic-link, set the `redirectTo` URL allowlist to include the
