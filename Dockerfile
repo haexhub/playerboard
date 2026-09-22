@@ -5,6 +5,9 @@ RUN corepack enable && corepack prepare pnpm@9.12.3 --activate
 
 FROM base AS deps
 COPY package.json pnpm-lock.yaml ./
+# Runtime uses Alpine's own chromium package (see the runner stage), not
+# Playwright's bundled download, which doesn't support musl libc.
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
@@ -22,6 +25,11 @@ RUN npm install --omit=dev --no-save supabase@2.117.0
 
 FROM base AS runner
 WORKDIR /app
+
+# POST /api/veo/login (specs/003-veo-analytics) drives this headless, to
+# perform a trainer-initiated Veo login — see research.md §9.
+RUN apk add --no-cache chromium
+ENV NUXT_VEO_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nuxt

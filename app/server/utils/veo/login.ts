@@ -13,7 +13,20 @@ const LOGIN_TIMEOUT_MS = 30_000
  * change; this still needs one real smoke test against production
  * credentials before being trusted end-to-end (see quickstart.md). */
 export const captureSessionViaLogin = async (email: string, password: string): Promise<string> => {
-  const browser = await chromium.launch({ headless: true })
+  // Production runs Alpine's own `chromium` package (Playwright's bundled
+  // download doesn't support musl libc) — see Dockerfile and quickstart.md.
+  // Locally this env var is unset, so Playwright launches its own
+  // downloaded browser as usual. --no-sandbox is required to run Chromium
+  // as a non-root container user; the only page ever navigated to here is
+  // Veo's own login form, not arbitrary content.
+  const browser = await chromium.launch({
+    headless: true,
+    executablePath: useRuntimeConfig().veoChromiumExecutablePath || undefined,
+    // --disable-dev-shm-usage avoids Chromium crashing against Docker's
+    // default small /dev/shm (64MB) — the standard Chromium-in-Docker
+    // mitigation, no host/compose change required.
+    args: ['--no-sandbox', '--disable-dev-shm-usage'],
+  })
   try {
     const context = await browser.newContext()
     const page = await context.newPage()

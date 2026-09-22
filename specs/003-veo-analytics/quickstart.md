@@ -76,18 +76,35 @@ operated the deployment
 
 </details>
 
-## New runtime dependency: Playwright + Chromium
+## New runtime dependency: Chromium
 
 `POST /api/veo/login` ([research.md §9](./research.md#9-interactive-login-headless-browser))
-drives a real headless Chromium to perform the trainer's Veo login. On the
-VPS, after `pnpm install`, run once:
+drives a real headless Chromium to perform the trainer's Veo login. This
+only runs on-demand when a trainer submits the linking form, never on the
+daily cron sync — `POST /api/veo/sync` itself has no new dependency.
 
-```bash
-npx playwright install --with-deps chromium
-```
+Production runs as a prebuilt Docker image
+(`ghcr.io/haexhub/playerboard`, built by `.github/workflows/ci.yml`), not a
+bare VPS process — the deployment Ansible role (`Projekte/ansible`,
+`roles/playerboard/`) only pulls and runs that image, it doesn't build it.
+So the Chromium dependency lives in the **Dockerfile** itself, not in any
+manual VPS/Ansible step:
 
-This only runs on-demand when a trainer submits the linking form, never on
-the daily cron sync — `POST /api/veo/sync` itself has no new dependency.
+- Playwright's own bundled Chromium download doesn't support Alpine's musl
+  libc (the app's base image, `node:22-alpine`), so the `deps` stage sets
+  `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` before `pnpm install`, and the
+  `runner` stage installs Alpine's own `chromium` package instead
+  (`apk add chromium`), pointing at it via
+  `NUXT_VEO_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium`
+  (`runtimeConfig.veoChromiumExecutablePath` in `nuxt.config.ts`, read by
+  `app/server/utils/veo/login.ts`). Verified working end-to-end in a
+  `node:22-alpine` container during this change.
+- `--no-sandbox` is passed when launching (required to run Chromium as the
+  container's non-root user); the only page ever navigated to is Veo's own
+  login form, not arbitrary content.
+- Local dev leaves `NUXT_VEO_CHROMIUM_EXECUTABLE_PATH` unset, so Playwright
+  launches its own downloaded browser (`~/.cache/ms-playwright`) as usual —
+  no local Alpine/chromium setup needed.
 
 ## Production scheduling
 

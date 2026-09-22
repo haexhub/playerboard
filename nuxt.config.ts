@@ -45,6 +45,7 @@ export default defineNuxtConfig({
     supabaseDbUrl: '',
     veoSyncSecret: '',
     veoLinkTokenSecret: '',
+    veoChromiumExecutablePath: '',
   },
 
   alias: {
