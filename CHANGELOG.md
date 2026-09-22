@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/haexhub/playerboard/compare/v0.3.5...v0.4.0) (2026-09-22)
+
+
+### Features
+
+* **profile:** hand the trainer role over before deleting an account ([ba1d66f](https://github.com/haexhub/playerboard/commit/ba1d66fbc8ea45a69e3dd39dca71d9a9086ec54b))
+
+
+### Bug Fixes
+
+* **profile:** address account deletion review ([9ef1547](https://github.com/haexhub/playerboard/commit/9ef1547e5dfc8c79762f9e9d7c6ef439cd3420c0))
+
 ## [0.3.5](https://github.com/haexhub/playerboard/compare/v0.3.4...v0.3.5) (2026-09-22)
 
 
