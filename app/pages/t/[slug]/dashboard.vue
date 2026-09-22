@@ -49,9 +49,16 @@ const topThree = computed(() => ranking.value?.rows.slice(0, 3) ?? [])
   <section class="space-y-6" data-testid="dashboard-page">
     <header class="space-y-1.5">
       <h1 class="text-2xl font-semibold text-foreground">{{ currentTeam?.name ?? 'Team' }}</h1>
-      <ShadcnBadge variant="secondary">
-        {{ isTrainer ? 'Trainer-Ansicht' : 'Spieler-Ansicht' }}
-      </ShadcnBadge>
+      <div class="flex items-center gap-2">
+        <ShadcnBadge variant="secondary">
+          {{ isTrainer ? 'Trainer-Ansicht' : 'Spieler-Ansicht' }}
+        </ShadcnBadge>
+        <ShadcnButton v-if="isTrainer" as-child variant="outline" size="sm">
+          <NuxtLink :to="`/t/${slug}/team/veo`" data-testid="dashboard-veo-link">
+            Veo-Kamera verknüpfen
+          </NuxtLink>
+        </ShadcnButton>
+      </div>
     </header>
 
     <TimeframePicker
