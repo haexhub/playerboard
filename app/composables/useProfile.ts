@@ -2,6 +2,12 @@ import type { Database } from '~/types/database'
 import { assertRowsAffected } from '~/utils/errors'
 import { displayNameSchema, extensionForMime, photoFileSchema } from '~/utils/validators'
 
+export type SoleTrainerTeam = {
+  team_id: string
+  team_name: string
+  candidates: { user_id: string; display_name: string }[]
+}
+
 export type OwnProfile = {
   display_name: string | null
   avatar_path: string | null
@@ -124,6 +130,65 @@ export const useProfile = () => {
     }
   }
 
+  // Teams the caller trains alone. Each has to be resolved before the account
+  // can go: hand the role to another member, or delete the team when nobody
+  // else is in it. The server re-checks all of this.
+  const soleTrainerTeams = async (): Promise<SoleTrainerTeam[]> => {
+    const uid = user.value?.sub
+    if (!uid) throw new Error('Nicht angemeldet')
+
+    const { data: mine, error: mineErr } = await client
+      .from('memberships')
+      .select('team_id, teams(name)')
+      .eq('user_id', uid)
+      .eq('role', 'trainer')
+    if (mineErr) throw mineErr
+    if (!mine?.length) return []
+
+    const teamIds = mine.map((m) => m.team_id)
+    const { data: others, error: othersErr } = await client
+      .from('memberships')
+      .select('team_id, user_id, role')
+      .in('team_id', teamIds)
+      .neq('user_id', uid)
+    if (othersErr) throw othersErr
+
+    // memberships and user_profiles both point at auth.users, so PostgREST
+    // cannot embed one in the other; the names are fetched separately.
+    const otherIds = [...new Set((others ?? []).map((m) => m.user_id))]
+    const nameById = new Map<string, string | null>()
+    if (otherIds.length > 0) {
+      const { data: profiles, error: profErr } = await client
+        .from('user_profiles')
+        .select('id, display_name')
+        .in('id', otherIds)
+      if (profErr) throw profErr
+      for (const profile of profiles ?? []) nameById.set(profile.id, profile.display_name)
+    }
+
+    return mine.flatMap((team) => {
+      const rest = (others ?? []).filter((m) => m.team_id === team.team_id)
+      if (rest.some((m) => m.role === 'trainer')) return []
+      return [
+        {
+          team_id: team.team_id,
+          team_name: team.teams?.name ?? 'Team',
+          candidates: rest.map((m) => ({
+            user_id: m.user_id,
+            display_name: nameById.get(m.user_id) ?? 'Unbenanntes Mitglied',
+          })),
+        },
+      ]
+    })
+  }
+
+  const deleteAccount = async (payload: {
+    handovers: { team_id: string; new_trainer_user_id: string }[]
+    delete_team_ids: string[]
+  }): Promise<void> => {
+    await $fetch('/api/profile/delete', { method: 'POST', body: payload })
+  }
+
   const moderateProfile = async (payload: {
     target_user_id: string
     team_id: string
@@ -132,5 +197,13 @@ export const useProfile = () => {
     await $fetch('/api/profile/moderate', { method: 'POST', body: payload })
   }
 
-  return { getOwnProfile, updateDisplayName, uploadAvatar, removeAvatar, moderateProfile }
+  return {
+    getOwnProfile,
+    updateDisplayName,
+    uploadAvatar,
+    removeAvatar,
+    moderateProfile,
+    soleTrainerTeams,
+    deleteAccount,
+  }
 }

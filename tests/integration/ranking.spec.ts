@@ -3,6 +3,7 @@
 import 'dotenv/config'
 import postgres from 'postgres'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { runIsolated } from './helpers/rollback'
 
 const DB_URL =
   process.env.SUPABASE_DB_URL ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
@@ -31,24 +32,9 @@ type RankingResult = {
   }>
 }
 
-class Rollback extends Error {}
-
-const runIsolated = async <T>(work: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> => {
-  let out!: T
-  try {
-    await sql.begin(async (tx) => {
-      out = await work(tx)
-      throw new Rollback()
-    })
-  } catch (e) {
-    if (!(e instanceof Rollback)) throw e
-  }
-  return out
-}
-
 describe('get_team_ranking', () => {
   it('produces the (1, 2, 2, 4) tie pattern under lexicographic category order', async () => {
-    const ranking = await runIsolated<RankingResult>(async (tx) => {
+    const ranking = await runIsolated<RankingResult>(sql, async (tx) => {
       const userId = crypto.randomUUID()
       const teamId = crypto.randomUUID()
 
@@ -134,7 +120,7 @@ describe('get_team_ranking', () => {
   })
 
   it('returns zero-score rows for players with no entries in the timeframe', async () => {
-    const { ranking, catId } = await runIsolated(async (tx) => {
+    const { ranking, catId } = await runIsolated(sql, async (tx) => {
       const userId = crypto.randomUUID()
       const teamId = crypto.randomUUID()
       await tx`insert into auth.users (id) values (${userId})`
@@ -167,7 +153,7 @@ describe('get_team_ranking', () => {
   // element order is unspecified and rank() can compare different vectors on
   // consecutive calls. Category id decides: the lower id is compared first.
   it('breaks a sort_order tie by category id, in both the header and the rank', async () => {
-    const { ranking, lowId, highId, leader } = await runIsolated(async (tx) => {
+    const { ranking, lowId, highId, leader } = await runIsolated(sql, async (tx) => {
       const userId = crypto.randomUUID()
       const teamId = crypto.randomUUID()
       await tx`insert into auth.users (id) values (${userId})`
@@ -221,7 +207,7 @@ describe('get_team_category_stats', () => {
   // Mirrors what the player page used to compute client-side: the average and
   // median of per-player sums, counting only players who scored in the category.
   it('averages per-player sums over participants only', async () => {
-    const { stats, catId } = await runIsolated(async (tx) => {
+    const { stats, catId } = await runIsolated(sql, async (tx) => {
       const userId = crypto.randomUUID()
       const teamId = crypto.randomUUID()
       await tx`insert into auth.users (id) values (${userId})`

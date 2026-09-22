@@ -240,3 +240,98 @@ test.describe('US4 — trainer resets an inappropriate avatar or name', () => {
     await otherCtx.close()
   })
 })
+
+test.describe('US5 — member deletes their own account', () => {
+  test('a sole trainer hands the role to a preselected member, who keeps the team', async ({
+    browser,
+  }) => {
+    test.setTimeout(180_000)
+    const suffix = uniqueSuffix()
+    const trainerEmail = `del-trainer-${suffix}@example.com`
+    const playerEmail = `del-player-${suffix}@example.com`
+    const teamSlug = `del-team-${suffix}`
+
+    const trainerCtx = await browser.newContext()
+    const trainerPage = await trainerCtx.newPage()
+    setupPage(trainerPage)
+    await signInWithMagicLink(trainerPage, trainerEmail)
+    await foundTeam(trainerPage, `Del Team ${suffix}`, teamSlug)
+
+    await trainerPage.goto(`/t/${teamSlug}/team/members`, { waitUntil: 'networkidle' })
+    await trainerPage
+      .getByLabel(/e-mail/i)
+      .first()
+      .fill(playerEmail)
+    await trainerPage.getByLabel(/rolle/i).selectOption('player')
+    await trainerPage.getByRole('button', { name: /einladen/i }).click()
+    await expect(trainerPage.getByText(playerEmail)).toBeVisible({ timeout: 10_000 })
+
+    const inviteLink = await fetchLatestMagicLink(playerEmail)
+    const playerCtx = await browser.newContext()
+    const playerPage = await playerCtx.newPage()
+    setupPage(playerPage)
+    await playerPage.goto(inviteLink, { waitUntil: 'networkidle' })
+    await playerPage.getByRole('button', { name: /annehmen/i }).click()
+    await playerPage.waitForURL(new RegExp(`/t/${teamSlug}(/|$)`), { timeout: 15_000 })
+
+    const [team] = await restGet<{ id: string }>(`teams?slug=eq.${teamSlug}&select=id`)
+    const teamId = team!.id
+
+    await trainerPage.goto('/profile', { waitUntil: 'networkidle' })
+    await trainerPage.getByTestId('account-delete-open').click()
+    const dialog = trainerPage.getByTestId('account-delete-dialog')
+    await expect(dialog).toBeVisible()
+
+    // A successor is preselected, so the trainer cannot delete without one.
+    const select = trainerPage.getByTestId(`successor-select-${teamId}`)
+    await expect(select).toBeVisible()
+    await expect(select).not.toHaveValue('')
+
+    await trainerPage.getByTestId('account-delete-confirm').click()
+    await trainerPage.waitForURL(/\/login$/, { timeout: 20_000 })
+
+    // The team survives and the former player is now its trainer.
+    const members = await restGet<{ user_id: string; role: string }>(
+      `memberships?team_id=eq.${teamId}&select=user_id,role`,
+    )
+    expect(members).toHaveLength(1)
+    expect(members[0]!.role).toBe('trainer')
+    expect(await restGet(`teams?id=eq.${teamId}&select=id`)).toHaveLength(1)
+
+    await trainerCtx.close()
+    await playerCtx.close()
+  })
+
+  test('a trainer who is the only member deletes the team along with the account', async ({
+    browser,
+  }) => {
+    test.setTimeout(120_000)
+    const suffix = uniqueSuffix()
+    const email = `solo-${suffix}@example.com`
+    const teamSlug = `solo-team-${suffix}`
+
+    const ctx = await browser.newContext()
+    const page = await ctx.newPage()
+    setupPage(page)
+    await signInWithMagicLink(page, email)
+    await foundTeam(page, `Solo Team ${suffix}`, teamSlug)
+
+    const [team] = await restGet<{ id: string }>(`teams?slug=eq.${teamSlug}&select=id`)
+    const teamId = team!.id
+
+    await page.goto('/profile', { waitUntil: 'networkidle' })
+    await page.getByTestId('account-delete-open').click()
+    const dialog = page.getByTestId('account-delete-dialog')
+    await expect(dialog).toBeVisible()
+    // No member to hand over to, so the team goes with the account.
+    await expect(dialog).toContainText(/wird\s+zusammen mit deinem Konto gelöscht/i)
+    await expect(page.getByTestId(`successor-select-${teamId}`)).toHaveCount(0)
+
+    await page.getByTestId('account-delete-confirm').click()
+    await page.waitForURL(/\/login$/, { timeout: 20_000 })
+
+    expect(await restGet(`teams?id=eq.${teamId}&select=id`)).toHaveLength(0)
+
+    await ctx.close()
+  })
+})
