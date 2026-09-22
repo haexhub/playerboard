@@ -41,7 +41,7 @@ export type Database = {
           email: string
           expires_at: string
           id: string
-          invited_by: string
+          invited_by: string | null
           player_id: string | null
           role: string
           team_id: string
@@ -53,7 +53,7 @@ export type Database = {
           email: string
           expires_at?: string
           id?: string
-          invited_by: string
+          invited_by?: string | null
           player_id?: string | null
           role: string
           team_id: string
@@ -65,7 +65,7 @@ export type Database = {
           email?: string
           expires_at?: string
           id?: string
-          invited_by?: string
+          invited_by?: string | null
           player_id?: string | null
           role?: string
           team_id?: string
@@ -310,7 +310,7 @@ export type Database = {
       teams: {
         Row: {
           created_at: string
-          created_by: string
+          created_by: string | null
           id: string
           last_updated_at: string
           last_updated_by: string | null
@@ -320,7 +320,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          created_by: string
+          created_by?: string | null
           id?: string
           last_updated_at?: string
           last_updated_by?: string | null
@@ -330,7 +330,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           id?: string
           last_updated_at?: string
           last_updated_by?: string | null
@@ -348,7 +348,7 @@ export type Database = {
           storage_path: string
           training_id: string
           uploaded_at: string
-          uploaded_by: string
+          uploaded_by: string | null
         }
         Insert: {
           content_type: string
@@ -357,7 +357,7 @@ export type Database = {
           storage_path: string
           training_id: string
           uploaded_at?: string
-          uploaded_by: string
+          uploaded_by?: string | null
         }
         Update: {
           content_type?: string
@@ -366,7 +366,7 @@ export type Database = {
           storage_path?: string
           training_id?: string
           uploaded_at?: string
-          uploaded_by?: string
+          uploaded_by?: string | null
         }
         Relationships: [
           {
@@ -660,6 +660,14 @@ export type Database = {
       get_public_ranking: {
         Args: { p_from: string; p_slug: string; p_to: string }
         Returns: Json
+      }
+      get_team_category_stats: {
+        Args: { p_from: string; p_team: string; p_to: string }
+        Returns: {
+          category_id: string
+          team_avg: number
+          team_median: number
+        }[]
       }
       get_team_ranking: {
         Args: { p_from: string; p_team: string; p_to: string }

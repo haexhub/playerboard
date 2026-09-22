@@ -25,12 +25,10 @@ export const teams = pgTable('teams', {
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
   timezone: text('timezone').notNull().default('Europe/Berlin'),
-  createdBy: uuid('created_by')
-    .notNull()
-    .references(() => authUsers.id),
+  createdBy: uuid('created_by').references(() => authUsers.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   lastUpdatedAt: timestamp('last_updated_at', { withTimezone: true }).notNull().defaultNow(),
-  lastUpdatedBy: uuid('last_updated_by').references(() => authUsers.id),
+  lastUpdatedBy: uuid('last_updated_by').references(() => authUsers.id, { onDelete: 'set null' }),
 })
 
 export const memberships = pgTable(
@@ -63,9 +61,7 @@ export const invitations = pgTable(
     email: text('email').notNull(),
     role: text('role').notNull(),
     token: text('token').notNull().unique(),
-    invitedBy: uuid('invited_by')
-      .notNull()
-      .references(() => authUsers.id),
+    invitedBy: uuid('invited_by').references(() => authUsers.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp('expires_at', { withTimezone: true })
       .notNull()
@@ -120,9 +116,9 @@ export const players = pgTable(
     linkedUserId: uuid('linked_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
     photoConsent: boolean('photo_consent').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    createdBy: uuid('created_by').references(() => authUsers.id),
+    createdBy: uuid('created_by').references(() => authUsers.id, { onDelete: 'set null' }),
     lastUpdatedAt: timestamp('last_updated_at', { withTimezone: true }).notNull().defaultNow(),
-    lastUpdatedBy: uuid('last_updated_by').references(() => authUsers.id),
+    lastUpdatedBy: uuid('last_updated_by').references(() => authUsers.id, { onDelete: 'set null' }),
   },
   (t) => [
     uniqueIndex('players_active_jersey_per_team_uniq')
@@ -148,9 +144,9 @@ export const pointCategories = pgTable(
     valueMin: integer('value_min').notNull(),
     valueMax: integer('value_max').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    createdBy: uuid('created_by').references(() => authUsers.id),
+    createdBy: uuid('created_by').references(() => authUsers.id, { onDelete: 'set null' }),
     lastUpdatedAt: timestamp('last_updated_at', { withTimezone: true }).notNull().defaultNow(),
-    lastUpdatedBy: uuid('last_updated_by').references(() => authUsers.id),
+    lastUpdatedBy: uuid('last_updated_by').references(() => authUsers.id, { onDelete: 'set null' }),
   },
   (t) => [
     check('point_categories_range_check', sql`${t.valueMax} >= ${t.valueMin}`),
@@ -171,9 +167,9 @@ export const trainings = pgTable(
     note: text('note'),
     status: text('status').notNull().default('draft'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    createdBy: uuid('created_by').references(() => authUsers.id),
+    createdBy: uuid('created_by').references(() => authUsers.id, { onDelete: 'set null' }),
     lastUpdatedAt: timestamp('last_updated_at', { withTimezone: true }).notNull().defaultNow(),
-    lastUpdatedBy: uuid('last_updated_by').references(() => authUsers.id),
+    lastUpdatedBy: uuid('last_updated_by').references(() => authUsers.id, { onDelete: 'set null' }),
   },
   (t) => [
     // Future-date validation is enforced by the database trigger using the
@@ -194,9 +190,7 @@ export const trainingPhotos = pgTable(
     storagePath: text('storage_path').notNull().unique(),
     contentType: text('content_type').notNull(),
     sizeBytes: integer('size_bytes').notNull(),
-    uploadedBy: uuid('uploaded_by')
-      .notNull()
-      .references(() => authUsers.id),
+    uploadedBy: uuid('uploaded_by').references(() => authUsers.id, { onDelete: 'set null' }),
     uploadedAt: timestamp('uploaded_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -224,9 +218,9 @@ export const pointEntries = pgTable(
       .references(() => pointCategories.id, { onDelete: 'restrict' }),
     value: integer('value').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    createdBy: uuid('created_by').references(() => authUsers.id),
+    createdBy: uuid('created_by').references(() => authUsers.id, { onDelete: 'set null' }),
     lastUpdatedAt: timestamp('last_updated_at', { withTimezone: true }).notNull().defaultNow(),
-    lastUpdatedBy: uuid('last_updated_by').references(() => authUsers.id),
+    lastUpdatedBy: uuid('last_updated_by').references(() => authUsers.id, { onDelete: 'set null' }),
   },
   (t) => [
     uniqueIndex('point_entries_training_player_category_uniq').on(
@@ -328,5 +322,5 @@ export const teamSettings = pgTable('team_settings', {
     .notNull()
     .default(sql`date_trunc('year', current_date)::date`),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedBy: uuid('updated_by').references(() => authUsers.id),
+  updatedBy: uuid('updated_by').references(() => authUsers.id, { onDelete: 'set null' }),
 })
