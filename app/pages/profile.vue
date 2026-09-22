@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AccountDeleteCard from '~/components/profile/AccountDeleteCard.vue'
 import ProfileForm from '~/components/profile/ProfileForm.vue'
 import { useProfile } from '~/composables/useProfile'
 
@@ -25,5 +26,6 @@ const {
       :avatar-url="profile.avatar_url"
       @saved="refresh"
     />
+    <AccountDeleteCard />
   </section>
 </template>

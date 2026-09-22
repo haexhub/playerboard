@@ -117,6 +117,32 @@ export type Database = {
           },
         ]
       }
+      pending_account_deletions: {
+        Row: {
+          created_at: string
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_account_deletions_team_id_teams_id_fk"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       players: {
         Row: {
           active: boolean
