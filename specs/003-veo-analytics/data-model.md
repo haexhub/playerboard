@@ -3,14 +3,19 @@
 Five new tables, following this repo's existing Drizzle conventions (uuid or
 natural-key PK per shape, `team_id` FK + index on team-scoped tables,
 `timestamp with time zone` columns). The sync route uses `useAdminDb()` for
-read access to all five. Since 2026-09-22 (see spec.md's Clarifications),
-`veo_team_mappings` and `veo_sync_credentials` are also written directly by
-an authenticated trainer, through `is_trainer`-gated RLS policies — not
-`useAdminDb()` — via the self-service linking flow in
-`POST /api/veo/login` + `POST /api/veo/link`. None of the five carry
-`created_by`/`last_updated_by` audit columns: the three analytics/status
-tables have no app-level author, and the two trainer-writable tables record
-"who" implicitly through `team_id` + RLS rather than a column.
+read access to all five. Since 2026-09-22 (see spec.md's Clarifications), a
+trainer can self-serve linking their team to Veo via
+`POST /api/veo/login` + `POST /api/veo/link`, instead of a deployment
+operator seeding rows by hand. `veo_team_mappings` gets `is_trainer`-gated
+RLS policies for this (`select`/`insert`/`update`, genuinely used by direct
+PostgREST callers and enforced as such). `veo_sync_credentials` stays fully
+`useAdminDb()`-only — its RLS can't cover an upsert without a `select`
+policy, which this table must never have (see
+[contracts/rls-policies.md](./contracts/rls-policies.md)) — so
+`POST /api/veo/link` writes it via an explicit trainer-role check instead.
+None of the five carry `created_by`/`last_updated_by` audit columns: the
+analytics/status tables have no app-level author, and `veo_team_mappings`
+records "who" implicitly through `team_id` + RLS rather than a column.
 
 ## `veo_team_mappings`
 
@@ -125,13 +130,15 @@ the trainer's password is never part of this row or any other.
 | `captured_at` | `timestamptz`, not null | when the session artifact was (re)captured |
 | `updated_at` | `timestamptz`, `defaultNow()` | |
 
-**RLS**: `insert`, `update` for `authenticated` gated by
-`public.is_trainer(team_id)` — a trainer can write only their own team's
-row. **No `select` policy for `authenticated`** — the trainer who just wrote
-the row cannot read it back, same as everyone else; only `useAdminDb()`
-(from `app/server/utils/veo/auth.ts` inside the sync route) reads it. This
-keeps the credential itself exactly as inaccessible as it was under the old
-deny-all policy — only the write path changed.
+**RLS**: no policy at all for `authenticated`/`anon`, for any operation —
+unchanged from before this feature. `POST /api/veo/link` writes this table
+via `useAdminDb()` with an explicit `requireTrainer()` check (not RLS): a
+`select` policy would be needed for `INSERT ... ON CONFLICT DO UPDATE` to
+resolve under RLS at all (confirmed by direct testing — without one, both
+`ON CONFLICT DO UPDATE` and a plain `UPDATE` silently fail to find the row),
+and this table must never have one. See
+[contracts/rls-policies.md](./contracts/rls-policies.md) for the full
+reasoning.
 
 ## Relationships
 

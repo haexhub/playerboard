@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { serverSupabaseUser } from '#supabase/server'
-import { schema, useUserDb } from '~/server/utils/db'
+import { requireTrainer, schema, useAdminDb } from '~/server/utils/db'
 import { pgError } from '~/server/utils/pg-error'
 import { verifyLinkToken } from '~/server/utils/veo/linkToken'
 
@@ -33,11 +33,21 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Link token does not match team_id' })
   }
 
+  const db = useAdminDb()
+  // Not RLS-enforced: veo_sync_credentials deliberately has no select policy
+  // for anyone, so Postgres can't resolve ON CONFLICT DO UPDATE against it
+  // under RLS (conflict detection needs row-visibility, which would mean
+  // making the credential readable — the one thing this table must never
+  // allow). So this write goes through useAdminDb() with the same explicit
+  // requireTrainer() check POST /api/veo/login already uses, instead of
+  // useUserDb()/RLS. veo_team_mappings is written the same way here so both
+  // rows commit atomically in one transaction; its RLS policies are still
+  // real and still enforced for any other caller (see contracts/rls-policies.md
+  // and the rls-negative-*.spec.ts positive/negative controls).
   try {
-    // useUserDb runs as the authenticated caller under RLS — the
-    // is_trainer(team_id) policies on both tables are the actual
-    // authorization check here, not application code (contracts/rls-policies.md).
-    await useUserDb(event, async (tx) => {
+    await requireTrainer(db, team_id, user.sub)
+
+    await db.transaction(async (tx) => {
       await tx
         .insert(schema.veoTeamMappings)
         .values({ teamId: team_id, veoClubSlug: veo_club_slug, veoTeamSlug: veo_team_slug, enabled: true })
@@ -61,9 +71,6 @@ export default defineEventHandler(async (event) => {
     })
   } catch (err) {
     if ((err as { statusCode?: number }).statusCode) throw err
-    if (pgError(err).code === '42501') {
-      throw createError({ statusCode: 403, statusMessage: 'Only trainers of this team may link it to Veo' })
-    }
     console.error('[veo/link] failed', pgError(err).code, pgError(err).message)
     throw createError({ statusCode: 500, statusMessage: 'Could not save Veo link' })
   }

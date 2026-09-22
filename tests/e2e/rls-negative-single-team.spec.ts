@@ -233,11 +233,11 @@ test.describe('RLS negative — single team (SC-003)', () => {
     )
     expect(playerCredInsert.ok()).toBe(false)
 
-    // Positive control for N11 (and for N13 below) — the trainer of this
-    // team really can insert then update (upsert) both tables; a
-    // broken/overly-strict policy would make N11's "denied" a false
-    // positive too (denied because writes are broken for everyone, not
-    // because the player specifically lacks permission).
+    // Positive control for N11 — the trainer of this team really can insert
+    // then update (upsert) veo_team_mappings; a broken/overly-strict policy
+    // would make N11's "denied" a false positive too (denied because writes
+    // are broken for everyone, not because the player specifically lacks
+    // permission).
     const trainerMappingInsert = await trainerCtx.request.post(
       `${SUPABASE_URL}/rest/v1/veo_team_mappings`,
       {
@@ -265,25 +265,22 @@ test.describe('RLS negative — single team (SC-003)', () => {
     )
     expect(await trainerMappingSelect.json()).toEqual([{ veo_team_slug: 'team-z' }])
 
+    // N13 — veo_sync_credentials denies every authenticated-role operation,
+    // even for the trainer of this exact team: it has no policy at all (not
+    // even insert/update) since Postgres can't resolve ON CONFLICT/UPDATE
+    // row-matching under RLS without a select policy, and adding one just to
+    // make writes "work" would defeat the point of this table (see
+    // contracts/rls-policies.md). Only useAdminDb() — auth.ts's read,
+    // link.post.ts's write — ever touches it.
     const trainerCredInsert = await trainerCtx.request.post(
       `${SUPABASE_URL}/rest/v1/veo_sync_credentials`,
       {
         headers: asUser(trainerToken),
-        data: [{ team_id: teamId, session_cookie: 'cookie-1', captured_at: new Date().toISOString() }],
+        data: [{ team_id: teamId, session_cookie: 'x', captured_at: new Date().toISOString() }],
       },
     )
-    expect(trainerCredInsert.ok()).toBe(true)
+    expect(trainerCredInsert.ok()).toBe(false)
 
-    const trainerCredUpdate = await trainerCtx.request.patch(
-      `${SUPABASE_URL}/rest/v1/veo_sync_credentials?team_id=eq.${teamId}`,
-      { headers: asUser(trainerToken), data: { session_cookie: 'cookie-2' } },
-    )
-    expect(trainerCredUpdate.ok()).toBe(true)
-
-    // N13 — veo_sync_credentials stays closed even to the trainer who just
-    // wrote it: no select policy exists for anyone. A row now genuinely
-    // exists (inserted above), so this proves RLS actively filters it,
-    // rather than the table merely being empty. See contracts/rls-policies.md V1.
     const credRes = await trainerCtx.request.get(
       `${SUPABASE_URL}/rest/v1/veo_sync_credentials?team_id=eq.${teamId}&select=*`,
       { headers: asUser(trainerToken) },
