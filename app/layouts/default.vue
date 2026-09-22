@@ -50,6 +50,11 @@ const { currentSlug, isTrainer } = useTeamContext()
                       <NuxtLink :to="`/t/${currentSlug}/trainings`">Trainings</NuxtLink>
                     </ShadcnButton>
                   </ShadcnSheetClose>
+                  <ShadcnSheetClose as-child>
+                    <ShadcnButton as-child variant="ghost" class="justify-start">
+                      <NuxtLink :to="`/t/${currentSlug}/analytics`">Veo-Analytics</NuxtLink>
+                    </ShadcnButton>
+                  </ShadcnSheetClose>
                   <template v-if="isTrainer">
                     <ShadcnSheetClose as-child>
                       <ShadcnButton as-child variant="ghost" class="justify-start">
@@ -73,6 +78,11 @@ const { currentSlug, isTrainer } = useTeamContext()
                     </ShadcnSheetClose>
                   </template>
                 </template>
+                <ShadcnSheetClose as-child>
+                  <ShadcnButton as-child variant="ghost" class="justify-start">
+                    <NuxtLink to="/profile">Profil</NuxtLink>
+                  </ShadcnButton>
+                </ShadcnSheetClose>
               </nav>
               <ShadcnSheetFooter>
                 <ShadcnSheetClose as-child>
