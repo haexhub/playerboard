@@ -449,8 +449,10 @@ Foto-URLs schlägt fehl.
 - **FR-012**: Ein Trainer MUSS bei einem Training pro aktivem Kaderspieler
   und pro aktiver Kategorie einen Punktwert eintragen können, oder das Feld
   leer lassen (Interpretation: nicht bewertet).
-- **FR-013**: Das System MUSS beim Speichern verhindern, dass ein Training
-  ohne mindestens ein zugeordnetes Foto gespeichert wird.
+- **FR-013**: *(entfällt seit 2026-09-11 — Fotos sind für ein Training in
+  jedem Status optional, der Speichern-Guard wurde in
+  `20260911130000_drop_photo_requirement.sql` entfernt; siehe Acceptance
+  Scenario 3 unter User Story 1.)*
 - **FR-014**: Ein Trainer MUSS ein gespeichertes Training nachträglich
   editieren können (Punkte korrigieren, Fotos ergänzen, Fotos löschen,
   Datum korrigieren).
