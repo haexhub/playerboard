@@ -141,6 +141,15 @@ die Kern-Wertschöpfung demonstrierbar.
    der Kategorie definierten Wertebereichs ein, **When** er speichern will,
    **Then** wird der einzelne Feldwert als ungültig markiert und das Training
    nicht gespeichert.
+5. **Given** ein Training ist gespeichert, **When** der Trainer das Datum
+   nachträglich korrigiert und speichert, **Then** wird das neue Datum
+   übernommen (sofern nicht in der Zukunft) und Historie/Rangliste zeigen
+   das korrigierte Datum.
+6. **Given** ein Trainer öffnet ein Training (Entwurf oder gespeichert),
+   **When** er es löscht und die Sicherheitsabfrage bestätigt, **Then** ist
+   das Training inklusive aller Punkteinträge und Fotos (auch der
+   Bilddateien im Storage) endgültig entfernt und erscheint nicht mehr in
+   der Trainings-Historie.
 
 ---
 
@@ -440,12 +449,19 @@ Foto-URLs schlägt fehl.
 - **FR-012**: Ein Trainer MUSS bei einem Training pro aktivem Kaderspieler
   und pro aktiver Kategorie einen Punktwert eintragen können, oder das Feld
   leer lassen (Interpretation: nicht bewertet).
-- **FR-013**: Das System MUSS beim Speichern verhindern, dass ein Training
-  ohne mindestens ein zugeordnetes Foto gespeichert wird.
+- **FR-013**: *(entfällt seit 2026-09-11 — Fotos sind für ein Training in
+  jedem Status optional, der Speichern-Guard wurde in
+  `20260911130000_drop_photo_requirement.sql` entfernt; siehe Acceptance
+  Scenario 3 unter User Story 1.)*
 - **FR-014**: Ein Trainer MUSS ein gespeichertes Training nachträglich
-  editieren können (Punkte korrigieren, Fotos ergänzen, Fotos löschen).
+  editieren können (Punkte korrigieren, Fotos ergänzen, Fotos löschen,
+  Datum korrigieren).
 - **FR-015**: Das System MUSS pro Punkteintrag `last_updated_at` und
   `last_updated_by` mitführen.
+- **FR-016**: Ein Trainer MUSS ein Training (Entwurf oder gespeichert)
+  vollständig löschen können. Beim Löschen MÜSSEN die zugehörigen
+  Punkteinträge und Fotos mitgelöscht werden, einschließlich der
+  Bilddateien im Storage-Bucket (keine verwaisten Fotodateien).
 
 **Kategorien**
 

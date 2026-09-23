@@ -14,7 +14,8 @@ import {
   type ConsentStatus,
   type TrainingPhotoView,
 } from '~/composables/useTrainingPhotos'
-import { formatDate } from '~/utils/dates'
+import { formatDate, isoDate } from '~/utils/dates'
+import { trainingDateSchema } from '~/utils/validators'
 
 definePageMeta({
   middleware: ['team-context'],
@@ -26,7 +27,7 @@ const { currentTeam, isTrainer } = useTeamContext()
 const teamId = computed(() => currentTeam.value?.id ?? '')
 const slug = computed(() => currentTeam.value?.slug ?? '')
 
-const { get, listEntries, save } = useTrainings()
+const { get, listEntries, save, deleteTraining } = useTrainings()
 const { listActive: listPlayers } = usePlayers()
 const { listActive: listCategories } = useCategories()
 const { list: listPhotos, deriveConsentStatus } = useTrainingPhotos()
@@ -40,6 +41,15 @@ const consentStatus = ref<ConsentStatus>('clean')
 const isSaving = ref(false)
 const saveError = ref<string | null>(null)
 const photosError = ref<string | null>(null)
+
+const isoToday = isoDate(new Date())
+const dateInput = ref('')
+const isSavingDate = ref(false)
+const dateError = ref<string | null>(null)
+
+const isDeleteDialogOpen = ref(false)
+const isDeleting = ref(false)
+const deleteError = ref<string | null>(null)
 
 const trainingTeamId = computed(() => training.value?.team_id ?? '')
 
@@ -153,6 +163,7 @@ watch(
     entries.value = data.entries
     photos.value = data.photos
     consentStatus.value = data.consentStatus
+    dateInput.value = data.training?.date ?? ''
   },
   { immediate: true },
 )
@@ -197,6 +208,41 @@ const onSave = async () => {
 }
 
 const statusLabel = computed(() => (training.value?.status === 'saved' ? 'Gespeichert' : 'Entwurf'))
+
+const isDateChanged = computed(() => !!training.value && dateInput.value !== training.value.date)
+
+const onSaveDate = async () => {
+  if (!training.value) return
+  dateError.value = null
+  const parsed = trainingDateSchema.safeParse(dateInput.value)
+  if (!parsed.success) {
+    dateError.value = parsed.error.issues[0]?.message ?? 'Ungültiges Datum'
+    return
+  }
+  isSavingDate.value = true
+  try {
+    training.value = await save(training.value.id, { date: parsed.data })
+  } catch (err) {
+    dateError.value = err instanceof Error ? err.message : 'Datum konnte nicht gespeichert werden'
+  } finally {
+    isSavingDate.value = false
+  }
+}
+
+const onDeleteTraining = async () => {
+  if (!training.value) return
+  deleteError.value = null
+  isDeleting.value = true
+  try {
+    await deleteTraining(training.value.id)
+    isDeleteDialogOpen.value = false
+    await navigateTo(`/t/${slug.value}/trainings`)
+  } catch (err) {
+    deleteError.value = err instanceof Error ? err.message : 'Training konnte nicht gelöscht werden'
+  } finally {
+    isDeleting.value = false
+  }
+}
 </script>
 
 <template>
@@ -222,9 +268,31 @@ const statusLabel = computed(() => (training.value?.status === 'saved' ? 'Gespei
           {{ statusLabel }}
         </span>
       </div>
+      <div v-if="isTrainer && training.status === 'saved'" class="flex items-center gap-2">
+        <ShadcnLabel class="flex items-center gap-2 text-sm text-neutral-600">
+          <span>Datum</span>
+          <ShadcnInput
+            v-model="dateInput"
+            type="date"
+            :max="isoToday"
+            data-testid="training-date-input"
+          />
+        </ShadcnLabel>
+        <ShadcnButton
+          type="button"
+          size="sm"
+          variant="outline"
+          data-testid="training-date-save-button"
+          :disabled="!isDateChanged || isSavingDate"
+          @click="onSaveDate"
+        >
+          {{ isSavingDate ? 'Speichere…' : 'Datum speichern' }}
+        </ShadcnButton>
+      </div>
+      <p v-else class="text-sm text-neutral-600">Datum {{ formatDate(training.date) }}</p>
+      <p v-if="dateError" class="text-sm text-red-700" role="alert">{{ dateError }}</p>
       <p class="text-sm text-neutral-600">
-        Datum {{ formatDate(training.date) }} · Zuletzt aktualisiert
-        {{ new Date(training.last_updated_at).toLocaleString('de-DE') }}
+        Zuletzt aktualisiert {{ new Date(training.last_updated_at).toLocaleString('de-DE') }}
       </p>
     </header>
 
@@ -312,6 +380,44 @@ const statusLabel = computed(() => (training.value?.status === 'saved' ? 'Gespei
         {{ isSaving ? 'Speichere…' : 'Speichern' }}
       </button>
       <p v-if="saveError" class="text-sm text-red-700" role="alert">{{ saveError }}</p>
+
+      <ShadcnButton
+        type="button"
+        variant="destructive"
+        data-testid="training-delete-button"
+        @click="isDeleteDialogOpen = true"
+      >
+        Training löschen
+      </ShadcnButton>
+
+      <ShadcnDialog v-model:open="isDeleteDialogOpen">
+        <ShadcnDialogContent>
+          <div data-testid="training-delete-dialog" class="space-y-4">
+            <ShadcnDialogHeader>
+              <ShadcnDialogTitle>Training löschen?</ShadcnDialogTitle>
+            </ShadcnDialogHeader>
+            <p class="text-sm text-neutral-600">
+              Das Training {{ training.title || formatDate(training.date) }} sowie alle zugehörigen
+              Punkte und Fotos werden unwiderruflich gelöscht.
+            </p>
+            <p v-if="deleteError" class="text-sm text-red-700" role="alert">{{ deleteError }}</p>
+            <ShadcnDialogFooter>
+              <ShadcnDialogClose as-child>
+                <ShadcnButton type="button" variant="outline">Abbrechen</ShadcnButton>
+              </ShadcnDialogClose>
+              <ShadcnButton
+                type="button"
+                variant="destructive"
+                :disabled="isDeleting"
+                data-testid="training-delete-confirm-button"
+                @click="onDeleteTraining"
+              >
+                {{ isDeleting ? 'Lösche…' : 'Endgültig löschen' }}
+              </ShadcnButton>
+            </ShadcnDialogFooter>
+          </div>
+        </ShadcnDialogContent>
+      </ShadcnDialog>
     </template>
 
     <template v-else>

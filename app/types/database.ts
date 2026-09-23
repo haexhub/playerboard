@@ -366,6 +366,41 @@ export type Database = {
         }
         Relationships: []
       }
+      training_deletion_jobs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          storage_paths: string[]
+          team_id: string
+          training_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          storage_paths: string[]
+          team_id: string
+          training_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          storage_paths?: string[]
+          team_id?: string
+          training_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_deletion_jobs_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       training_photos: {
         Row: {
           content_type: string
