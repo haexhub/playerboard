@@ -96,5 +96,17 @@ export const useTrainingPhotos = () => {
     return players.every((p) => p.photo_consent) ? 'clean' : 'blocked'
   }
 
-  return { upload, list, deriveConsentStatus }
+  const removeForTraining = async (training_id: string): Promise<void> => {
+    const { data, error } = await client
+      .from('training_photos')
+      .select('storage_path')
+      .eq('training_id', training_id)
+    if (error) throw error
+    const paths = (data ?? []).map((r) => r.storage_path)
+    if (paths.length === 0) return
+    const { error: removeError } = await client.storage.from(BUCKET).remove(paths)
+    if (removeError) throw removeError
+  }
+
+  return { upload, list, deriveConsentStatus, removeForTraining }
 }

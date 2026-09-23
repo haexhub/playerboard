@@ -122,6 +122,14 @@ export const useTrainings = () => {
     return data as TrainingRow
   }
 
+  const deleteTraining = async (id: string): Promise<void> => {
+    if (!user.value) throw new Error('Not authenticated')
+    const { removeForTraining } = useTrainingPhotos()
+    await removeForTraining(id)
+    const { error } = await client.from('trainings').delete().eq('id', id)
+    if (error) throw error
+  }
+
   const list = async (team_id: string): Promise<TrainingRow[]> => {
     const { data, error } = await client
       .from('trainings')
@@ -148,5 +156,5 @@ export const useTrainings = () => {
     return (data ?? []) as PointEntryRow[]
   }
 
-  return { createDraft, updateEntry, deleteEntry, save, list, get, listEntries }
+  return { createDraft, updateEntry, deleteEntry, deleteTraining, save, list, get, listEntries }
 }
