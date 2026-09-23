@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.5.0](https://github.com/haexhub/playerboard/compare/v0.4.0...v0.5.0) (2026-09-23)
+
+
+### Features
+
+* **public:** add public Veo-Stats tab with trainer opt-in toggle ([e1b3809](https://github.com/haexhub/playerboard/commit/e1b3809b6fafcafdf6de1549a534ef33f60becb6))
+* **trainings:** allow deleting trainings and editing their date ([514c8f5](https://github.com/haexhub/playerboard/commit/514c8f563a26b0137d1ad02d7150b813c5707c1a))
+* **trainings:** allow deleting trainings and editing their date ([b0b41e0](https://github.com/haexhub/playerboard/commit/b0b41e05a180deb8c717a783a6717c235cd94ea5))
+* **veo:** add veo_player_match_stats table and public_stats_enabled column ([f125694](https://github.com/haexhub/playerboard/commit/f1256949fd004e700e987fa750049fb95b432b63))
+* **veo:** let trainers self-link their team to Veo ([dddf239](https://github.com/haexhub/playerboard/commit/dddf2399dfcb1eb867a1052a694e90f73118a979))
+* **veo:** let trainers self-link their team to Veo ([44217cc](https://github.com/haexhub/playerboard/commit/44217cc2df80dc5ab3045be99590d727c334edc5))
+* **veo:** link to the Veo linking page from the dashboard ([69c2f06](https://github.com/haexhub/playerboard/commit/69c2f0656290dcdab7f8e46adca09151d880ee79))
+
+
+### Bug Fixes
+
+* **ci:** sync generated database types ([d2e0ebf](https://github.com/haexhub/playerboard/commit/d2e0ebf0487c527ebf34fa52fe7a2570b8041775))
+* **public:** address PR review findings ([8af9ecb](https://github.com/haexhub/playerboard/commit/8af9ecb233a3d46e95b772ca603b570d947b6576))
+* **trainings:** make deletion cleanup recoverable ([b4cf014](https://github.com/haexhub/playerboard/commit/b4cf014a9e3df2a57193c051efe3e3551be8740c))
+* **veo:** address PR51 review findings ([07c3d68](https://github.com/haexhub/playerboard/commit/07c3d6830e7c70802337f06a16f5984984945d09))
+* **veo:** stop 403ing a real trainer on /api/veo/link ([d94e942](https://github.com/haexhub/playerboard/commit/d94e942c15f9818a87f2be6f94876966b61ecded))
+
 ## [0.4.0](https://github.com/haexhub/playerboard/compare/v0.3.5...v0.4.0) (2026-09-22)
 
 
