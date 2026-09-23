@@ -1,7 +1,8 @@
 # Phase 1 Data Model: Einheitlicher Spieler-Dialog & direkte Einladungs-Aktionen
 
 One column added to the existing `players` table (specs/001-points-and-photos). No new tables. No
-change to `invitations` beyond behavior (research.md §3) — its schema is untouched.
+change to `invitations` beyond behavior (research.md §3) — its schema is untouched. The migration
+must backfill known legacy addresses before creating the new unique index (see below).
 
 ## `players` (delta)
 
@@ -32,13 +33,29 @@ deactivated player must not silently collide with a since-created player using t
 |---|---|---|
 | `linked_user_id is null`, `email is null` | Never invited, no address on file. | — |
 | `linked_user_id is null`, `email is not null` | Address on file, not yet accepted (or never invited). "Direkt einladen" checkbox is enabled. | Trainer, via `usePlayers().update()`/`.create()` (plain column write, RLS-gated). |
-| `linked_user_id is not null` | Player has an accepted account. "Direkt einladen" is hidden/disabled — nothing left to invite. | Trainer, via the new `POST /api/players/[player_id]/email` route only (keeps the Auth login email and this column in sync — see contracts/rls-policies.md). Never written directly through `usePlayers().update()` once linked. |
+| `linked_user_id is not null` | Player has an accepted account. "Direkt einladen" is hidden/disabled — nothing left to invite. A valid, non-empty email is required because it is also the Auth login email. | Trainer, via the new `POST /api/players/[player_id]/email` route only (keeps the Auth login email and this column in sync — see contracts/rls-policies.md). Never written directly through `usePlayers().update()` once linked. |
 
 This split is enforced client-side (`PlayerForm.vue` branches on `props.player?.linked_user_id`)
 and server-side by the new route only ever being called for the linked case; a direct
 `usePlayers().update({ email })` call for a linked player would still succeed under RLS (the
 policy is column-agnostic) but would desynchronize `players.email` from the real login email, so
 the client simply never does that once `linked_user_id` is set.
+
+## Migration/backfill
+
+The generated migration must be hand-reviewed and ordered as follows:
+
+1. Add nullable `players.email`.
+2. Backfill each player from the current `auth.users.email` when `linked_user_id` is set; otherwise
+   use the newest invitation for that `player_id`, preferring an open invitation over an accepted
+   one. Normalize candidates with `lower(trim(...))`.
+3. Only write a candidate when no other player in the same team has the same normalized address.
+   Leave ambiguous legacy duplicates `NULL` and emit a clear migration log/notice for follow-up.
+4. Create `players_email_per_team_uniq` after the backfill.
+
+This preserves known addresses for existing data without making deployment dependent on arbitrary
+resolution of historical duplicates. Newly created rows use the normal application paths below;
+`InviteForm.vue` must pass its invitation email when it pre-creates a player row.
 
 ## `invitations` (behavior delta only, no schema change)
 

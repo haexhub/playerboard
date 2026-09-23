@@ -21,6 +21,7 @@
 - [x] Edge cases are identified
 - [x] Scope is clearly bounded
 - [x] Dependencies and assumptions identified
+- [x] Existing player/invitation data migration and ambiguous legacy-email handling are specified
 
 ## Feature Readiness
 

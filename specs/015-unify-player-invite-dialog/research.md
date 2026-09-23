@@ -50,6 +50,12 @@ invitation for the given `player_id` first; if one exists, `UPDATE` its `email`/
 `expires_at` in place and resend, instead of attempting an `INSERT` that would hit
 `invitations_player_open_uniq` and fail with `23505` → `409`.
 
+The transaction locks the referenced player row before this lookup, so two concurrent resend
+requests for a player cannot both observe "no open invitation" and race into the partial unique
+index. The update path snapshots the previous invitation values. If mail delivery fails after the
+transaction commits, the route restores the previous values; the existing invitation must not be
+silently invalidated by an unsuccessful resend.
+
 **Rationale**: Both the dialog's "Direkt einladen" checkbox and the list's dialog-free "Einladen"
 button need to work whether or not a prior invitation is still open — that's the whole point of
 "resend." Reusing the one existing endpoint keeps a single code path for "get this player invited"
@@ -74,6 +80,12 @@ button need to work whether or not a prior invitation is still open — that's t
 `POST /api/players/[player_id]/email`, calling
 `admin.auth.admin.updateUserById(linked_user_id, { email, email_confirm: true })`, then syncing
 `players.email` on success.
+
+The route trims and lowercases a valid non-empty email before doing any external or database
+write. It checks the per-team uniqueness constraint before changing Auth, then uses compensating
+rollback if the subsequent `players.email` update fails: restore the Auth user's previous email
+and leave the player row unchanged. This is required because the Auth API and the database do not
+share one transaction.
 
 **Rationale**: Confirmed with the operator: apply immediately, no confirmation round-trip to the
 new address, no delete-and-recreate of the player. `email_confirm: true` matches "trainer already
@@ -131,8 +143,9 @@ version.
 
 ## 7. `InviteForm.vue` scope boundary
 
-**Decision**: `InviteForm.vue` is left completely unchanged, including its optional
-"create a player row" sub-flow. Only its *usage* on the players roster page
+**Decision**: `InviteForm.vue` keeps its existing UI and workflow, including its optional
+"create a player row" sub-flow. That sub-flow additionally persists the already entered invitation
+email into `players.email`. Only its *usage* on the players roster page
 (`isInviteDialogOpen`, `openInviteDialog`, `onInvited`, the dialog block, the `@invite` listener)
 is removed.
 
@@ -141,10 +154,26 @@ covers player-creation-with-invite. Tracing actual usage
 (`app/pages/t/[slug]/team/members.vue:32`) showed `InviteForm` is also the invite form on the
 *team members* page, where a trainer can invite someone with role "player" and optionally
 pre-create their roster row in the same step — a workflow this feature was never asked to change.
-Removing the sub-flow would have silently regressed that unrelated page. This was caught before
-implementation and the spec (FR-011) was corrected accordingly.
+Removing the sub-flow would have silently regressed that unrelated page. Persisting its email is
+part of the same data-model change, so a player created there remains eligible for the roster's
+direct resend action. This was caught before implementation and the spec (FR-011) was corrected
+accordingly.
 
 **Alternatives considered**:
 - *Remove the sub-flow from `InviteForm.vue` and add it back on `team/members.vue` in some other
   form*: rejected — pure scope creep relative to what was requested; `team/members.vue` isn't
   otherwise touched by this feature.
+
+## 8. Backfilling existing player emails
+
+**Decision**: The schema migration backfills `players.email` before creating its unique index.
+For each player, prefer the current `auth.users.email` of `linked_user_id`; otherwise use the
+newest invitation email for that `player_id`, preferring an open invitation over an accepted one.
+Values are normalized to lower case. A candidate is written only when it is unique within its
+team; ambiguous legacy duplicates remain `NULL` and are reported by the migration rather than
+being assigned arbitrarily.
+
+**Rationale**: Without a backfill, the new column would be `NULL` for all existing players even
+when the application already knows their invitation or login address. Their new edit form would
+show an empty email and the direct resend button would be disabled immediately after rollout.
+The unique index must be created after this cleanup so deployment cannot fail on legacy data.

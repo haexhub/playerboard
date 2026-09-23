@@ -5,8 +5,9 @@ No new dev-environment setup — reuses the running stack from
 After `/speckit.tasks` lands and the migration is authored:
 
 1. `pnpm db:generate` — Drizzle picks up `email` on `players` (+ `players_email_per_team_uniq`).
-2. Review the generated migration against [data-model.md](./data-model.md) — no hand-written RLS
-   migration needed this time (contracts/rls-policies.md — no policy change).
+2. Review the generated migration against [data-model.md](./data-model.md): backfill unambiguous
+   legacy addresses before creating the unique index; no hand-written RLS migration is needed this
+   time (contracts/rls-policies.md — no policy change).
 3. `pnpm db:reset` to apply, then `pnpm gen:types`.
 4. Manual smoke test as a trainer on `/t/<slug>/players`:
    - "Neuer Spieler" → save with just a name, no email — player is created, "Direkt einladen" was
@@ -18,6 +19,8 @@ After `/speckit.tasks` lands and the migration is authored:
    - Accept the invite as that email in another session, then "Bearbeiten" the now-linked player →
      confirm "Direkt einladen" is gone/disabled, and changing the email now updates the login email
      instead (verify via Supabase Auth dashboard or another sign-in with the new address).
+     Confirm that clearing the linked player's email is rejected and leaves the old address intact.
    - Deactivate the player, then reactivate via "Bearbeiten" → "Aktiv im Kader" — confirm no
      separate "Aktivieren" button exists in the list.
    - Try to give two players in the same team the same email → confirm the save is rejected.
+   - Simulate a resend-mail failure → confirm the previous open invitation/token remains usable.

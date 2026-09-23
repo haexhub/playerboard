@@ -15,19 +15,19 @@ becomes idempotent per `player_id` (updates an existing open invitation instead 
 `invitations_player_open_uniq`), and a new trainer-gated route corrects a linked player's real
 login e-mail via `admin.auth.admin.updateUserById(...)` instead of delete-and-recreate. The
 players roster page's separate generic invite dialog (`isInviteDialogOpen` / `InviteForm.vue`
-wiring) is removed as dead code; `InviteForm.vue` itself is untouched since `team/members.vue`
-still depends on it, including its optional player-precreate sub-flow.
+wiring) is removed as dead code; `InviteForm.vue` remains the members-page workflow, with its
+optional player-precreate sub-flow additionally persisting the invitation email.
 
 ## Technical Context
 
 **Language/Version**: TypeScript 5.6+, strict mode; Node.js 22 LTS — same stack, no new runtime.
 **Primary Dependencies**: None new. Reuses `zod`, `drizzle-orm`, the existing `serverSupabaseServiceRole`/`serverSupabaseUser` helpers, and `app/server/utils/db.ts`'s `requireTrainer`/`useAdminDb` (already used by `issue.post.ts` and `profile/moderate.post.ts`, which is the direct precedent for the new email-correction route's `admin.auth.admin.*` call shape).
-**Storage**: PostgreSQL (Supabase-managed). One new nullable column, `players.email`, plus one new partial unique index (`players_email_per_team_uniq`, mirroring the existing `players_active_jersey_per_team_uniq` pattern). No new tables.
-**Testing**: Vitest for any pure logic worth isolating (e.g. the "can invite / is linked" visibility predicate, if it ends up non-trivial enough to extract — otherwise covered inline by the e2e specs, per Simplicity). Playwright e2e: rewrite the mode-based subtests in `tests/e2e/players-flow.spec.ts` (link/invite radio assertions no longer apply) and extend `tests/e2e/invitation-mail.spec.ts` for idempotent resend — same fixture/seed strategy already used by both files, no new test infrastructure.
+**Storage**: PostgreSQL (Supabase-managed). One new nullable column, `players.email`, plus one new partial unique index (`players_email_per_team_uniq`, mirroring the existing `players_active_jersey_per_team_uniq` pattern). The migration backfills unambiguous addresses from linked Auth users or invitation history before creating the index; no new tables.
+**Testing**: Vitest for any pure logic worth isolating (e.g. the "can invite / is linked" visibility predicate, if it ends up non-trivial enough to extract — otherwise covered inline by the e2e specs, per Simplicity). Playwright e2e: rewrite the mode-based subtests in `tests/e2e/players-flow.spec.ts` (link/invite radio assertions no longer apply) and extend `tests/e2e/invitation-mail.spec.ts` for idempotent resend, concurrent resend, and preserving the previous invitation when mail delivery fails — same fixture/seed strategy already used by both files, no new test infrastructure.
 **Target Platform**: Existing web app. `POST /api/invitations/issue` gains idempotent-resend behavior (no route added there); one new route, `POST /api/players/[player_id]/email`, added for the linked-player email correction — no new deployment target.
 **Project Type**: Web application — extends the existing single Nuxt project, no new project.
 **Performance Goals**: None new. Both affected actions are single-click, single-row admin operations at the scale of one team's roster (bounded per Constitution's Simplicity rationale) — negligible volume.
-**Constraints**: RLS mandatory (Principle II) — the new `players.email` column needs no new policy, since `players_write_trainer`/`players_read_member` already cover every column on the table. The new server route re-derives authorization itself (`requireTrainer`) exactly like `issue.post.ts` and `profile/moderate.post.ts` already do, rather than inventing a new authorization mechanism.
+**Constraints**: RLS mandatory (Principle II) — the new `players.email` column needs no new policy, since `players_write_trainer`/`players_read_member` already cover every column on the table. The new server route re-derives authorization itself (`requireTrainer`) exactly like `issue.post.ts` and `profile/moderate.post.ts` already do, rather than inventing a new authorization mechanism. It must validate and normalize a non-empty email for linked players, preflight team uniqueness, and compensate if Auth and the database cannot be updated consistently.
 **Scale/Scope**: One team, one squad (per Constitution's Simplicity rationale) — email-uniqueness and idempotent-resend checks are both simple, unindexed-scale lookups scoped to a single team's roster.
 
 ## Constitution Check
@@ -38,7 +38,7 @@ Constitution v1.1.0 ([`.specify/memory/constitution.md`](../../.specify/memory/c
 
 | Principle | Gate | Status |
 |---|---|---|
-| **I. Simplicity First** (NON-NEGOTIABLE) | No new abstraction/service without present-day need; reuse existing patterns. | ✅ Pass. No new invite endpoint — the existing `issue.post.ts` is made idempotent in place and reused unchanged by both the dialog checkbox and the list button. The one new route (`players/[player_id]/email.post.ts`) mirrors `profile/moderate.post.ts`'s exact `requireTrainer` + `serverSupabaseServiceRole` + `admin.auth.admin.*` shape rather than inventing a new authorization pattern. The "link existing account" mode is *removed* from the dialog (net simplification), not replaced by something new. `InviteForm.vue` is deliberately left untouched rather than "cleaned up," since its player-precreate sub-flow is still load-bearing for `team/members.vue` — extending scope there was considered and rejected as out-of-scope creep. |
+| **I. Simplicity First** (NON-NEGOTIABLE) | No new abstraction/service without present-day need; reuse existing patterns. | ✅ Pass. No new invite endpoint — the existing `issue.post.ts` is made idempotent in place and reused by both the dialog checkbox and the list button. The one new route (`players/[player_id]/email.post.ts`) mirrors `profile/moderate.post.ts`'s exact `requireTrainer` + `serverSupabaseServiceRole` + `admin.auth.admin.*` shape rather than inventing a new authorization pattern. The "link existing account" mode is *removed* from the dialog (net simplification), not replaced by something new. `InviteForm.vue` keeps its load-bearing members-page workflow; the only added write is persisting the email that already belongs to the pre-created player row. |
 | **II. Role-Based Access via Supabase RLS** (NON-NEGOTIABLE) | Every table + at least one policy; cross-boundary access denied by policy, not app logic. | ✅ Pass. `players.email` is covered by the existing `players_read_member`/`players_write_trainer` policies (they gate the whole row, not specific columns) — no new policy needed. The new email-correction route needs `service_role` (to call `admin.auth.admin.updateUserById`), so — like `issue.post.ts` and `profile/moderate.post.ts` before it — it re-checks the caller's trainer role itself via `requireTrainer` before touching anything, rather than relying on RLS it deliberately bypasses. See [contracts/rls-policies.md](./contracts/rls-policies.md). |
 | **III. Konfigurierbare Punktekategorien** | N/A — feature does not touch point categories. | ✅ N/A |
 | **IV. Mobile-First UX** | New UI usable on ≥360px portrait; ≥44px touch targets. | ✅ Pass. Reuses the existing dialog/table/`ShadcnCheckbox`/`ShadcnButton` components at their existing touch-target sizing; the change is field composition and button wiring, not new layout primitives. |
@@ -86,6 +86,9 @@ app/
 │                               # optional `email`; new thin wrapper `updateLinkedEmail(id, email)` →
 │                               # `POST /api/players/[player_id]/email` (mirrors `useInvitations().issue`'s
 │                               # `$fetch` wrapper shape)
+├── components/team/
+│   └── InviteForm.vue         # Keep the existing members-page workflow; persist its pre-created
+│                              # player's invitation email in `players.email`
 └── server/api/
     ├── invitations/
     │   └── issue.post.ts      # Idempotent per `player_id`: inside the existing transaction, look up an open
@@ -97,14 +100,14 @@ app/
             └── email.post.ts  # New. Trainer-gated (`requireTrainer`), service-role: verifies the player
                                  # belongs to `team_id` and is linked (`linked_user_id` not null), calls
                                  # `admin.auth.admin.updateUserById(linked_user_id, { email, email_confirm: true })`,
-                                 # syncs `players.email` on success; on failure, leaves `players.email` untouched
-                                 # and surfaces the error (mirrors `profile/moderate.post.ts`'s shape)
+                                 # syncs `players.email` on success; on failure, compensates the Auth change,
+                                 # leaves the player row untouched, and surfaces the error
 
 db/schema/index.ts               # + `email: text('email')` on `players`, + `players_email_per_team_uniq`
                                    # partial unique index (mirrors `players_active_jersey_per_team_uniq`)
 
 supabase/migrations/
-└── <ts>_players_email.sql       # drizzle-generated column + unique index
+└── <ts>_players_email.sql       # column + backfill + unique index (index after backfill)
 
 app/types/database.ts            # regenerated via `pnpm gen:types` (Constitution Principle V)
 
@@ -123,8 +126,8 @@ RLS-gated Supabase browser client exactly like every other `players` column toda
 genuinely new server-side piece, the email-correction route, reuses the exact
 `requireTrainer` + `serverSupabaseServiceRole` shape `profile/moderate.post.ts` already established
 for "trainer corrects something about a linked account" — not a new authorization pattern.
-`issue.post.ts` keeps its existing transaction and rollback-on-mail-failure behavior; only its
-insert-vs-update branching changes.
+`issue.post.ts` keeps its existing transaction and rollback-on-mail-failure behavior for both insert
+and update paths; only its insert-vs-update branching changes.
 
 ## Complexity Tracking
 

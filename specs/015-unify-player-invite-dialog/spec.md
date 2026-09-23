@@ -41,8 +41,10 @@ zu einem dauerhaft gespeicherten, jederzeit über "Bearbeiten" änderbaren Feld,
 ### User Story 1 - Spieler über ein einheitliches Formular anlegen oder bearbeiten (Priority: P1)
 
 Ein Trainer legt einen neuen Spieler an oder bearbeitet einen bestehenden über ein einziges
-Formular ohne Modus-Auswahl. Die E-Mail ist ein optionales Feld; ist sie ausgefüllt, kann der
-Trainer per Checkbox festlegen, ob beim Speichern sofort eine Einladung verschickt werden soll.
+Formular ohne Modus-Auswahl. Bei nicht verknüpften Spielern ist die E-Mail ein optionales Feld;
+ist sie ausgefüllt, kann der Trainer per Checkbox festlegen, ob beim Speichern sofort eine
+Einladung verschickt werden soll. Bei verknüpften Spielern bleibt eine gültige Login-E-Mail
+erforderlich.
 
 **Why this priority**: Kernanliegen der Anfrage — die aktuelle Drei-Modi-Auswahl beim Anlegen
 verwirrt und die Bearbeiten-Ansicht bietet heute keine E-Mail-Verwaltung.
@@ -120,6 +122,8 @@ speichern — der Spieler erscheint in der Liste wieder als aktiv.
 
 - E-Mail-Feld leer beim Speichern: "Direkt einladen" kann nicht angehakt sein, kein
   Einladungsversand.
+- Bei einem bereits verknüpften Spieler darf das E-Mail-Feld nicht geleert oder mit einem
+  ungültigen Wert gespeichert werden, weil es zugleich die Login-E-Mail ist.
 - Zwei Spieler desselben Teams würden dieselbe E-Mail erhalten (Groß-/Kleinschreibung
   ignoriert): Speichern wird mit Validierungsfehler abgelehnt.
 - "Einladen" wird für einen Spieler geklickt, der bereits eine offene, noch nicht abgelaufene
@@ -128,6 +132,9 @@ speichern — der Spieler erscheint in der Liste wieder als aktiv.
 - Die E-Mail eines bereits verknüpften Spielers wird auf eine Adresse geändert, die schon zu einem
   anderen Supabase-Auth-Konto gehört: Änderung wird abgelehnt, Fehlermeldung angezeigt, die zuvor
   gespeicherte E-Mail bleibt unverändert bestehen.
+- Wenn der Versand einer erneuten Einladung fehlschlägt, bleiben die vorherige Einladung und ihr
+  bisheriger Token gültig; ein fehlgeschlagener Versand darf keinen funktionierenden Einladungslink
+  unbrauchbar machen.
 - Ein Spieler wird deaktiviert, während eine Einladung für ihn offen ist: Der Einladungsstatus
   bleibt unabhängig vom Aktiv-Status unverändert.
 
@@ -136,13 +143,16 @@ speichern — der Spieler erscheint in der Liste wieder als aktiv.
 ### Functional Requirements
 
 - **FR-001**: Der Anlegen/Bearbeiten-Dialog MUSS ein einziges Formular ohne Modus-Auswahl sein,
-  mit den Feldern Name (Pflicht), E-Mail (optional), Trikotnummer (optional), Position (optional),
-  Foto-Einwilligung, Aktiv im Kader und "Direkt einladen".
+  mit den Feldern Name (Pflicht), E-Mail (optional bei nicht verknüpften Spielern), Trikotnummer
+  (optional), Position (optional), Foto-Einwilligung, Aktiv im Kader und "Direkt einladen". Bei
+  verknüpften Spielern muss die E-Mail gültig und nicht leer sein.
 - **FR-002**: Der bisherige Modus "Bestehendes Konto verknüpfen" MUSS aus diesem Dialog entfernt
   werden; die Funktion bleibt ausschließlich über die bestehende Konto-Spalte im Spielerstamm
   erreichbar.
-- **FR-003**: Spieler MÜSSEN eine dauerhaft gespeicherte, über "Bearbeiten" jederzeit änderbare
-  E-Mail-Adresse haben können (auch ohne dass zu diesem Zeitpunkt eine Einladung verschickt wird).
+- **FR-003**: Nicht verknüpfte Spieler MÜSSEN eine dauerhaft gespeicherte, über "Bearbeiten"
+  jederzeit änderbare E-Mail-Adresse haben können (auch ohne dass zu diesem Zeitpunkt eine
+  Einladung verschickt wird). Bei bereits verknüpften Spielern bleibt die E-Mail-Adresse ein
+  gültiger, nicht-leerer Login-Bezug und darf nicht geleert werden.
 - **FR-004**: Die E-Mail-Adresse MUSS pro Team eindeutig sein (Groß-/Kleinschreibung ignorierend),
   analog zur bestehenden Eindeutigkeitsregel für Trikotnummern.
 - **FR-005**: Die "Direkt einladen"-Checkbox MUSS nur aktivierbar sein, wenn eine E-Mail
@@ -154,8 +164,8 @@ speichern — der Spieler erscheint in der Liste wieder als aktiv.
 - **FR-007**: Wird bei einem bereits verknüpften Spieler (`linked_user_id` gesetzt) die E-Mail
   geändert, MUSS die Login-E-Mail des bestehenden Kontos direkt angepasst werden — ohne den
   Spieler-Datensatz zu löschen und neu anzulegen. Schlägt die Änderung fehl (z. B. Adresse bereits
-  vergeben), DARF die zuvor gespeicherte E-Mail nicht überschrieben werden und der Fehler MUSS dem
-  Trainer angezeigt werden.
+  vergeben oder leer/ungültig), DARF weder die Login-E-Mail noch die zuvor gespeicherte E-Mail
+  überschrieben werden und der Fehler MUSS dem Trainer angezeigt werden.
 - **FR-008**: Der "Einladen"-Button im Spielerstamm DARF keinen Dialog mehr öffnen. Er MUSS
   stattdessen direkt eine (erneute) Einladung an die für den Spieler hinterlegte E-Mail auslösen.
 - **FR-009**: Der "Einladen"-Button MUSS deaktiviert sein, wenn der Spieler keine E-Mail hinterlegt
@@ -168,13 +178,17 @@ speichern — der Spieler erscheint in der Liste wieder als aktiv.
 - **FR-011**: Die bisherige generische Einladungs-Dialog-Anbindung an den Spielerstamm (der
   separate "Spieler einladen"-Dialog samt zugehörigem Öffnen-Zustand) MUSS entfernt werden, da sie
   durch das vereinheitlichte Formular und die direkte Einladen-Aktion redundant geworden ist. Die
-  Komponente `InviteForm.vue` selbst — inklusive ihrer optionalen "Spieler gleichzeitig
-  anlegen"-Unterfunktion — MUSS unverändert erhalten bleiben, da sie auch auf der
-  Mitglieder-Seite (`team/members.vue`) für Trainer- und Spieler-Einladungen genutzt wird und
-  diese Unterfunktion dort weiterhin gebraucht wird.
+  Komponente `InviteForm.vue` selbst bleibt für die Mitglieder-Seite (`team/members.vue`) samt
+  ihrer optionalen "Spieler gleichzeitig anlegen"-Unterfunktion erhalten; wenn sie dort einen
+  Spieler vorab anlegt, MUSS sie die Einladungs-E-Mail auch in `players.email` speichern, damit
+  der neue Bestandspfad denselben Spieler später erneut einladen kann.
 - **FR-012**: Für diese Fähigkeit MUSS die Schreibautorisierung weiterhin ausschließlich über
   bestehende bzw. minimal erweiterte RLS-Policies auf `players` erfolgen; es DÜRFEN keine neuen
   Rollen oder Berechtigungsmodelle eingeführt werden.
+- **FR-013**: Beim erstmaligen Einführen von `players.email` MÜSSEN bekannte E-Mail-Adressen aus
+  bestehenden verknüpften Konten und Einladungen übernommen werden, sofern die Zuordnung innerhalb
+  des Teams eindeutig ist. Mehrdeutige Altbestände DÜRFEN nicht willkürlich zugeordnet werden und
+  MÜSSEN für eine spätere manuelle Nachpflege erkennbar bleiben.
 
 ### Key Entities
 
@@ -193,8 +207,10 @@ speichern — der Spieler erscheint in der Liste wieder als aktiv.
   Formulardurchlauf anlegen, ohne einen Modus wählen zu müssen.
 - **SC-002**: Ein Trainer kann einem bestehenden Spieler nachträglich eine E-Mail hinzufügen und
   im selben Speichervorgang eine Einladung auslösen.
-- **SC-003**: Ein erneuter Klick auf "Einladen" für einen Spieler mit offener Einladung führt in
-  100 % der Fälle zu einer erfolgreich zugestellten (erneuten) Einladung statt zu einem Fehler.
+- **SC-003**: Ein erneuter Klick auf "Einladen" für einen Spieler mit offener Einladung führt zu
+  einer erfolgreichen Resend-Anfrage mit derselben Einladungs-ID und einem neuen gültigen Token,
+  statt wegen der offenen Einladung mit `409` fehlzuschlagen. Die tatsächliche Zustellung durch
+  den externen Maildienst ist dabei nicht Teil des messbaren Anwendungsergebnisses.
 - **SC-004**: Kein Spieler kann nach dem Speichern eine E-Mail tragen, die im selben Team bereits
   einem anderen Spieler zugeordnet ist.
 - **SC-005**: Ein deaktivierter Spieler kann ausschließlich über den Bearbeiten-Dialog wieder
@@ -205,15 +221,21 @@ speichern — der Spieler erscheint in der Liste wieder als aktiv.
 - Die Änderung der Login-E-Mail eines bereits verknüpften Spielers erfolgt serverseitig direkt
   (`updateUserById`, sofort wirksam ohne Bestätigungs-E-Mail an die neue Adresse) statt über
   Löschen und Neuanlegen — bestätigt durch den Auftraggeber.
+- Bei einem bereits verknüpften Spieler ist die E-Mail im Formular weiterhin erforderlich; nur
+  bei nicht verknüpften Spielern ist sie optional.
 - `players.email` ist pro Team eindeutig (Groß-/Kleinschreibung ignorierend) — bestätigt durch den
   Auftraggeber, analog zur bestehenden Trikotnummer-Regel.
 - Der Modus "Bestehendes Konto verknüpfen" entfällt im Dialog vollständig und bleibt nur über die
   Konto-Spalte im Spielerstamm erreichbar — bestätigt durch den Auftraggeber.
-- `InviteForm.vue` bleibt vollständig unverändert bestehen (inkl. ihrer "Spieler gleichzeitig
-  anlegen"-Unterfunktion), da sie auch von `team/members.vue` für Trainer- und Spieler-Einladungen
-  genutzt wird; nur ihre Anbindung an den Spielerstamm (der dortige Dialog-Zustand und -Trigger)
-  entfällt.
+- `InviteForm.vue` bleibt als UI und Workflow für `team/members.vue` erhalten (inkl. ihrer
+  "Spieler gleichzeitig anlegen"-Unterfunktion). Ihr Precreate-Schreibvorgang wird lediglich um
+  das Speichern der bereits eingegebenen Einladungs-E-Mail in `players.email` ergänzt; nur ihre
+  Anbindung an den Spielerstamm (der dortige Dialog-Zustand und -Trigger) entfällt.
 - Es werden keine neuen RLS-Policies benötigt: Lese-/Schreibzugriff auf das neue `email`-Feld läuft
   über die bestehenden Policies `players_read_member` / `players_write_trainer`; nur die
   serverseitige Auth-E-Mail-Änderung und der idempotente Einladungs-Resend benötigen weiterhin
   Service-Role-Zugriff wie die bestehende Einladungs-Route.
+- Bei Einführung der neuen Spalte werden bekannte E-Mail-Adressen aus bestehenden verknüpften
+  Auth-Konten und, sofern dort nicht vorhanden, aus den neuesten Einladungen übernommen. Bei
+  nicht eindeutig auflösbaren Altbeständen bleibt das Feld leer, statt eine Adresse willkürlich
+  einem Spieler zuzuordnen.

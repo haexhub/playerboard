@@ -36,11 +36,13 @@ implemented before this phase is done.
 
 - [ ] T001 Add `email: text('email')` and the `players_email_per_team_uniq` partial unique index (`on (teamId, lower(email)) where email is not null`) to the `players` table definition in `db/schema/index.ts`, per [data-model.md](./data-model.md) (mirrors the existing `players_active_jersey_per_team_uniq` shape)
 - [ ] T002 Run `pnpm db:generate` to produce the Drizzle migration for T001 under `supabase/migrations/` (depends on T001)
-- [ ] T003 Run `pnpm gen:types` and commit the regenerated `app/types/database.ts` together with the migration from T002 (Constitution Principle V)
-- [ ] T004 [P] Make `app/server/api/invitations/issue.post.ts` idempotent per `player_id`: inside the existing `db.transaction`, when `player_id` is present, first look up an open invitation (`accepted_at is null`) for that `player_id`; if found, `UPDATE` its `email`/`token`/`expires_at` instead of inserting; otherwise keep today's stale-cleanup-by-email + insert path unchanged (research.md §3, contracts/rls-policies.md)
-- [ ] T005 [P] New test in `tests/e2e/invitation-mail.spec.ts`: issuing an invitation twice with the same `player_id` (direct API calls via `ctx.request.post`, mirroring this file's existing `acceptViaApi` pattern) returns `200` both times with the **same** invitation `id` in the response, instead of a second-call `409` — confirms T004's update-in-place behavior. The existing no-`player_id` duplicate-invite negative test elsewhere in this file must still pass unchanged (that path is untouched)
+- [ ] T002a [US1] Before the generated unique index is created, add the reviewed backfill from [data-model.md](./data-model.md): prefer the linked Auth user's email, otherwise the newest invitation email for the player; normalize to lowercase, write only team-unique candidates, leave ambiguous duplicates `NULL`, and emit a migration notice for follow-up (implements FR-013; depends on T002)
+- [ ] T003 Run `pnpm gen:types` and commit the regenerated `app/types/database.ts` together with the schema/backfill migration from T002/T002a (Constitution Principle V)
+- [ ] T004 [P] Make `app/server/api/invitations/issue.post.ts` idempotent per `player_id`: inside the existing `db.transaction`, lock the validated player row before looking up an open invitation; if found, snapshot its old values and `UPDATE` its `email`/`token`/`expires_at` instead of inserting; otherwise keep today's stale-cleanup-by-email + insert path unchanged. If mail sending fails, restore the old invitation values on the update path or delete the new row on the insert path (research.md §3, contracts/rls-policies.md)
+- [ ] T005 [P] Extend `tests/e2e/invitation-mail.spec.ts`: issuing an invitation twice with the same `player_id` (direct API calls via `ctx.request.post`, mirroring this file's existing `acceptViaApi` pattern) returns `200` both times with the **same** invitation `id` and a fresh token; also cover concurrent resend calls and verify a simulated mail failure does not invalidate the previous invitation. The existing no-`player_id` duplicate-invite negative test elsewhere in this file must still pass unchanged (that path is untouched)
 - [ ] T006 [P] Extend `usePlayers.ts` (`app/composables/usePlayers.ts`): add `email: string | null` to the `Player` type, include `email` in `list()`'s `.select(...)` projection, and add optional `email` to `create()`'s and `update()`'s payload types
 - [ ] T007 [P] Extend the local `PlayerRow` type in `app/pages/t/[slug]/players/index.vue` to include `email: string | null` and `linked_user_id: string | null`, matching `usePlayers().list()`'s row shape (depends on T006)
+- [ ] T007a [P] Keep `InviteForm.vue`'s existing members-page UI and precreate flow, but pass the normalized invitation email into `usePlayers().create()` so every newly pre-created player has the durable `players.email` value (depends on T006)
 
 **Checkpoint**: Schema and composable/type plumbing ready — all three user stories can now proceed.
 
@@ -48,8 +50,8 @@ implemented before this phase is done.
 
 ## Phase 3: User Story 1 - Spieler über ein einheitliches Formular anlegen oder bearbeiten (Priority: P1) 🎯 MVP
 
-**Goal**: One flat form (no mode radio) for both create and edit; email is optional and
-persistent; "Direkt einladen" checkbox sends/resends an invite on save when applicable;
+**Goal**: One flat form (no mode radio) for both create and edit; email is persistent and optional
+for unlinked players but required for linked players; the "Direkt einladen" checkbox sends/resends an invite on save when applicable;
 changing a linked player's email corrects their real login email instead of
 deleting/recreating the player.
 
@@ -63,19 +65,19 @@ there updates the login email instead.
 
 - [ ] T008 Rewrite the "new-player form invites a not-yet-existing account and auto-links it on acceptance" test in `tests/e2e/players-flow.spec.ts` (currently lines ~214-274) for the unified form: no mode radio to check, fill `Name`/`Trikotnummer`/`E-Mail` directly in one form, check "Direkt einladen", submit — keep the existing pending-then-auto-linked-on-acceptance assertions
 - [ ] T009 Delete the "new-player form links an invited-but-unlinked account in one step" test in `tests/e2e/players-flow.spec.ts` (currently lines ~150-212) — the dialog's "Bestehendes Konto verknüpfen" mode is removed (research.md §6); its coverage is redundant with the Konto-column linking already exercised later in this file's first test
-- [ ] T010 Update the "Invite CTA opens the team InviteForm pre-filled with role player" section of the first test in `tests/e2e/players-flow.spec.ts` (currently lines ~101-108, `player-invite-dialog`/`player-invite-button`): replace with editing Bruno via "Bearbeiten" to add `inviteeEmail` and checking "Direkt einladen", then save — continue with the existing accept-invite assertions below it unchanged (depends on T008-T009 landing first in the same file)
+- [ ] T010 Update the "Invite CTA opens the team InviteForm pre-filled with role player" section of the first test in `tests/e2e/players-flow.spec.ts` (currently lines ~101-108, `player-invite-dialog`/`player-invite-button`): replace with editing Bruno via "Bearbeiten" to add `inviteeEmail` and checking "Direkt einladen", then save — continue with the existing accept-invite assertions below it unchanged (depends on T008-T009 landing first in the same file). Extend the team-members precreate scenario to assert that its player row retains the invitation email and can use the roster resend action.
 - [ ] T011 New scenario in `tests/e2e/players-flow.spec.ts`: create a player with no email — "Direkt einladen" is absent or disabled; edit to add an email — the checkbox becomes available; save with it unchecked — no invitation is created
 - [ ] T012 New scenario in `tests/e2e/players-flow.spec.ts`: creating a second player in the same team with an email already used by another player in that team (case-insensitive) is rejected with an inline error, and no change is persisted
-- [ ] T013 New scenario in `tests/e2e/players-flow.spec.ts`: once a player is linked (reuse the accept flow from T008), re-opening "Bearbeiten" shows "Direkt einladen" absent/disabled; changing the email field and saving updates their login email (confirm by signing in with the new address) instead of creating a duplicate player
+- [ ] T013 New scenario in `tests/e2e/players-flow.spec.ts`: once a player is linked (reuse the accept flow from T008), re-opening "Bearbeiten" shows "Direkt einladen" absent/disabled; changing the email field and saving updates their login email (confirm by signing in with the new address) instead of creating a duplicate player. Also verify an empty/malformed email is rejected without changing either Auth or the saved player email, and that a conflicting Auth address leaves both old values intact.
 
 ### Implementation for User Story 1
 
-- [ ] T014 [US1] In `app/components/players/PlayerForm.vue`, remove the `Mode` type, the `mode` ref, the mode radiogroup, and the entire `link`-mode block (candidate select, `onCandidateChange`, `selectedCandidateId`, `candidates`/`listLinkCandidates` usage) — email becomes a plain, always-rendered optional field regardless of create/edit
-- [ ] T015 [US1] In `PlayerForm.vue`, extend `props.player`'s type to include `email: string | null` and `linked_user_id: string | null`; add the "Direkt einladen" checkbox, enabled only when the email input is non-empty and `!props.player?.linked_user_id` (depends on T007, T014)
+- [ ] T014 [US1] In `app/components/players/PlayerForm.vue`, remove the `Mode` type, the `mode` ref, the mode radiogroup, and the entire `link`-mode block (candidate select, `onCandidateChange`, `selectedCandidateId`, `candidates`/`listLinkCandidates` usage) — email becomes a plain field for create/edit, optional for unlinked players and required for linked players
+- [ ] T015 [US1] In `PlayerForm.vue`, extend `props.player`'s type to include `email: string | null` and `linked_user_id: string | null`; add the "Direkt einladen" checkbox, enabled only when the email input is non-empty and `!props.player?.linked_user_id`. For linked players, validate that the email remains non-empty and valid (depends on T007, T014)
 - [ ] T016 [US1] In `PlayerForm.vue`'s `submit()`: for a not-yet-linked player (create, or edit where `!props.player?.linked_user_id`), include `email` in the same `create()`/`update()` call as the other fields; if "Direkt einladen" is checked, call `useInvitations().issue({ team_id, email, role: 'player', player_id })` after that save succeeds; on invite failure, surface the error but do **not** delete/roll back the just-saved player (research.md §5 — remove the existing `remove(createdPlayerId)` compensating-delete path and its `23505`-means-jersey-clash special-casing, since that mapping no longer applies once "invite" isn't the sole create path)
-- [ ] T017 [US1] In `PlayerForm.vue`'s `submit()`: for an already-linked player whose email changed, call `usePlayers().updateLinkedEmail(id, email)` instead of including `email` in the plain `update()` call; on failure, show the error and keep the previously displayed email (depends on T018)
+- [ ] T017 [US1] In `PlayerForm.vue`'s `submit()`: for an already-linked player whose email changed, require a non-empty valid normalized email and call `usePlayers().updateLinkedEmail(id, email)` instead of including `email` in the plain `update()` call; on failure, show the error and keep the previously displayed email (depends on T018)
 - [ ] T018 [US1] [P] Add `updateLinkedEmail(id, email, team_id)` to `app/composables/usePlayers.ts` — thin wrapper: `$fetch('/api/players/' + id + '/email', { method: 'POST', body: { team_id, email } })`, mirroring `useInvitations().issue`'s `$fetch` shape
-- [ ] T019 [US1] [P] Implement `app/server/api/players/[player_id]/email.post.ts`: `requireTrainer(db, team_id, userId)`, verify `player_id` belongs to `team_id` (mirrors `issue.post.ts`'s check), verify `linked_user_id is not null` (else `400`), call `serverSupabaseServiceRole<Database>(event).auth.admin.updateUserById(linked_user_id, { email, email_confirm: true })`, then on success `UPDATE players SET email = $email WHERE id = $player_id`; on failure leave `players.email` untouched and propagate the error (`409` for a conflicting address, else `500`) — per [contracts/rls-policies.md](./contracts/rls-policies.md)
+- [ ] T019 [US1] [P] Implement `app/server/api/players/[player_id]/email.post.ts`: validate/trim/lowercase the non-empty email, `requireTrainer(db, team_id, userId)`, load the player and its current linked user/email, verify `player_id` belongs to `team_id` and `linked_user_id is not null` (else `400`), and preflight the per-team uniqueness check. Call `updateUserById` and then update `players.email`; if the database update fails, compensate by restoring the Auth user's previous email before returning `409`/`500`. If Auth fails, leave `players.email` untouched — per [contracts/rls-policies.md](./contracts/rls-policies.md)
 
 **Checkpoint**: User Story 1 fully functional and independently testable — one form for
 create/edit, optional persistent email, invite checkbox, linked-player email correction.
@@ -136,7 +138,7 @@ Kader" → save; the row shows "Aktiv" again.
 ### Phase Dependencies
 
 - **Setup (Phase 1)**: None — empty phase.
-- **Foundational (Phase 2)**: No dependencies beyond Setup — **BLOCKS** all user stories (schema + shared types + idempotent invite endpoint are used by all three).
+- **Foundational (Phase 2)**: No dependencies beyond Setup — **BLOCKS** all user stories (schema/backfill + shared types + idempotent invite endpoint are used by all three).
 - **User Stories (Phase 3-5)**: All depend on Foundational completion.
   - US1 and US2 both touch `PlayerForm.vue`/`PlayerList.vue`/`players/index.vue` and the same `players-flow.spec.ts` file — implement in priority order (US1 → US2 → US3) rather than in parallel, to avoid conflicting edits to those shared files.
   - US3 has no code dependency on US1/US2 — it could run anytime after Foundational, but is sequenced last since it's the lowest priority and its test lives in the same shared spec file.
@@ -150,7 +152,7 @@ Kader" → save; the row shows "Aktiv" again.
 
 ### Parallel Opportunities
 
-- T004, T006, T007 (Foundational) can run in parallel — different files, T004 doesn't depend on the schema change.
+- T004, T006, T007, T007a (Foundational) can run in parallel — different files, T004 doesn't depend on the schema change.
 - T005 (Foundational test) can be written in parallel with T004, run after to confirm it passes.
 - T018 and T019 (US1) touch different files and can be built in parallel, then wired together.
 - T026 (Polish) can start as soon as all implementation tasks are done, in parallel with T027/T028.
