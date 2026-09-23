@@ -8,6 +8,7 @@ import { usePlayerScores, type PlayerScoreWithTeamStats } from '~/composables/us
 import { useTeamSettings } from '~/composables/useTeamSettings'
 import { useTimeframe } from '~/composables/useTimeframe'
 import type { Database } from '~/types/database'
+import { errorMessage } from '~/utils/errors'
 
 definePageMeta({
   middleware: ['team-context'],
@@ -49,6 +50,8 @@ const isLoading = ref(false)
 const loadError = ref<string | null>(null)
 const isEditing = ref(false)
 const playerFormRef = ref<InstanceType<typeof PlayerForm> | null>(null)
+const playerReloadError = ref<string | null>(null)
+const isReloadingPlayer = ref(false)
 let latestLoad = 0
 
 const timeframe = useTimeframe(slug, seasonStart)
@@ -68,9 +71,25 @@ const loadStatic = async () => {
   categories.value = await listCategories(p.team_id)
 }
 
+const reloadPlayer = async () => {
+  playerReloadError.value = null
+  isReloadingPlayer.value = true
+  try {
+    await loadStatic()
+    return true
+  } catch (err) {
+    playerReloadError.value = errorMessage(
+      err,
+      'Spieler konnte nach dem Speichern nicht neu geladen werden.',
+    )
+    return false
+  } finally {
+    isReloadingPlayer.value = false
+  }
+}
+
 const onPlayerSaved = async () => {
-  isEditing.value = false
-  await loadStatic()
+  if (await reloadPlayer()) isEditing.value = false
 }
 
 const loadTimeframed = async () => {
@@ -146,21 +165,35 @@ watch(
       class="space-y-3 rounded-md border border-input p-4"
       data-testid="player-detail-edit-form"
     >
-      <PlayerForm ref="playerFormRef" :team-id="player.team_id" :player="player" @saved="onPlayerSaved" />
+      <PlayerForm
+        ref="playerFormRef"
+        :team-id="player.team_id"
+        :player="player"
+        @saved="onPlayerSaved"
+      />
       <div class="flex gap-2">
-        <ShadcnButton type="button" variant="outline" @click="isEditing = false">
+        <ShadcnButton
+          type="button"
+          variant="outline"
+          :disabled="playerFormRef?.loading || isReloadingPlayer"
+          @click="isEditing = false"
+        >
           Abbrechen
         </ShadcnButton>
         <ShadcnButton
           type="submit"
           form="player-form"
-          :disabled="playerFormRef?.loading"
+          :disabled="playerFormRef?.loading || isReloadingPlayer"
           data-testid="player-detail-edit-submit"
         >
           {{ playerFormRef?.loading ? 'Speichere…' : 'Speichern' }}
         </ShadcnButton>
       </div>
     </div>
+    <p v-if="playerReloadError" class="text-sm text-red-700" role="alert">
+      {{ playerReloadError }}
+      <button type="button" class="ml-2 underline" @click="reloadPlayer">Erneut versuchen</button>
+    </p>
 
     <TimeframePicker
       :preset="timeframe.preset.value"
