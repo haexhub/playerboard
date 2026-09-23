@@ -333,41 +333,6 @@ export type Database = {
           },
         ]
       }
-      training_deletion_jobs: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          id: string
-          storage_paths: string[]
-          team_id: string
-          training_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          storage_paths: string[]
-          team_id: string
-          training_id: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          storage_paths?: string[]
-          team_id?: string
-          training_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "training_deletion_jobs_team_id_teams_id_fk"
-            columns: ["team_id"]
-            isOneToOne: false
-            referencedRelation: "teams"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       teams: {
         Row: {
           created_at: string
@@ -400,6 +365,41 @@ export type Database = {
           timezone?: string
         }
         Relationships: []
+      }
+      training_deletion_jobs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          storage_paths: string[]
+          team_id: string
+          training_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          storage_paths: string[]
+          team_id: string
+          training_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          storage_paths?: string[]
+          team_id?: string
+          training_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_deletion_jobs_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       training_photos: {
         Row: {
@@ -878,3 +878,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
