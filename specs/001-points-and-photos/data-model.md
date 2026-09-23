@@ -170,6 +170,18 @@ Photos are optional for a training in every state — no trigger guards the
 draft → saved transition against missing photos (dropped in
 `20260911130000_drop_photo_requirement.sql`).
 
+`date`, `title` and `note` remain editable after the draft → saved
+transition via the same update path used to finalize a draft (FR-014);
+the not-future check and RLS (`tr_write_trainer`) apply the same as on
+create.
+
+A trainer can delete a training outright (FR-016), covered by the same
+`tr_write_trainer` policy (`for all`). The FK cascades (`on delete
+cascade`) remove its `point_entries` and `training_photos` rows; the
+application additionally removes the corresponding files from the
+`training-photos` storage bucket before deleting the row, since the FK
+cascade only clears the DB rows, not the bucket objects.
+
 ## training_photos
 
 | Column | Type | Constraints | Notes |

@@ -25,7 +25,7 @@ const asUser = (tx: postgres.TransactionSql, userId: string) =>
   ])
 
 describe('deleting a training', () => {
-  it('cascades to its point entries and photo rows, even while saved with a single photo', async () => {
+  it('cascades to its point entries and photo rows, even while saved', async () => {
     const remaining = await runIsolated(sql, async (tx) => {
       const trainerId = crypto.randomUUID()
       const teamId = crypto.randomUUID()
@@ -47,8 +47,6 @@ describe('deleting a training', () => {
                values (${photoId}, ${trainingId}, ${teamId + '/' + trainingId + '/' + photoId + '.jpg'}, 'image/jpeg', 100, ${trainerId})`
       await tx`insert into public.point_entries (training_id, player_id, category_id, value)
                values (${trainingId}, ${playerId}, ${catId}, 5)`
-      // Only one photo, so this only succeeds because it is the transition into
-      // 'saved', not a later removal of the last photo.
       await tx`update public.trainings set status = 'saved' where id = ${trainingId}`
 
       await asUser(tx, trainerId)
