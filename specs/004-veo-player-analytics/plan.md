@@ -76,11 +76,11 @@ app/
 │   ├── VeoMatchCard.vue               # + per-player breakdown block; trainer-only jersey-number assign/correct controls (US3)
 │   └── VeoPlayerSeasonSummary.vue     # new: per-player season totals table
 ├── composables/
-│   ├── useVeoAnalytics.ts             # listMatches() gains a nested veo_player_match_stats(...) select (player_id not null only); computeSeasonSummary() gains a per-player equivalent
+│   ├── useVeoAnalytics.ts             # keeps the member display query limited to player_id not null; adds a trainer-only path for unassigned jersey rows; computeSeasonSummary() gains a per-player equivalent
 │   └── useVeoPlayerAssignment.ts      # new: calls POST /api/veo/matches/[matchId]/player-assignment
 └── server/
     ├── api/veo/
-    │   ├── sync.post.ts               # + per match: fetch player stats, match jersey numbers, upsert veo_player_match_stats (player_id preserved when matched_manually) — same transaction as the existing match+team-stats upsert
+    │   ├── sync.post.ts               # + per match: fetch player stats, reserve existing jersey assignments before mapping new rows, upsert Veo stats (player_id set on insert and preserved on conflict) — same transaction as the existing match+team-stats upsert
     │   └── matches/[matchId]/player-assignment.post.ts  # new, US3: trainer session + requireTrainer() check → sets player_id + matched_manually for one (match, jersey number)
     └── utils/veo/
         ├── client.ts                  # + fetchPlayerAnalysisStats(): POST .../analysis/stats/ with {type: 'cross_match', group_by: 'player', match_ids}
@@ -107,9 +107,10 @@ tests/e2e/
 **Structure Decision**: Extends the existing single Nuxt project and the
 existing 003-veo-analytics vertical slice — no new project, no new page. The
 one new table is read exactly like `veo_match_stats` already is (plain
-RLS-gated Supabase browser client, filtered to `player_id is not null`), and
-written by `POST /api/veo/sync` via `useAdminDb()` exactly like
-`veo_match_stats` is. The one genuinely new piece is the trainer-correction
+RLS-gated Supabase browser client, with the member display filtered to
+`player_id is not null`), and its Veo values are written by
+`POST /api/veo/sync` via `useAdminDb()` exactly like `veo_match_stats` is.
+The one genuinely new piece is the trainer-correction
 write path, `POST /api/veo/matches/[matchId]/player-assignment` — a single
 new route reusing the exact `requireTrainer()` + `useAdminDb()` shape
 `POST /api/veo/link` already established, not a new authorization pattern.

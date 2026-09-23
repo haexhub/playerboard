@@ -49,10 +49,11 @@ No new authentication surface. The route's existing bearer-secret check
 (`runtimeConfig.veoSyncSecret`, see
 [003-veo-analytics/research.md §2](../../003-veo-analytics/research.md#2-authenticating-the-cron-caller))
 covers this table's writes too — same route, same transaction as the
-existing `veo_matches`/`veo_match_stats` upsert. Its upsert only overwrites
-`player_id` for rows where `matched_manually = false` (research.md §10) —
-this is application logic inside the `useAdminDb()`-authorized route, not a
-distinct RLS concern.
+existing `veo_matches`/`veo_match_stats` upsert. The sync sets `player_id`
+only on insert and preserves it on conflict; it also reserves existing
+match-level assignments before inserting new jersey-number groups
+(research.md §10). This is application logic inside the
+`useAdminDb()`-authorized route, not a distinct RLS concern.
 
 ## `POST /api/veo/matches/[matchId]/player-assignment` (User Story 3, added 2026-09-23)
 

@@ -138,23 +138,29 @@ one query per team per run, not one per match.
 
 **Decision**: `useVeoAnalytics.ts`'s existing `listMatches()` query (which
 already nests `veo_match_stats(...)` under each `veo_matches` row) gains one
-more nested relation, `veo_player_match_stats(player_id, matched_jersey_number,
-stat_type, category, value, players(name, jersey_number))`. Both display
-needs are then served from this single, already-existing query:
+more nested relation, `veo_player_match_stats(player_id, veo_jersey_number,
+stat_type, category, value, players(name, jersey_number))`, filtered to
+`player_id is not null` for the member-facing display. Trainers additionally
+use a separate, trainer-only data path that fetches the same match's rows
+with `player_id is null` and their `veo_jersey_number` values for correction:
 
 - **User Story 1 (dashboard season summary)**: a new `computePlayerSeasonSummary()`
   function sums `value` by `player_id`/`stat_type` across all fetched
   matches — the exact same on-read-aggregation pattern
   `computeSeasonSummary()` already uses for team stats (003-veo-analytics
   research.md §6).
-- **User Story 2 (per-match breakdown)**: each match's own
-  `veo_player_match_stats` array (already present in that match's row from
-  the same query) is passed straight to `VeoMatchCard.vue`.
+- **User Story 2 (per-match breakdown)**: each match's assigned
+  `veo_player_match_stats` array is passed straight to `VeoMatchCard.vue`.
+- **User Story 3 (trainer correction)**: the trainer-only path supplies
+  unassigned jersey rows to `VeoMatchCard.vue` without broadening the assigned
+  player query or changing the per-player season summary input.
 
-**Rationale**: No second query, no new composable beyond adding to the
-existing one — reuses the fetch-once-aggregate-in-JS approach already
-validated for team stats. Data volume (one team, tens of matches, ~16
-players × 9 stats each) is trivial for client-side summation.
+**Rationale**: The member-facing query remains narrow and cannot expose
+unassigned rows as player statistics. The trainer-only path is isolated to
+the correction UI, while the assigned query continues to use the
+fetch-once-aggregate-in-JS approach already validated for team stats. Data
+volume (one team, tens of matches, ~16 players × 9 stats each) is trivial for
+client-side summation.
 
 **Alternatives considered**: A dedicated `/api/veo/player-stats` read
 endpoint or a separate Supabase RPC for the season sum — rejected as an
@@ -194,19 +200,17 @@ the writes stale (fail closed, same as today).
 
 **Decision**: `veo_player_match_stats` is keyed by `(match_id,
 veo_jersey_number, stat_type)` with `player_id` as a nullable column, plus a
-`matched_manually boolean not null default false` flag. The sync route
-always upserts a row for every jersey number Veo reports (whether or not it
-currently resolves to a roster player), but the upsert's `player_id` is only
-overwritten when `matched_manually` is `false` on the existing row:
+`matched_manually boolean not null default false` flag. The logical assignment
+and the flag are at jersey-number level and are repeated across that jersey
+number's stat rows. The sync route always upserts a row for every jersey
+number Veo reports (whether or not it currently resolves to a roster player).
+On insert, `player_id` is set to the roster match, if any; on conflict,
+`player_id` is preserved unchanged regardless of `matched_manually`:
 
 ```sql
 on conflict (match_id, veo_jersey_number, stat_type) do update set
   category = excluded.category,
   value = excluded.value,
-  player_id = case when veo_player_match_stats.matched_manually
-                then veo_player_match_stats.player_id
-                else excluded.player_id
-              end,
   updated_at = now()
 ```
 
@@ -221,12 +225,13 @@ number (not just correct a wrong auto-match), the raw per-jersey-number
 stats must already be stored somewhere before the correction happens —
 otherwise there is nothing to assign. Keying by `veo_jersey_number` instead
 of `player_id` makes the row's identity Veo's own stable identifier, with
-`player_id` demoted to a resolved/overridable attribute — exactly mirroring
-how `matched_jersey_number` was already planned as an audit column, just
-promoted into the primary key. The `matched_manually` guard is what makes
-FR-013 ("a manual correction survives future syncs") hold without any
-special-casing in the sync route's control flow — it's a single `CASE` in
-the existing upsert, not a second code path.
+`player_id` demoted to a resolved/overridable attribute. Preserving
+`player_id` on conflict makes
+FR-013 ("a manual correction survives future syncs") hold without a second
+sync code path. Before inserting a new jersey-number group, sync reserves all
+player IDs already assigned to another jersey number in that match (including
+manual assignments) and leaves a duplicate auto-match as `player_id = null`;
+this preserves FR-016 for new rows as well as for manual corrections.
 
 **Alternatives considered**:
 - *A separate `veo_player_match_overrides` table, consulted by the sync
@@ -252,7 +257,9 @@ the existing upsert, not a second code path.
 `POST /api/veo/matches/[matchId]/player-assignment`, authenticated via
 `serverSupabaseUser(event)` + `requireTrainer(db, team_id, userId)` (the same
 explicit app-level check `POST /api/veo/link` already uses), writing via
-`useAdminDb()`. `veo_player_match_stats` gets **no** `insert`/`update`/
+`useAdminDb()`. The sync route also writes `player_id` when inserting a new
+jersey-number group; this assignment route is the only path that changes an
+existing group's assignment. `veo_player_match_stats` gets **no** `insert`/`update`/
 `delete` RLS policy for `authenticated` — the existing
 `veo_player_match_stats_read_member` `select` policy is untouched.
 
@@ -317,11 +324,15 @@ per-team, not per-match).
 
 **Decision**: `POST /api/veo/matches/[matchId]/player-assignment` enforces
 "at most one jersey number per player per match" transactionally in the
-route itself, not via a database constraint: before setting `player_id` +
-`matched_manually = true` on every row sharing the target
-`(match_id, veo_jersey_number)`, it first clears (`player_id = null`,
-`matched_manually = true`) any *other* jersey number's rows in the same
-match that currently carry that `player_id`.
+route itself, not via a database constraint. The transaction first locks the
+shared `veo_matches` row with `FOR UPDATE`, which is also the lock the sync
+uses while reserving existing assignments and inserting new jersey-number
+groups. Before setting `player_id` + `matched_manually = true` on every row
+sharing the target `(match_id, veo_jersey_number)`, it clears
+(`player_id = null`, `matched_manually = true`) any *other* jersey number's
+rows in the same match that currently carry that `player_id`. The shared
+match-row lock serializes concurrent assignments; an implementation using
+Serializable isolation instead MUST retry serialization failures.
 
 **Rationale**: The natural PK, `(match_id, veo_jersey_number, stat_type)`,
 already produces nine rows per jersey number (one per curated stat) sharing
@@ -332,9 +343,10 @@ as a database constraint would need splitting the table into a
 jersey-to-player assignment table plus a separate stat-values table (a real
 option, see Alternatives) — more moving parts than this single write path
 justifies. Since this table has no RLS write policy at all (research.md
-§11) and only this one server route ever writes `player_id`, enforcing the
-invariant there is the whole surface area that needs it; there is no other
-path (direct PostgREST, another route) that could violate it. The cleared
+§11), the sync and assignment paths are both server-controlled, and both use
+the shared match-row lock, enforcing the invariant covers the whole write
+surface; there is no other path (direct PostgREST, another route) that could
+violate it. The cleared
 row also gets `matched_manually = true` so the next automatic sync doesn't
 silently reassign the freed-up jersey number back to the same player if
 their `players.jersey_number` still happens to match it.
@@ -344,8 +356,9 @@ their `players.jersey_number` still happens to match it.
 index on `(match_id, player_id) where player_id is not null`) plus a
 separate stat-values table — rejected: adds a second table and a join to
 every read (dashboard season summary, per-match breakdown), undoing
-research.md §6's single-query design, to enforce an invariant that a single
-`useAdminDb()`-only route can already guarantee by itself.
+research.md §6's assigned-read design, to enforce an invariant that the
+server-controlled sync and assignment paths can guarantee with a shared
+match-row lock.
 
 ## 15. Testing strategy
 
