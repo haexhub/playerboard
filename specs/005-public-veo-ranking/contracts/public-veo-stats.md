@@ -65,8 +65,10 @@ declare
   v_enabled boolean;
   v_rows jsonb;
 begin
-  select id, season_start into v_team_id, v_season_start
-    from public.teams where slug = p_slug;
+  select t.id, ts.season_start into v_team_id, v_season_start
+    from public.teams t
+    join public.team_settings ts on ts.team_id = t.id
+   where t.slug = p_slug;
 
   if v_team_id is null then
     return jsonb_build_object(

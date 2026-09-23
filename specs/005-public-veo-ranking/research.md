@@ -55,12 +55,12 @@ narrow-grant projections of the same underlying team).
 ## 3. Season boundary for the Veo-Stats aggregate
 
 **Finding** (from `/speckit.clarify`): the public Veo-Stats sum is bounded to
-`teams.season_start .. now()`, matching the existing season concept the
+`team_settings.season_start .. now()`, matching the existing season concept the
 points ranking already uses (`get_public_ranking`'s `p_from`/`p_to`, sourced
 from `team_settings.season_start` client-side via `useTimeframe`).
 
 **Decision**: `get_public_veo_stats(p_slug text)` takes no date-range
-parameters (unlike `get_public_ranking`) — it reads `teams.season_start`
+parameters (unlike `get_public_ranking`) — it reads `team_settings.season_start`
 itself and filters `veo_matches.played_at >= season_start`. No timeframe
 picker on the public Veo-Stats tab (FR-011): the season boundary is the only
 bound, computed server-side, not client-selectable.

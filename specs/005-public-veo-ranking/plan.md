@@ -19,7 +19,7 @@ default-off public opt-in (`veo_team_mappings.public_stats_enabled`,
 automatically publishes it. A new `security definer` function,
 `get_public_veo_stats`, owned by the same `public_ranking_reader` role
 `get_public_ranking` already uses, computes the season-bounded
-(`teams.season_start .. now`) aggregate server-side. This feature has a hard
+(`team_settings.season_start .. now`) aggregate server-side. This feature has a hard
 prerequisite: 004-veo-player-analytics' foundational schema
 (`veo_player_match_stats`) is not implemented yet (see research.md §1) —
 this plan's Veo-Stats tab has nothing to query until that lands.

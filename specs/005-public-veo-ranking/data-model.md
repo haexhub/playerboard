@@ -27,7 +27,7 @@ either gate in FR-005 is off. `security definer`, owned by the existing
 
 | Table | Columns | Why |
 |---|---|---|
-| `teams` | `season_start` (in addition to the already-granted `id, name, slug`) | Season boundary (research.md §3) |
+| `team_settings` | `team_id, season_start` | Season boundary (research.md §3) — not on `teams` itself |
 | `veo_team_mappings` | `team_id, enabled, public_stats_enabled` | Gate check (FR-005) |
 | `veo_matches` | `id, team_id, played_at` | Season-bounded match scoping |
 | `veo_player_match_stats` | `match_id, player_id, stat_type, value` | The stats themselves; `player_id is not null` only (FR-009); no `veo_jersey_number` grant needed — not displayed publicly (research.md §5) |
@@ -45,7 +45,7 @@ roster jersey-number lookup.
    `rows` — this is not an error state (FR-005/FR-008), the page simply
    doesn't render the Veo tab.
 3. Otherwise: join `veo_player_match_stats` (`player_id is not null`) →
-   `veo_matches` (`played_at >= teams.season_start`, `team_id` scoped) →
+   `veo_matches` (`played_at >= team_settings.season_start`, `team_id` scoped) →
    `players` (`active`, for the current `jersey_number`); `sum(value)` grouped
    by `(player_id, stat_type)`; pivot to one row per `player_id` with a
    `stats` object keyed by `stat_type`; project only `jersey_number` and

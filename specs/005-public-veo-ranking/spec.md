@@ -12,7 +12,7 @@
 
 ### Session 2026-09-23
 
-- Q: Der Veo-Stats-Tab soll Saison-Summen zeigen, aber 004 selbst begrenzt die Summe nicht auf die aktuelle Saison (`teams.season_start`), sondern auf "alle synchronisierten Spiele" (potenziell mehrjährige Historie durch den vollständigen Erst-Import). Worauf soll sich die öffentliche Veo-Saison-Summe beziehen? → A: Aktuelle Saison (`season_start` bis heute) — dasselbe Saison-Konzept wie die Trainingsbewertungen-Rangliste.
+- Q: Der Veo-Stats-Tab soll Saison-Summen zeigen, aber 004 selbst begrenzt die Summe nicht auf die aktuelle Saison (`team_settings.season_start`), sondern auf "alle synchronisierten Spiele" (potenziell mehrjährige Historie durch den vollständigen Erst-Import). Worauf soll sich die öffentliche Veo-Saison-Summe beziehen? → A: Aktuelle Saison (`season_start` bis heute) — dasselbe Saison-Konzept wie die Trainingsbewertungen-Rangliste.
 - Q: Soll dieselbe `is_veo_enabled`-Freischaltung (die heute nur die teaminterne Sichtbarkeit steuert) automatisch auch die öffentliche Veröffentlichung der Veo-Stats auslösen, oder braucht es einen separaten, expliziten Schalter? → A: Separater, expliziter Public-Schalter — ein Trainer muss die öffentliche Sichtbarkeit der Veo-Stats zusätzlich zur internen Veo-Freischaltung explizit aktivieren; Standardwert ist deaktiviert.
 
 ## User Scenarios & Testing *(mandatory)*

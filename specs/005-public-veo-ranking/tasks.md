@@ -45,10 +45,21 @@ unchanged (see [quickstart.md](./quickstart.md)).
 **Purpose**: Schema and RPC every user story depends on. No user story can
 be implemented or tested before this phase is done.
 
-- [ ] T001 Add `publicStatsEnabled: boolean('public_stats_enabled').notNull().default(false)` to the `veoTeamMappings` table definition in `db/schema/index.ts`, per [data-model.md](./data-model.md)
-- [ ] T002 Run `pnpm db:generate` to produce the Drizzle migration for the new column under `supabase/migrations/` (depends on T001)
-- [ ] T003 Hand-write the migration `supabase/migrations/<ts>_get_public_veo_stats.sql`: grant the additional narrow columns to `public_ranking_reader` (`teams.season_start`; `veo_team_mappings.team_id, enabled, public_stats_enabled`; `veo_matches.id, team_id, played_at`; `veo_player_match_stats.match_id, player_id, stat_type, value`) and create `public.get_public_veo_stats(p_slug text)` exactly per [contracts/public-veo-stats.md](./contracts/public-veo-stats.md)'s implementation sketch and [data-model.md](./data-model.md)'s grouping/pivot logic; `owner to public_ranking_reader`; `revoke all ... from public, service_role`; `grant execute ... to anon, authenticated` (depends on T002)
-- [ ] T004 Run `pnpm gen:types` and commit the regenerated `app/types/database.ts` together with both migrations from T002/T003 (Principle V)
+**Scope note**: the external blocking prerequisite above materialized during
+implementation (`veo_player_match_stats` genuinely didn't exist). Per
+operator decision, 004-veo-player-analytics' own foundational schema (its
+table, `veo_player_match_stats_read_member` RLS policy per
+[004/data-model.md](../004-veo-player-analytics/data-model.md), and the
+regenerated types) was implemented as part of this phase — not a 005 task
+originally, added here for traceability: `db/schema/index.ts`
+(`veoPlayerMatchStats`), `supabase/migrations/20260923143353_*.sql`
+(drizzle-generated table) and `20260923143500_veo_player_match_stats_rls.sql`
+(hand-written RLS), folded into T001–T004 below.
+
+- [X] T001 Add `publicStatsEnabled: boolean('public_stats_enabled').notNull().default(false)` to the `veoTeamMappings` table definition in `db/schema/index.ts`, per [data-model.md](./data-model.md) — plus, per the scope note above, `veoPlayerMatchStats` (004's table)
+- [X] T002 Run `pnpm db:generate` to produce the Drizzle migration for the new column (and the new `veo_player_match_stats` table) under `supabase/migrations/` (depends on T001)
+- [X] T003 Hand-write `supabase/migrations/20260923150000_public_veo_stats.sql`: grant the additional narrow columns to `public_ranking_reader` (`team_settings.team_id, season_start` — not `teams`, corrected during implementation; `veo_team_mappings.team_id, enabled, public_stats_enabled`; `veo_matches.id, team_id, played_at`; `veo_player_match_stats.match_id, player_id, stat_type, value`) and create `public.get_public_veo_stats(p_slug text)` per [contracts/public-veo-stats.md](./contracts/public-veo-stats.md) and [data-model.md](./data-model.md); `owner to public_ranking_reader`; `revoke all ... from public, service_role`; `grant execute ... to anon, authenticated`. Plus `supabase/migrations/20260923143500_veo_player_match_stats_rls.sql` (004's RLS policy, scope note above) (depends on T002)
+- [X] T004 Run `pnpm gen:types` and commit the regenerated `app/types/database.ts` together with all migrations from T002/T003 (Principle V)
 
 **Checkpoint**: Schema and RPC ready. US1 and US2 can now both start (US1's own test only needs the RPC's `enabled` gate field, not real Veo data).
 
