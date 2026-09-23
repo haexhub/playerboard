@@ -1,18 +1,25 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-[specs/005-public-veo-ranking/plan.md](specs/005-public-veo-ranking/plan.md)
+[specs/015-unify-player-invite-dialog/plan.md](specs/015-unify-player-invite-dialog/plan.md)
 
 Companion artifacts:
 
+- Feature spec: [specs/015-unify-player-invite-dialog/spec.md](specs/015-unify-player-invite-dialog/spec.md)
+- Research decisions: [specs/015-unify-player-invite-dialog/research.md](specs/015-unify-player-invite-dialog/research.md)
+- Data model: [specs/015-unify-player-invite-dialog/data-model.md](specs/015-unify-player-invite-dialog/data-model.md)
+- RLS policies & route contracts: [specs/015-unify-player-invite-dialog/contracts/rls-policies.md](specs/015-unify-player-invite-dialog/contracts/rls-policies.md)
+- Quickstart: [specs/015-unify-player-invite-dialog/quickstart.md](specs/015-unify-player-invite-dialog/quickstart.md)
+
+Previous features (still shipping/maintained, not superseded):
+
+- Plan: [specs/005-public-veo-ranking/plan.md](specs/005-public-veo-ranking/plan.md)
 - Feature spec: [specs/005-public-veo-ranking/spec.md](specs/005-public-veo-ranking/spec.md)
 - Research decisions: [specs/005-public-veo-ranking/research.md](specs/005-public-veo-ranking/research.md)
 - Data model: [specs/005-public-veo-ranking/data-model.md](specs/005-public-veo-ranking/data-model.md)
 - RLS policies contract: [specs/005-public-veo-ranking/contracts/rls-policies.md](specs/005-public-veo-ranking/contracts/rls-policies.md)
 - Public Veo stats contract: [specs/005-public-veo-ranking/contracts/public-veo-stats.md](specs/005-public-veo-ranking/contracts/public-veo-stats.md)
 - Quickstart: [specs/005-public-veo-ranking/quickstart.md](specs/005-public-veo-ranking/quickstart.md)
-
-Previous features (still shipping/maintained, not superseded):
 
 - Plan: [specs/004-veo-player-analytics/plan.md](specs/004-veo-player-analytics/plan.md)
 - Feature spec: [specs/004-veo-player-analytics/spec.md](specs/004-veo-player-analytics/spec.md)
