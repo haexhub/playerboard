@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import PlayerForm from '~/components/players/PlayerForm.vue'
 import PlayerProgressChart from '~/components/stats/PlayerProgressChart.vue'
 import TimeframePicker from '~/components/stats/TimeframePicker.vue'
 import { useCategories, type ActiveCategory } from '~/composables/useCategories'
@@ -7,6 +8,7 @@ import { usePlayerScores, type PlayerScoreWithTeamStats } from '~/composables/us
 import { useTeamSettings } from '~/composables/useTeamSettings'
 import { useTimeframe } from '~/composables/useTimeframe'
 import type { Database } from '~/types/database'
+import { errorMessage } from '~/utils/errors'
 
 definePageMeta({
   middleware: ['team-context'],
@@ -15,7 +17,7 @@ definePageMeta({
 const route = useRoute()
 const playerId = String(route.params.id)
 
-const { currentTeam, currentSlug } = useTeamContext()
+const { currentTeam, currentSlug, isTrainer } = useTeamContext()
 const client = useSupabaseClient<Database>()
 const teamId = computed(() => currentTeam.value?.id ?? '')
 const slug = computed(() => currentSlug.value ?? '')
@@ -36,6 +38,8 @@ type PlayerInfo = {
   name: string
   jersey_number: number | null
   position: string | null
+  photo_consent: boolean
+  active: boolean
 }
 
 const player = ref<PlayerInfo | null>(null)
@@ -44,6 +48,10 @@ const scores = ref<PlayerScoreWithTeamStats[]>([])
 const timeSeries = ref<Map<string, { date: string; value: number }[]>>(new Map())
 const isLoading = ref(false)
 const loadError = ref<string | null>(null)
+const isEditing = ref(false)
+const playerFormRef = ref<InstanceType<typeof PlayerForm> | null>(null)
+const playerReloadError = ref<string | null>(null)
+const isReloadingPlayer = ref(false)
 let latestLoad = 0
 
 const timeframe = useTimeframe(slug, seasonStart)
@@ -54,13 +62,34 @@ const loadStatic = async () => {
   // and filtering on its empty id would render "nicht gefunden" for a real player.
   const { data: p, error } = await client
     .from('players')
-    .select('id, team_id, name, jersey_number, position')
+    .select('id, team_id, name, jersey_number, position, photo_consent, active')
     .eq('id', playerId)
     .maybeSingle()
   if (error) throw error
   player.value = p
   if (!p) return
   categories.value = await listCategories(p.team_id)
+}
+
+const reloadPlayer = async () => {
+  playerReloadError.value = null
+  isReloadingPlayer.value = true
+  try {
+    await loadStatic()
+    return true
+  } catch (err) {
+    playerReloadError.value = errorMessage(
+      err,
+      'Spieler konnte nach dem Speichern nicht neu geladen werden.',
+    )
+    return false
+  } finally {
+    isReloadingPlayer.value = false
+  }
+}
+
+const onPlayerSaved = async () => {
+  if (await reloadPlayer()) isEditing.value = false
 }
 
 const loadTimeframed = async () => {
@@ -106,14 +135,65 @@ watch(
 <template>
   <section v-if="player" class="space-y-6" data-testid="player-detail-page">
     <header class="space-y-1">
-      <h1 class="text-2xl font-semibold text-neutral-900">
-        <span class="text-neutral-500 mr-2">
-          {{ player.jersey_number !== null ? `#${player.jersey_number}` : '—' }}
-        </span>
-        {{ player.name }}
-      </h1>
+      <div class="flex items-center justify-between gap-3">
+        <h1 class="text-2xl font-semibold text-neutral-900">
+          <span class="text-neutral-500 mr-2">
+            {{ player.jersey_number !== null ? `#${player.jersey_number}` : '—' }}
+          </span>
+          {{ player.name }}
+        </h1>
+        <ShadcnButton
+          v-if="isTrainer && !isEditing"
+          type="button"
+          variant="outline"
+          size="sm"
+          data-testid="player-detail-edit-button"
+          @click="isEditing = true"
+        >
+          Bearbeiten
+        </ShadcnButton>
+      </div>
       <p v-if="player.position" class="text-sm text-neutral-600">Position: {{ player.position }}</p>
+      <p v-if="isTrainer" class="text-sm text-neutral-600">
+        Foto-Einwilligung: {{ player.photo_consent ? 'Ja' : 'Nein' }} ·
+        {{ player.active ? 'Aktiv' : 'Inaktiv' }}
+      </p>
     </header>
+
+    <div
+      v-if="isEditing"
+      class="space-y-3 rounded-md border border-input p-4"
+      data-testid="player-detail-edit-form"
+    >
+      <PlayerForm
+        ref="playerFormRef"
+        :team-id="player.team_id"
+        :player="player"
+        @saved="onPlayerSaved"
+      />
+      <div class="flex gap-2">
+        <ShadcnButton
+          type="button"
+          variant="outline"
+          :disabled="playerFormRef?.loading || isReloadingPlayer"
+          @click="isEditing = false"
+        >
+          Abbrechen
+        </ShadcnButton>
+        <ShadcnButton
+          type="submit"
+          form="player-form"
+          :disabled="playerFormRef?.loading || isReloadingPlayer"
+          data-testid="player-detail-edit-submit"
+        >
+          {{ playerFormRef?.loading ? 'Speichere…' : 'Speichern' }}
+        </ShadcnButton>
+      </div>
+    </div>
+    <p v-if="playerReloadError" class="text-sm text-red-700" role="alert">
+      {{ playerReloadError }}
+      <button type="button" class="ml-2 underline" @click="reloadPlayer">Erneut versuchen</button>
+    </p>
 
     <TimeframePicker
       :preset="timeframe.preset.value"

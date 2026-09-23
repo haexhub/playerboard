@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { fetchLatestMagicLink, signInWithMagicLink } from './helpers/magic-link'
+import { restGet } from './helpers/supabase-rest'
 
 const uniqueSuffix = () => Math.random().toString(36).slice(2, 8)
 
@@ -326,5 +327,70 @@ test.describe('US4 — trainer manages the player roster', () => {
 
     await trainerCtx.close()
     await inviteeCtx.close()
+  })
+
+  test('trainer edits player settings inline from the detail page', async ({ browser }) => {
+    test.setTimeout(90_000)
+    const suffix = uniqueSuffix()
+    const trainerEmail = `trainer-det-${suffix}@example.com`
+    const teamName = `Det Team ${suffix}`
+    const teamSlug = `det-team-${suffix}`
+
+    const trainerCtx = await browser.newContext()
+    const trainerPage = await trainerCtx.newPage()
+    setupPage(trainerPage)
+
+    await signInWithMagicLink(trainerPage, trainerEmail)
+    await trainerPage.waitForURL(/\/start$/, { timeout: 15_000 })
+    await trainerPage.getByLabel(/team-name/i).fill(teamName)
+    await trainerPage.getByLabel(/slug/i).fill(teamSlug)
+    await trainerPage.getByRole('button', { name: /team gründen/i }).click()
+    await trainerPage.waitForURL(new RegExp(`/t/${teamSlug}(/|$)`), { timeout: 15_000 })
+
+    // Create a player via the roster page, then jump to their detail page.
+    await trainerPage.goto(`/t/${teamSlug}/players`, { waitUntil: 'networkidle' })
+    const playerDialog = trainerPage.getByTestId('player-dialog')
+    await trainerPage.getByTestId('player-new-button').click()
+    await playerDialog.getByRole('radio', { name: 'Manuell' }).check()
+    await playerDialog.getByLabel('Name').fill('Dana Detail')
+    await playerDialog.getByLabel(/Trikotnummer/).fill('5')
+    await trainerPage.getByTestId('player-form-submit').click()
+    await expect(playerDialog).toBeHidden()
+
+    const [team] = await restGet<{ id: string }>(`teams?select=id&slug=eq.${teamSlug}`)
+    const [player] = await restGet<{ id: string }>(
+      `players?select=id&team_id=eq.${team!.id}&name=eq.${encodeURIComponent('Dana Detail')}`,
+    )
+
+    await trainerPage.goto(`/t/${teamSlug}/players/${player!.id}`, { waitUntil: 'networkidle' })
+    await expect(trainerPage.getByTestId('player-detail-page')).toBeVisible()
+
+    // Edit affordance is trainer-visible and pre-fills the current values.
+    await trainerPage.getByTestId('player-detail-edit-button').click()
+    const editForm = trainerPage.getByTestId('player-detail-edit-form')
+    await expect(editForm).toBeVisible()
+    await expect(editForm.getByLabel('Name')).toHaveValue('Dana Detail')
+    await expect(editForm.getByLabel(/Trikotnummer/)).toHaveValue('5')
+
+    // Change name, jersey number and photo consent, then save.
+    await editForm.getByLabel('Name').fill('Dana Detail II')
+    await editForm.getByLabel(/Trikotnummer/).fill('6')
+    const consentCheckbox = editForm.getByRole('checkbox', { name: 'Foto-Einwilligung' })
+    await consentCheckbox.check()
+    await trainerPage.getByTestId('player-detail-edit-submit').click()
+
+    await expect(editForm).toBeHidden()
+    const heading = trainerPage.getByRole('heading', { level: 1 })
+    await expect(heading).toContainText('Dana Detail II')
+    await expect(heading).toContainText('#6')
+    await expect(trainerPage.getByText('Foto-Einwilligung: Ja')).toBeVisible()
+
+    // Consistency with the roster page: the same record reflects the change there too.
+    await trainerPage.goto(`/t/${teamSlug}/players`, { waitUntil: 'networkidle' })
+    await expect(
+      trainerPage.getByTestId('player-row').filter({ hasText: 'Dana Detail II' }),
+    ).toContainText('6')
+
+    await trainerCtx.close()
   })
 })
