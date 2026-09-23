@@ -1,17 +1,24 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-[specs/003-veo-analytics/plan.md](specs/003-veo-analytics/plan.md)
+[specs/004-veo-player-analytics/plan.md](specs/004-veo-player-analytics/plan.md)
 
 Companion artifacts:
 
+- Feature spec: [specs/004-veo-player-analytics/spec.md](specs/004-veo-player-analytics/spec.md)
+- Research decisions: [specs/004-veo-player-analytics/research.md](specs/004-veo-player-analytics/research.md)
+- Data model: [specs/004-veo-player-analytics/data-model.md](specs/004-veo-player-analytics/data-model.md)
+- RLS policies contract: [specs/004-veo-player-analytics/contracts/rls-policies.md](specs/004-veo-player-analytics/contracts/rls-policies.md)
+- Quickstart: [specs/004-veo-player-analytics/quickstart.md](specs/004-veo-player-analytics/quickstart.md)
+
+Previous features (still shipping/maintained, not superseded):
+
+- Plan: [specs/003-veo-analytics/plan.md](specs/003-veo-analytics/plan.md)
 - Feature spec: [specs/003-veo-analytics/spec.md](specs/003-veo-analytics/spec.md)
 - Research decisions: [specs/003-veo-analytics/research.md](specs/003-veo-analytics/research.md)
 - Data model: [specs/003-veo-analytics/data-model.md](specs/003-veo-analytics/data-model.md)
 - RLS policies & sync-route contract: [specs/003-veo-analytics/contracts/rls-policies.md](specs/003-veo-analytics/contracts/rls-policies.md)
 - Quickstart: [specs/003-veo-analytics/quickstart.md](specs/003-veo-analytics/quickstart.md)
-
-Previous features (still shipping/maintained, not superseded):
 
 - Plan: [specs/002-member-profile/plan.md](specs/002-member-profile/plan.md)
 - Feature spec: [specs/002-member-profile/spec.md](specs/002-member-profile/spec.md)
