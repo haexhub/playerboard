@@ -589,6 +589,57 @@ export type Database = {
           },
         ]
       }
+      veo_player_match_stats: {
+        Row: {
+          category: string
+          created_at: string
+          match_id: string
+          matched_manually: boolean
+          player_id: string | null
+          stat_type: string
+          updated_at: string
+          value: number
+          veo_jersey_number: number
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          match_id: string
+          matched_manually?: boolean
+          player_id?: string | null
+          stat_type: string
+          updated_at?: string
+          value: number
+          veo_jersey_number: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          match_id?: string
+          matched_manually?: boolean
+          player_id?: string | null
+          stat_type?: string
+          updated_at?: string
+          value?: number
+          veo_jersey_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "veo_player_match_stats_match_id_veo_matches_id_fk"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "veo_matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "veo_player_match_stats_player_id_players_id_fk"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       veo_sync_credentials: {
         Row: {
           captured_at: string
@@ -657,6 +708,7 @@ export type Database = {
         Row: {
           created_at: string
           enabled: boolean
+          public_stats_enabled: boolean
           team_id: string
           updated_at: string
           veo_club_slug: string
@@ -665,6 +717,7 @@ export type Database = {
         Insert: {
           created_at?: string
           enabled?: boolean
+          public_stats_enabled?: boolean
           team_id: string
           updated_at?: string
           veo_club_slug: string
@@ -673,6 +726,7 @@ export type Database = {
         Update: {
           created_at?: string
           enabled?: boolean
+          public_stats_enabled?: boolean
           team_id?: string
           updated_at?: string
           veo_club_slug?: string
@@ -722,6 +776,7 @@ export type Database = {
         Args: { p_from: string; p_slug: string; p_to: string }
         Returns: Json
       }
+      get_public_veo_stats: { Args: { p_slug: string }; Returns: Json }
       get_team_category_stats: {
         Args: { p_from: string; p_team: string; p_to: string }
         Returns: {

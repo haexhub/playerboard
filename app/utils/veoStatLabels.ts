@@ -13,6 +13,14 @@ const STAT_LABELS: Record<string, string> = {
   football_interception_total: 'Interceptions',
   football_loose_total: 'Zweikämpfe',
   football_save_total: 'Paraden',
+  // Per-player curated stats (004-veo-player-analytics research.md §3)
+  distance_total_meters: 'Distanz',
+  sprints_total: 'Sprints',
+  top_speed_kmh: 'Höchstgeschw.',
+  average_speed_kmh: 'Ø-Geschw.',
+  high_intensity_runs_total: 'Intensivläufe',
+  seconds_played_total: 'Spielzeit',
+  football_goal_involvement_total: 'Torbeteiligungen',
 }
 
 const CATEGORY_LABELS: Record<string, string> = {

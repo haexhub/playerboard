@@ -1,0 +1,1 @@
+ALTER TABLE "veo_team_mappings" ADD COLUMN "public_stats_enabled" boolean DEFAULT false NOT NULL;

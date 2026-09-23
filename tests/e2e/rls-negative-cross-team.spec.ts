@@ -111,6 +111,9 @@ test.describe('RLS negative — cross team (SC-008, SC-009)', () => {
         invited_by: trainerBUserId,
       },
     ])
+    await restInsert('veo_team_mappings', [
+      { team_id: teamBId, veo_club_slug: 'x', veo_team_slug: 'y', enabled: true },
+    ])
 
     // Real Storage object under team B's prefix, uploaded with the service
     // role (bypasses RLS — this is fixture setup, not the attack).
@@ -207,12 +210,41 @@ test.describe('RLS negative — cross team (SC-008, SC-009)', () => {
         data: [{ team_id: teamBId, session_cookie: 'x', captured_at: new Date().toISOString() }],
       })
       expect(x12.ok()).toBe(false)
+
+      // X13 — flip team B's public Veo-Stats visibility switch from team A's
+      // side (005-public-veo-ranking, contracts/rls-policies.md W2).
+      const x13 = await trainerACtx.request.patch(
+        `${SUPABASE_URL}/rest/v1/veo_team_mappings?team_id=eq.${teamBId}`,
+        {
+          headers: { ...asUser(token), Prefer: 'return=representation' },
+          data: { public_stats_enabled: true },
+        },
+      )
+      const x13Body = x13.ok() ? ((await x13.json()) as unknown[]) : []
+      expect(x13Body).toHaveLength(0)
     }
 
     // X1..X6 as TU_A.
     await runAttackerChecks(trainerAToken)
     // X7 — same checks as PU_A.
     await runAttackerChecks(playerAToken)
+
+    // Positive verification for X13 — team B's switch is still off despite
+    // both attackers' attempts above.
+    const [mappingBAfterAttacks] = await restGet<{ public_stats_enabled: boolean }>(
+      `veo_team_mappings?team_id=eq.${teamBId}&select=public_stats_enabled`,
+    )
+    expect(mappingBAfterAttacks!.public_stats_enabled).toBe(false)
+
+    // W3 (005-public-veo-ranking) — anon cannot select any of the base
+    // tables behind get_public_veo_stats directly, only execute the RPC.
+    for (const table of ['veo_team_mappings', 'veo_matches', 'veo_player_match_stats']) {
+      const res = await trainerACtx.request.get(`${SUPABASE_URL}/rest/v1/${table}?select=*`, {
+        headers: asAnon(),
+      })
+      expect(res.ok()).toBe(true)
+      expect(await res.json()).toEqual([])
+    }
 
     // X8 — anon reads `teams`.
     const x8 = await trainerACtx.request.get(`${SUPABASE_URL}/rest/v1/teams`, {

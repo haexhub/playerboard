@@ -3,6 +3,7 @@ import {
   boolean,
   check,
   date,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -262,6 +263,7 @@ export const veoTeamMappings = pgTable('veo_team_mappings', {
   veoClubSlug: text('veo_club_slug').notNull(),
   veoTeamSlug: text('veo_team_slug').notNull(),
   enabled: boolean('enabled').notNull().default(true),
+  publicStatsEnabled: boolean('public_stats_enabled').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
@@ -308,6 +310,32 @@ export const veoMatchStats = pgTable(
       'veo_match_stats_team_association_check',
       sql`${t.teamAssociation} in ('own','opponent')`,
     ),
+  ],
+)
+
+// Veo-Spieler-Statistiken (specs/004-veo-player-analytics). Identity is
+// Veo's own jersey number, not a Playerboard player — player_id is a
+// resolved/overridable attribute, set automatically at sync time or
+// manually by a trainer. Implemented here as a blocking prerequisite for
+// 005-public-veo-ranking (see specs/005-public-veo-ranking/research.md §1).
+export const veoPlayerMatchStats = pgTable(
+  'veo_player_match_stats',
+  {
+    matchId: uuid('match_id')
+      .notNull()
+      .references(() => veoMatches.id, { onDelete: 'cascade' }),
+    veoJerseyNumber: integer('veo_jersey_number').notNull(),
+    statType: text('stat_type').notNull(),
+    playerId: uuid('player_id').references(() => players.id, { onDelete: 'set null' }),
+    matchedManually: boolean('matched_manually').notNull().default(false),
+    category: text('category').notNull(),
+    value: doublePrecision('value').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.matchId, t.veoJerseyNumber, t.statType] }),
+    index('veo_player_match_stats_player_idx').on(t.playerId),
   ],
 )
 

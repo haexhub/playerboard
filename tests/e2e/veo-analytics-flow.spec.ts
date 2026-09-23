@@ -1,6 +1,12 @@
 import { expect, test, type Page } from '@playwright/test'
 import { signInWithMagicLink } from './helpers/magic-link'
-import { SUPABASE_URL, restGet, restHeaders, restInsert } from './helpers/supabase-rest'
+import {
+  anonHeaders,
+  SUPABASE_URL,
+  restGet,
+  restHeaders,
+  restInsert,
+} from './helpers/supabase-rest'
 
 const restUpsert = async (table: string, onConflict: string, row: unknown): Promise<void> => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=${onConflict}`, {
@@ -202,6 +208,42 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     await pageA.reload({ waitUntil: 'networkidle' })
     await expect(pageA.getByTestId('veo-sync-status-failing')).toBeVisible()
     await expect(pageA.getByTestId('veo-sync-status-ok')).toHaveCount(0)
+
+    // 005-public-veo-ranking US1: a trainer flips the public Veo-Stats
+    // visibility switch, independent of internal Veo enablement — the RPC's
+    // `enabled` field must track only the toggle, not any UI reload.
+    const fetchPublicVeoStats = async () => {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_public_veo_stats`, {
+        method: 'POST',
+        headers: anonHeaders(),
+        body: JSON.stringify({ p_slug: slugA }),
+      })
+      if (!res.ok) throw new Error(`get_public_veo_stats failed: ${res.status}`)
+      return (await res.json()) as { enabled: boolean }
+    }
+
+    expect((await fetchPublicVeoStats()).enabled).toBe(false)
+
+    await pageA.goto(`/t/${slugA}/team/veo`, { waitUntil: 'networkidle' })
+    const toggleInput = pageA.getByTestId('veo-public-stats-toggle-input')
+    await expect(toggleInput).not.toBeChecked()
+
+    // The checkbox flips its DOM state immediately on click; the save is an
+    // async Supabase update, so wait for that request to complete before
+    // asserting on the server side.
+    const waitForMappingSave = () =>
+      pageA.waitForResponse(
+        (res) =>
+          res.url().includes('/rest/v1/veo_team_mappings') && res.request().method() === 'PATCH',
+      )
+
+    await Promise.all([waitForMappingSave(), toggleInput.check()])
+    await expect(toggleInput).toBeChecked()
+    expect((await fetchPublicVeoStats()).enabled).toBe(true)
+
+    await Promise.all([waitForMappingSave(), toggleInput.uncheck()])
+    await expect(toggleInput).not.toBeChecked()
+    expect((await fetchPublicVeoStats()).enabled).toBe(false)
 
     await ctxA.close()
     await ctxB.close()
