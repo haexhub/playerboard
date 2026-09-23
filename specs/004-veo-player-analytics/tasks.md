@@ -32,10 +32,20 @@ or cron change; it reuses 003-veo-analytics' configuration unchanged (see
 **Purpose**: Schema every user story depends on. No user story can be
 implemented or tested before this phase is done.
 
-- [ ] T001 Add the `veoPlayerMatchStats` table definition to `db/schema/index.ts` exactly per [data-model.md](./data-model.md): PK `(matchId, veoJerseyNumber, statType)`, nullable `playerId` FK (`on delete set null`), `matchedManually` boolean default `false`, `category`, `value` (double precision), `createdAt`/`updatedAt`, plus the `veo_player_match_stats_player_idx` index
-- [ ] T002 Run `pnpm db:generate` to produce the Drizzle migration for the new table under `supabase/migrations/` (depends on T001)
-- [ ] T003 Hand-write the RLS migration `supabase/migrations/<ts>_veo_player_match_stats_rls.sql`: enable RLS, add the `veo_player_match_stats_read_member` select policy per [contracts/rls-policies.md](./contracts/rls-policies.md) — no insert/update/delete policy for `authenticated` (depends on T002)
-- [ ] T004 Run `pnpm gen:types` and commit the regenerated `app/types/database.ts` together with both migrations from T002/T003 (Principle V)
+**Scope note**: T001-T004 landed early, as part of
+[005-public-veo-ranking](../005-public-veo-ranking/spec.md) (its public Veo
+tab hard-depends on this schema — see
+[005/research.md §1](../005-public-veo-ranking/research.md)). Already in
+`main`: `db/schema/index.ts` (`veoPlayerMatchStats` table),
+`supabase/migrations/20260923143353_demonic_james_howlett.sql` (table),
+`supabase/migrations/20260923143500_veo_player_match_stats_rls.sql` (RLS,
+`veo_player_match_stats_read_member` policy), and the regenerated
+`app/types/database.ts`.
+
+- [X] T001 Add the `veoPlayerMatchStats` table definition to `db/schema/index.ts` exactly per [data-model.md](./data-model.md): PK `(matchId, veoJerseyNumber, statType)`, nullable `playerId` FK (`on delete set null`), `matchedManually` boolean default `false`, `category`, `value` (double precision), `createdAt`/`updatedAt`, plus the `veo_player_match_stats_player_idx` index
+- [X] T002 Run `pnpm db:generate` to produce the Drizzle migration for the new table under `supabase/migrations/` (depends on T001)
+- [X] T003 Hand-write the RLS migration `supabase/migrations/<ts>_veo_player_match_stats_rls.sql`: enable RLS, add the `veo_player_match_stats_read_member` select policy per [contracts/rls-policies.md](./contracts/rls-policies.md) — no insert/update/delete policy for `authenticated` (depends on T002)
+- [X] T004 Run `pnpm gen:types` and commit the regenerated `app/types/database.ts` together with both migrations from T002/T003 (Principle V)
 
 **Checkpoint**: Schema ready. All user stories below can now start.
 
