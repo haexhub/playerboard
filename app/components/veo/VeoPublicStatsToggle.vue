@@ -31,6 +31,8 @@ const onToggle = async (event: Event) => {
     await setPublicStatsEnabled(props.teamId, next)
     enabled.value = next
   } catch (err) {
+    const input = event.target as HTMLInputElement
+    input.checked = enabled.value
     error.value = errorMessage(err, 'Einstellung konnte nicht gespeichert werden.')
   } finally {
     saving.value = false

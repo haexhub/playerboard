@@ -104,9 +104,10 @@ Trainingsbewertungen tab (001) identifies rows by the player's *current*
 `players.jersey_number`.
 
 **Decision**: The public Veo-Stats tab aggregates
-`veo_player_match_stats` by `player_id` (summing `value` per `stat_type`,
-`player_id is not null` rows only, `veo_matches.played_at >= season_start`)
-and labels each resulting row with that player's *current*
+`veo_player_match_stats` by `player_id` (`player_id is not null` rows only,
+`veo_matches.played_at >= season_start`), summing additive `value` metrics,
+taking the maximum for `top_speed_kmh`, and averaging match values for
+`average_speed_kmh`. It labels each resulting row with that player's *current*
 `players.jersey_number` — not the per-match historical `veo_jersey_number`.
 This matches the points-ranking convention and keeps the tab a single,
 season-long row per player even if their number changed mid-season (see

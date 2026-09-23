@@ -46,10 +46,12 @@ roster jersey-number lookup.
    doesn't render the Veo tab.
 3. Otherwise: join `veo_player_match_stats` (`player_id is not null`) →
    `veo_matches` (`played_at >= team_settings.season_start`, `team_id` scoped) →
-   `players` (`active`, for the current `jersey_number`); `sum(value)` grouped
-   by `(player_id, stat_type)`; pivot to one row per `player_id` with a
-   `stats` object keyed by `stat_type`; project only `jersey_number` and
-   `stats` — never `player_id` — in the returned rows (FR-007).
+   `players` (`active`, for the current `jersey_number`); aggregate by
+   `(player_id, stat_type)` using `sum(value)` for additive metrics,
+   `max(value)` for `top_speed_kmh`, and `avg(value)` for
+   `average_speed_kmh`; pivot to one row per `player_id` with a `stats` object
+   keyed by `stat_type`; project only `jersey_number` and `stats` — never
+   `player_id` — in the returned rows (FR-007).
 4. A `stat_type` with zero contributing rows for a player is simply absent
    from that player's `stats` object (FR-010) — never fabricated as `0`,
    mirrored from `get_public_ranking`'s existing `scores` pattern (which

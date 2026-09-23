@@ -20,11 +20,14 @@ export const useVeoLink = () => {
   }
 
   const setPublicStatsEnabled = async (team_id: string, enabled: boolean) => {
-    const { error } = await client
+    const { data, error } = await client
       .from('veo_team_mappings')
       .update({ public_stats_enabled: enabled })
       .eq('team_id', team_id)
+      .select('team_id')
+      .maybeSingle()
     if (error) throw error
+    if (!data) throw new Error('Keine Veo-Verknüpfung für dieses Team gefunden.')
   }
 
   const login = async (payload: { team_id: string; email: string; password: string }) => {

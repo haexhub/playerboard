@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import PublicRankingTable from '~/components/stats/PublicRankingTable.vue'
 import PublicVeoStatsTable from '~/components/stats/PublicVeoStatsTable.vue'
 import TimeframePicker from '~/components/stats/TimeframePicker.vue'
@@ -58,21 +58,26 @@ watch(
 const { getPublicVeoStats } = usePublicVeoStats()
 const veoStats = ref<PublicVeoStats | null>(null)
 const veoLoadError = ref<string | null>(null)
+let latestVeoLoad = 0
 
-const loadVeoStats = async () => {
+const loadVeoStats = async (teamSlug: string) => {
+  const loadId = ++latestVeoLoad
+  veoStats.value = null
+  activeTab.value = 'points'
   veoLoadError.value = null
   try {
-    veoStats.value = await getPublicVeoStats(slug.value)
+    const next = await getPublicVeoStats(teamSlug)
+    if (loadId !== latestVeoLoad) return
+    veoStats.value = next
+    if (!next.enabled) activeTab.value = 'points'
   } catch (err) {
+    if (loadId !== latestVeoLoad) return
     veoLoadError.value =
       err instanceof Error ? err.message : 'Veo-Stats konnten nicht geladen werden'
   }
 }
 
-watch(slug, () => void loadVeoStats(), { immediate: true })
-onMounted(() => {
-  if (!veoStats.value) void loadVeoStats()
-})
+watch(slug, (teamSlug) => void loadVeoStats(teamSlug), { immediate: true })
 </script>
 
 <template>

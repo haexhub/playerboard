@@ -144,6 +144,17 @@ test.describe('US5 — anonymous public ranking', () => {
         home_or_away: 'away',
       },
     ])
+    const [matchSecondInSeason] = await restInsert<{ id: string }>('veo_matches', [
+      {
+        team_id,
+        veo_match_id: `veo-in-second-${suffix}`,
+        played_at: new Date().toISOString(),
+        opponent_name: 'Public Veo Opponent 2',
+        own_score: 2,
+        opponent_score: 1,
+        home_or_away: 'away',
+      },
+    ])
     await restInsert('veo_player_match_stats', [
       {
         match_id: matchInSeason!.id,
@@ -160,6 +171,38 @@ test.describe('US5 — anonymous public ranking', () => {
         player_id: player22!.id,
         category: 'physical',
         value: 10,
+      },
+      {
+        match_id: matchInSeason!.id,
+        veo_jersey_number: 11,
+        stat_type: 'top_speed_kmh',
+        player_id: player11Id,
+        category: 'physical',
+        value: 24,
+      },
+      {
+        match_id: matchInSeason!.id,
+        veo_jersey_number: 11,
+        stat_type: 'average_speed_kmh',
+        player_id: player11Id,
+        category: 'physical',
+        value: 10,
+      },
+      {
+        match_id: matchSecondInSeason!.id,
+        veo_jersey_number: 11,
+        stat_type: 'top_speed_kmh',
+        player_id: player11Id,
+        category: 'physical',
+        value: 27,
+      },
+      {
+        match_id: matchSecondInSeason!.id,
+        veo_jersey_number: 11,
+        stat_type: 'average_speed_kmh',
+        player_id: player11Id,
+        category: 'physical',
+        value: 14,
       },
       // Pre-season: same player (jersey 11), must not contribute to the sum.
       {
@@ -189,6 +232,8 @@ test.describe('US5 — anonymous public ranking', () => {
     await expect(jersey11Row.getByTestId('public-veo-stat-distance_total_meters')).toHaveText(
       '5000',
     )
+    await expect(jersey11Row.getByTestId('public-veo-stat-top_speed_kmh')).toHaveText('27')
+    await expect(jersey11Row.getByTestId('public-veo-stat-average_speed_kmh')).toHaveText('12')
     const jersey22Row = veoRows.filter({ hasText: '#22' })
     await expect(jersey22Row.getByTestId('public-veo-stat-sprints_total')).toHaveText('10')
     await expect(anonPage.locator('body')).not.toContainText('Veo Secret Player 22')

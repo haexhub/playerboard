@@ -64,16 +64,24 @@ begin
     );
   end if;
 
-  -- Sum curated stat values per player across matches played since
+  -- Aggregate curated stat values per player across matches played since
   -- season_start, then pivot to one row per player and project only the
   -- player's current jersey_number — never player_id, never a name
-  -- (specs/005-public-veo-ranking/data-model.md).
+  -- (specs/005-public-veo-ranking/data-model.md). Additive metrics are
+  -- summed; speed metrics retain their meaning across multiple matches.
   with in_season_matches as (
     select id from public.veo_matches
      where team_id = v_team_id and played_at >= v_season_start
   ),
-  summed as (
-    select vpms.player_id, vpms.stat_type, sum(vpms.value) as total
+  aggregated as (
+    select
+      vpms.player_id,
+      vpms.stat_type,
+      case
+        when vpms.stat_type = 'top_speed_kmh' then max(vpms.value)
+        when vpms.stat_type = 'average_speed_kmh' then avg(vpms.value)
+        else sum(vpms.value)
+      end as total
       from public.veo_player_match_stats vpms
       join in_season_matches m on m.id = vpms.match_id
      where vpms.player_id is not null
@@ -81,7 +89,7 @@ begin
   ),
   pivoted as (
     select player_id, jsonb_object_agg(stat_type, total) as stats
-      from summed
+      from aggregated
      group by player_id
   )
   select jsonb_agg(
