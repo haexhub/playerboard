@@ -12,11 +12,19 @@ export const useVeoLink = () => {
   const getCurrentMapping = async (team_id: string) => {
     const { data, error } = await client
       .from('veo_team_mappings')
-      .select('veo_club_slug, veo_team_slug, enabled')
+      .select('veo_club_slug, veo_team_slug, enabled, public_stats_enabled')
       .eq('team_id', team_id)
       .maybeSingle()
     if (error) throw error
     return data
+  }
+
+  const setPublicStatsEnabled = async (team_id: string, enabled: boolean) => {
+    const { error } = await client
+      .from('veo_team_mappings')
+      .update({ public_stats_enabled: enabled })
+      .eq('team_id', team_id)
+    if (error) throw error
   }
 
   const login = async (payload: { team_id: string; email: string; password: string }) => {
@@ -35,5 +43,5 @@ export const useVeoLink = () => {
     return await $fetch<{ ok: true }>('/api/veo/link', { method: 'POST', body: payload })
   }
 
-  return { getCurrentMapping, login, link }
+  return { getCurrentMapping, login, link, setPublicStatsEnabled }
 }

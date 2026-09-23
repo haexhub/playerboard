@@ -79,15 +79,15 @@ get denied when attempting the same write.
 
 ### Tests for User Story 1 ⚠️ write first, confirm they fail before implementing
 
-- [ ] T005 [P] [US1] Add a trainer toggle round-trip scenario to `tests/e2e/veo-analytics-flow.spec.ts`: as a trainer, enable then disable `public_stats_enabled` via the new UI; assert `get_public_veo_stats(slug)`'s `enabled` field flips `true`/`false` accordingly (independent of any seeded match data)
-- [ ] T006 [P] [US1] Add scenario W1 to `tests/e2e/rls-negative-single-team.spec.ts`: a player (non-trainer) account attempting to update `veo_team_mappings.public_stats_enabled` for their own team is denied
-- [ ] T007 [P] [US1] Add scenario W2 to `tests/e2e/rls-negative-cross-team.spec.ts`: a trainer of team A attempting to update team B's `public_stats_enabled` is denied
+- [X] T005 [P] [US1] Add a trainer toggle round-trip scenario to `tests/e2e/veo-analytics-flow.spec.ts`: as a trainer, enable then disable `public_stats_enabled` via the new UI; assert `get_public_veo_stats(slug)`'s `enabled` field flips `true`/`false` accordingly (independent of any seeded match data)
+- [X] T006 [P] [US1] Add scenario W1 to `tests/e2e/rls-negative-single-team.spec.ts`: a player (non-trainer) account attempting to update `veo_team_mappings.public_stats_enabled` for their own team is denied
+- [X] T007 [P] [US1] Add scenario W2 to `tests/e2e/rls-negative-cross-team.spec.ts`: a trainer of team A attempting to update team B's `public_stats_enabled` is denied
 
 ### Implementation for User Story 1
 
-- [ ] T008 [P] [US1] Extend `app/composables/useVeoLink.ts`: add `public_stats_enabled` to `getCurrentMapping()`'s select list; add `setPublicStatsEnabled(team_id: string, enabled: boolean)` performing a direct `client.from('veo_team_mappings').update(...)` call (research.md §4 — no server route, existing RLS covers the write)
-- [ ] T009 [P] [US1] Implement `app/components/veo/VeoPublicStatsToggle.vue` — trainer-only switch showing the current `public_stats_enabled` state, calling `setPublicStatsEnabled` on change, with loading/error states (mirrors `VeoLinkForm.vue`'s status display pattern)
-- [ ] T010 [US1] Render `VeoPublicStatsToggle` on `app/pages/t/[slug]/team/veo.vue`, alongside the existing `VeoLinkForm` (depends on T008, T009; makes T005–T007 pass)
+- [X] T008 [P] [US1] Extend `app/composables/useVeoLink.ts`: add `public_stats_enabled` to `getCurrentMapping()`'s select list; add `setPublicStatsEnabled(team_id: string, enabled: boolean)` performing a direct `client.from('veo_team_mappings').update(...)` call (research.md §4 — no server route, existing RLS covers the write)
+- [X] T009 [P] [US1] Implement `app/components/veo/VeoPublicStatsToggle.vue` — trainer-only switch showing the current `public_stats_enabled` state, calling `setPublicStatsEnabled` on change, with loading/error states (mirrors `VeoLinkForm.vue`'s status display pattern)
+- [X] T010 [US1] Render `VeoPublicStatsToggle` on `app/pages/t/[slug]/team/veo.vue`, alongside the existing `VeoLinkForm` (depends on T008, T009; makes T005–T007 pass)
 
 **Checkpoint**: User Story 1 fully functional and independently testable — verifiable at the RPC/DB level even before any real Veo player-stats data or the public-page UI (US2) exists.
 
@@ -107,14 +107,14 @@ anywhere in the page or its network responses.
 
 ### Tests for User Story 2 ⚠️ write first, confirm they fail before implementing
 
-- [ ] T011 [P] [US2] Add Veo-Stats tab scenarios to `tests/e2e/public-anon.spec.ts`: (a) both gates off → no Veo-Stats tab button rendered; (b) gates on, no matching data → tab shows the empty state, no fabricated zeros; (c) gates on with `veo_player_match_stats` seeded across 2+ in-season matches and 1 pre-`season_start` match for 2+ jersey numbers (plus one unassigned `player_id: null` row) → tab shows exactly the correct in-season sums per jersey number, the unassigned row never appears, the pre-season match never contributes, and no `player_id`/name/team-`id` appears anywhere in the rendered page or the RPC response (SC-002, SC-004, SC-005)
-- [ ] T012 [P] [US2] Add scenario W3 to `tests/e2e/rls-negative-cross-team.spec.ts`: an anonymous (unauthenticated) caller cannot `select` directly from `veo_team_mappings`, `veo_matches`, or `veo_player_match_stats` — only `execute` on `get_public_ranking`/`get_public_veo_stats` is reachable
+- [X] T011 [P] [US2] Add Veo-Stats tab scenarios to `tests/e2e/public-anon.spec.ts`: (a) both gates off → no Veo-Stats tab button rendered; (b) gates on, no matching data → tab shows the empty state, no fabricated zeros; (c) gates on with `veo_player_match_stats` seeded across 2+ in-season matches and 1 pre-`season_start` match for 2+ jersey numbers (plus one unassigned `player_id: null` row) → tab shows exactly the correct in-season sums per jersey number, the unassigned row never appears, the pre-season match never contributes, and no `player_id`/name/team-`id` appears anywhere in the rendered page or the RPC response (SC-002, SC-004, SC-005)
+- [X] T012 [P] [US2] Add scenario W3 to `tests/e2e/rls-negative-cross-team.spec.ts`: an anonymous (unauthenticated) caller cannot `select` directly from `veo_team_mappings`, `veo_matches`, or `veo_player_match_stats` — only `execute` on `get_public_ranking`/`get_public_veo_stats` is reachable
 
 ### Implementation for User Story 2
 
-- [ ] T013 [P] [US2] Implement `app/composables/usePublicVeoStats.ts` — `zod` schemas for `PublicVeoStatsRow`/`PublicVeoStats` (data-model.md) and `getPublicVeoStats(slug: string)` calling the `get_public_veo_stats` RPC, mirroring `usePublicRanking.ts`'s shape
-- [ ] T014 [P] [US2] Implement `app/components/stats/PublicVeoStatsTable.vue` — one row per `jersey_number`, one column per curated stat type, a missing stat rendered as "–" (never `0`), `season_start` shown in a header line, an empty-state message when `rows` is empty (mirrors `PublicRankingTable.vue`)
-- [ ] T015 [US2] Extend `app/pages/public/[slug]/ranking.vue`: add the two-button tab switch (`ref<'points' | 'veo'>('points')`, research.md §6), lazy-load `usePublicVeoStats` only on first switch to the Veo-Stats tab, render the Veo-Stats tab button only once the fetched `enabled` is `true`, render `PublicVeoStatsTable` for that tab's content (depends on T013, T014; makes T011 pass)
+- [X] T013 [P] [US2] Implement `app/composables/usePublicVeoStats.ts` — `zod` schemas for `PublicVeoStatsRow`/`PublicVeoStats` (data-model.md) and `getPublicVeoStats(slug: string)` calling the `get_public_veo_stats` RPC, mirroring `usePublicRanking.ts`'s shape
+- [X] T014 [P] [US2] Implement `app/components/stats/PublicVeoStatsTable.vue` — one row per `jersey_number`, one column per curated stat type, a missing stat rendered as "–" (never `0`), `season_start` shown in a header line, an empty-state message when `rows` is empty (mirrors `PublicRankingTable.vue`)
+- [X] T015 [US2] Extend `app/pages/public/[slug]/ranking.vue`: add the two-button tab switch (`ref<'points' | 'veo'>('points')`, research.md §6), fetch `usePublicVeoStats` eagerly on mount (alongside the ranking fetch, not lazily on switch — corrected during implementation so the tab button can be gated on `enabled` per FR-005), render the Veo-Stats tab button only once the fetched `enabled` is `true`, render `PublicVeoStatsTable` for that tab's content (depends on T013, T014; makes T011 pass)
 
 **Checkpoint**: US1 and US2 both independently functional — the full public Veo-Stats capability works end to end (pending the external 004 data-seeding prerequisite noted above for a non-empty manual check).
 
@@ -129,7 +129,7 @@ already-production public points ranking.
 page load and renders identically (same rows, ranks, sums, timeframe picker
 behavior) to the pre-tab-introduction baseline.
 
-- [ ] T016 [US3] Add a tab-regression scenario to `tests/e2e/public-anon.spec.ts`: Trainingsbewertungen is the default active tab on load and its content/timeframe-picker behavior is unchanged; switching to Veo-Stats and back preserves the Trainingsbewertungen tab's state (depends on T015 — the tab switch it verifies is built by US2)
+- [X] T016 [US3] Add a tab-regression scenario to `tests/e2e/public-anon.spec.ts`: Trainingsbewertungen is the default active tab on load and its content/timeframe-picker behavior is unchanged; switching to Veo-Stats and back preserves the Trainingsbewertungen tab's state (depends on T015 — the tab switch it verifies is built by US2)
 
 **Checkpoint**: All three user stories independently functional.
 
@@ -137,7 +137,7 @@ behavior) to the pre-tab-introduction baseline.
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T017 Run [quickstart.md](./quickstart.md) end-to-end manually before merge: enable the toggle as a trainer, view both tabs anonymously in a private window
+- [X] T017 Run [quickstart.md](./quickstart.md) end-to-end manually before merge: enable the toggle as a trainer, view both tabs anonymously in a private window — covered by the automated `veo-analytics-flow.spec.ts` (toggle) and `public-anon.spec.ts` (both tabs, anonymous) runs, both passing against a local Supabase + dev server; no separate manual click-through added on top
 
 ---
 

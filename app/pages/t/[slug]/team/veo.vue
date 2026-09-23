@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import VeoLinkForm from '~/components/veo/VeoLinkForm.vue'
+import VeoPublicStatsToggle from '~/components/veo/VeoPublicStatsToggle.vue'
 
 definePageMeta({
   middleware: ['trainer-only'],
@@ -21,5 +22,7 @@ const teamId = computed(() => currentTeam.value?.id ?? '')
     </header>
 
     <VeoLinkForm v-if="teamId" :key="teamId" :team-id="teamId" />
+
+    <VeoPublicStatsToggle v-if="teamId" :key="`public-${teamId}`" :team-id="teamId" />
   </section>
 </template>

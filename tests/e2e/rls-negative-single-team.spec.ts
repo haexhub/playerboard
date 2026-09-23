@@ -295,6 +295,23 @@ test.describe('RLS negative — single team (SC-003)', () => {
     })
     expect(n14.status()).toBe(403)
 
+    // N15 — a player (non-trainer) cannot flip the public Veo-Stats
+    // visibility switch (005-public-veo-ranking FR-004). Reuses the
+    // veo_team_mappings row the trainer already created above (N11/N13).
+    const n15 = await playerCtx.request.patch(
+      `${SUPABASE_URL}/rest/v1/veo_team_mappings?team_id=eq.${teamId}`,
+      {
+        headers: { ...asUser(playerToken), Prefer: 'return=representation' },
+        data: { public_stats_enabled: true },
+      },
+    )
+    const n15Body = n15.ok() ? ((await n15.json()) as unknown[]) : []
+    expect(n15Body).toHaveLength(0)
+    const [refetchedMapping] = await restGet<{ public_stats_enabled: boolean }>(
+      `veo_team_mappings?team_id=eq.${teamId}&select=public_stats_enabled`,
+    )
+    expect(refetchedMapping!.public_stats_enabled).toBe(false)
+
     await trainerCtx.close()
     await playerCtx.close()
   })

@@ -32,7 +32,7 @@ this plan's Veo-Stats tab has nothing to query until that lands.
 **Testing**: Vitest for the new `usePublicVeoStats.ts` schema parsing (mirroring the existing pattern, if any exists for `usePublicRanking.ts`); Playwright e2e extending `public-anon.spec.ts` (both tabs, both gate states) and `rls-negative-cross-team.spec.ts`/`rls-negative-single-team.spec.ts` (toggle write denial for non-trainers and cross-team).
 **Target Platform**: Existing web app; no new route. `app/pages/public/[slug]/ranking.vue` gains the tab switch and a second data fetch; `app/pages/t/[slug]/team/veo.vue` gains the toggle section.
 **Project Type**: Web application — extends the existing single Nuxt project.
-**Performance Goals**: No new performance targets. One additional RPC call from the public page only when the visitor switches to the Veo-Stats tab (lazy, not fetched eagerly on page load) — negligible added load.
+**Performance Goals**: No new performance targets. One additional RPC call on every public page load (in parallel with the existing ranking call), not just when the Veo-Stats tab is opened — required so the tab button itself can be hidden per FR-005 before any switch happens (corrected during implementation from an earlier lazy-load assumption). Negligible added load either way.
 **Constraints**: RLS mandatory (Principle II) — covered entirely by already-existing policies for the write path (research.md §4) and the existing `security definer`/narrow-grant pattern for the read path (research.md §2); no new policy needed. Public opt-in must default to `false` (spec FR-003, privacy-driven).
 **Scale/Scope**: One page's UI change, one column, one function. Same order of magnitude as 001's original public-ranking addition.
 
@@ -83,7 +83,7 @@ specs/005-public-veo-ranking/
 app/
 ├── pages/
 │   ├── public/[slug]/
-│   │   └── ranking.vue                # + tab switch (Trainingsbewertungen / Veo-Stats), lazy-loads Veo data on first switch
+│   │   └── ranking.vue                # + tab switch (Trainingsbewertungen / Veo-Stats), fetches Veo data eagerly alongside the ranking so the tab button can be gated on `enabled`
 │   └── t/[slug]/team/
 │       └── veo.vue                    # + renders VeoPublicStatsToggle
 ├── components/
