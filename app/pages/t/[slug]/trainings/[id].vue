@@ -209,9 +209,7 @@ const onSave = async () => {
 
 const statusLabel = computed(() => (training.value?.status === 'saved' ? 'Gespeichert' : 'Entwurf'))
 
-const isDateChanged = computed(
-  () => !!training.value && dateInput.value !== training.value.date,
-)
+const isDateChanged = computed(() => !!training.value && dateInput.value !== training.value.date)
 
 const onSaveDate = async () => {
   if (!training.value) return

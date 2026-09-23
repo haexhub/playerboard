@@ -86,4 +86,34 @@ describe('deleting a training', () => {
 
     expect(outcome).toHaveLength(0)
   })
+
+  it('keeps a trainer deletion job after the training cascade', async () => {
+    const job = await runIsolated(sql, async (tx) => {
+      const trainerId = crypto.randomUUID()
+      const teamId = crypto.randomUUID()
+      const trainingId = crypto.randomUUID()
+      const storagePath = `${teamId}/${trainingId}/${crypto.randomUUID()}.jpg`
+      await tx`insert into auth.users (id) values (${trainerId})`
+      await tx`insert into public.teams (id, name, slug) values (${teamId}, 'Del Team 3', ${'del3-' + trainerId.slice(0, 8)})`
+      await tx`insert into public.memberships (user_id, team_id, role) values (${trainerId}, ${teamId}, 'trainer')`
+      await tx`insert into public.trainings (id, team_id, date, status)
+               values (${trainingId}, ${teamId}, current_date, 'saved')`
+
+      await asUser(tx, trainerId)
+      await tx`insert into public.training_deletion_jobs
+               (training_id, team_id, storage_paths, created_by)
+               values (${trainingId}, ${teamId}, ${[storagePath]}, ${trainerId})`
+      await tx`delete from public.trainings where id = ${trainingId}`
+
+      const [remainingTraining, remainingJob] = await Promise.all([
+        tx`select 1 from public.trainings where id = ${trainingId}`,
+        tx`select training_id, storage_paths from public.training_deletion_jobs where training_id = ${trainingId}`,
+      ])
+      return { remainingTraining, remainingJob, storagePath }
+    })
+
+    expect(job.remainingTraining).toHaveLength(0)
+    expect(job.remainingJob).toHaveLength(1)
+    expect(job.remainingJob[0]?.storage_paths).toEqual([job.storagePath])
+  })
 })

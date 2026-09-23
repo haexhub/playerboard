@@ -176,11 +176,13 @@ the not-future check and RLS (`tr_write_trainer`) apply the same as on
 create.
 
 A trainer can delete a training outright (FR-016), covered by the same
-`tr_write_trainer` policy (`for all`). The FK cascades (`on delete
-cascade`) remove its `point_entries` and `training_photos` rows; the
-application additionally removes the corresponding files from the
-`training-photos` storage bucket before deleting the row, since the FK
-cascade only clears the DB rows, not the bucket objects.
+`tr_write_trainer` policy (`for all`). The application first records the
+photo paths in the trainer-only `training_deletion_jobs` table, then deletes
+the training row and its cascading `point_entries` and `training_photos`
+rows. It removes the recorded files from the `training-photos` storage bucket
+in batches of at most 1,000 and deletes the cleanup job only after that
+succeeds. A failed database delete leaves the files and job intact; a failed
+Storage delete leaves the job available for a later retry.
 
 ## training_photos
 
@@ -291,3 +293,5 @@ Written in migrations under `supabase/migrations/…_functions.sql`:
 8. `20260910123500_functions.sql` — `get_team_ranking`,
    `get_player_scores_by_category`, `get_public_ranking` + grants.
 9. `20260910124000_seed_fixtures.sql` — seed only for local dev.
+10. `20260923100000_training_deletion_cleanup.sql` — durable training
+    deletion jobs and post-delete Storage cleanup policy.

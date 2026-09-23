@@ -51,6 +51,13 @@ export type SaveTrainingInput = {
   note?: string | null
 }
 
+type TrainingDeletionJobRow = {
+  id: string
+  training_id: string
+  team_id: string
+  storage_paths: string[]
+}
+
 export const useTrainings = () => {
   const client = useSupabaseClient<Database>()
   const user = useSupabaseUser()
@@ -124,10 +131,70 @@ export const useTrainings = () => {
 
   const deleteTraining = async (id: string): Promise<void> => {
     if (!user.value) throw new Error('Not authenticated')
-    const { removeForTraining } = useTrainingPhotos()
-    await removeForTraining(id)
-    const { error } = await client.from('trainings').delete().eq('id', id)
-    if (error) throw error
+    const { listStoragePaths, removeStoragePaths } = useTrainingPhotos()
+
+    const { data: existingJob, error: jobLookupError } = await client
+      .from('training_deletion_jobs')
+      .select('id, training_id, team_id, storage_paths')
+      .eq('training_id', id)
+      .maybeSingle()
+    if (jobLookupError) throw jobLookupError
+
+    let deletionJob = existingJob as TrainingDeletionJobRow | null
+    const isRecovery = deletionJob !== null
+
+    if (!deletionJob) {
+      const { data: training, error: trainingLookupError } = await client
+        .from('trainings')
+        .select('team_id')
+        .eq('id', id)
+        .maybeSingle()
+      if (trainingLookupError) throw trainingLookupError
+      if (!training) throw new Error('Training nicht gefunden')
+
+      const storagePaths = await listStoragePaths(id)
+      const { data: createdJob, error: jobInsertError } = await client
+        .from('training_deletion_jobs')
+        .insert({
+          training_id: id,
+          team_id: training.team_id,
+          storage_paths: storagePaths,
+          created_by: user.value.sub,
+        })
+        .select('id, training_id, team_id, storage_paths')
+        .single()
+      if (jobInsertError) throw jobInsertError
+      deletionJob = createdJob as TrainingDeletionJobRow
+    }
+
+    const { data: deletedTraining, error: deleteError } = await client
+      .from('trainings')
+      .delete()
+      .eq('id', id)
+      .select('id')
+      .maybeSingle()
+    if (deleteError) throw deleteError
+
+    if (!deletedTraining && !isRecovery) {
+      throw new Error('Training konnte nicht gelöscht werden')
+    }
+    if (!deletedTraining && isRecovery) {
+      const { data: remainingTraining, error: remainingTrainingError } = await client
+        .from('trainings')
+        .select('id')
+        .eq('id', id)
+        .maybeSingle()
+      if (remainingTrainingError) throw remainingTrainingError
+      if (remainingTraining) throw new Error('Training konnte nicht gelöscht werden')
+    }
+
+    await removeStoragePaths(deletionJob.storage_paths)
+
+    const { error: jobDeleteError } = await client
+      .from('training_deletion_jobs')
+      .delete()
+      .eq('id', deletionJob.id)
+    if (jobDeleteError) throw jobDeleteError
   }
 
   const list = async (team_id: string): Promise<TrainingRow[]> => {

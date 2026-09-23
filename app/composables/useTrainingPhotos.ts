@@ -3,6 +3,7 @@ import { extensionForMime, photoFileSchema } from '~/utils/validators'
 
 const BUCKET = 'training-photos'
 const SIGNED_URL_TTL_SECONDS = 600
+const STORAGE_DELETE_BATCH_SIZE = 1000
 
 export type TrainingPhotoRow = {
   id: string
@@ -96,17 +97,43 @@ export const useTrainingPhotos = () => {
     return players.every((p) => p.photo_consent) ? 'clean' : 'blocked'
   }
 
-  const removeForTraining = async (training_id: string): Promise<void> => {
-    const { data, error } = await client
-      .from('training_photos')
-      .select('storage_path')
-      .eq('training_id', training_id)
-    if (error) throw error
-    const paths = (data ?? []).map((r) => r.storage_path)
-    if (paths.length === 0) return
-    const { error: removeError } = await client.storage.from(BUCKET).remove(paths)
-    if (removeError) throw removeError
+  const listStoragePaths = async (training_id: string): Promise<string[]> => {
+    const paths: string[] = []
+
+    for (let offset = 0; ; offset += STORAGE_DELETE_BATCH_SIZE) {
+      const { data, error } = await client
+        .from('training_photos')
+        .select('storage_path')
+        .eq('training_id', training_id)
+        .order('id', { ascending: true })
+        .range(offset, offset + STORAGE_DELETE_BATCH_SIZE - 1)
+      if (error) throw error
+
+      const page = (data ?? []).map((row) => row.storage_path)
+      paths.push(...page)
+      if (page.length < STORAGE_DELETE_BATCH_SIZE) return paths
+    }
   }
 
-  return { upload, list, deriveConsentStatus, removeForTraining }
+  const removeStoragePaths = async (paths: string[]): Promise<void> => {
+    for (let offset = 0; offset < paths.length; offset += STORAGE_DELETE_BATCH_SIZE) {
+      const { error } = await client.storage
+        .from(BUCKET)
+        .remove(paths.slice(offset, offset + STORAGE_DELETE_BATCH_SIZE))
+      if (error) throw error
+    }
+  }
+
+  const removeForTraining = async (training_id: string): Promise<void> => {
+    await removeStoragePaths(await listStoragePaths(training_id))
+  }
+
+  return {
+    upload,
+    list,
+    deriveConsentStatus,
+    listStoragePaths,
+    removeStoragePaths,
+    removeForTraining,
+  }
 }
