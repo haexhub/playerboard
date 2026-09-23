@@ -2,7 +2,9 @@
 import { computed, ref } from 'vue'
 import RankingTable from '~/components/stats/RankingTable.vue'
 import TimeframePicker from '~/components/stats/TimeframePicker.vue'
+import VeoPlayerSeasonSummary from '~/components/veo/VeoPlayerSeasonSummary.vue'
 import { useTimeframedRanking } from '~/composables/useRanking'
+import { computePlayerSeasonSummary, useVeoAnalytics } from '~/composables/useVeoAnalytics'
 import type { Database } from '~/types/database'
 
 definePageMeta({
@@ -35,6 +37,21 @@ const loadLinkedPlayer = async () => {
 }
 
 await loadLinkedPlayer()
+
+const { listMatches } = useVeoAnalytics()
+const veoPlayerSeasonSummary = ref<ReturnType<typeof computePlayerSeasonSummary>>([])
+
+const loadVeoPlayerStats = async () => {
+  if (!teamId.value) return
+  try {
+    veoPlayerSeasonSummary.value = computePlayerSeasonSummary(await listMatches(teamId.value))
+  } catch {
+    // Veo is an optional per-team integration; a fetch error here must not
+    // break the rest of the dashboard.
+    veoPlayerSeasonSummary.value = []
+  }
+}
+await loadVeoPlayerStats()
 
 const myRow = computed(() =>
   linkedPlayerId.value
@@ -132,6 +149,11 @@ const topThree = computed(() => ranking.value?.rows.slice(0, 3) ?? [])
       :slug="slug"
       :link-players="true"
       :highlight-player-id="linkedPlayerId"
+    />
+
+    <VeoPlayerSeasonSummary
+      v-if="veoPlayerSeasonSummary.length"
+      :players="veoPlayerSeasonSummary"
     />
   </section>
 </template>

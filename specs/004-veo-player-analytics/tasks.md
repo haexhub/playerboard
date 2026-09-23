@@ -65,18 +65,18 @@ appear on its own.
 
 ### Tests for User Story 1 ⚠️ write first, confirm they fail before implementing
 
-- [ ] T005 [P] [US1] Save a representative `POST .../analysis/stats/` (`type: cross_match, group_by: player`) response as fixture `tests/fixtures/veo/analysis-stats-player-response.json`, per the shape documented in [research.md §2](./research.md#2-player-stats-response-shape)
-- [ ] T006 [P] [US1] Unit tests in `tests/unit/veo-map-player-stats.spec.ts` for `mapPlayerStats.ts`: full fixture payload with a matching active roster → rows with `player_id` set for every curated stat; a jersey number with no active-roster match → rows still returned with `player_id: null` (not dropped, per FR-011); a `type` outside the nine curated stats → dropped (FR-008)
-- [ ] T007 [P] [US1] E2E test in `tests/e2e/veo-analytics-flow.spec.ts`: seed `veo_player_match_stats` rows (`player_id` set) across 2+ matches for 2+ known roster players, open `/t/[slug]/dashboard`, assert the per-player season summary equals the manually computed sums; also seed one `player_id: null` row and assert it never appears anywhere on the page
+- [X] T005 [P] [US1] Save a representative `POST .../analysis/stats/` (`type: cross_match, group_by: player`) response as fixture `tests/fixtures/veo/analysis-stats-player-response.json`, per the shape documented in [research.md §2](./research.md#2-player-stats-response-shape)
+- [X] T006 [P] [US1] Unit tests in `tests/unit/veo-map-player-stats.spec.ts` for `mapPlayerStats.ts`: full fixture payload with a matching active roster → rows with `player_id` set for every curated stat; a jersey number with no active-roster match → rows still returned with `player_id: null` (not dropped, per FR-011); a `type` outside the nine curated stats → dropped (FR-008)
+- [X] T007 [P] [US1] E2E test in `tests/e2e/veo-analytics-flow.spec.ts`: seed `veo_player_match_stats` rows (`player_id` set) across 2+ matches for 2+ known roster players, open `/t/[slug]/dashboard`, assert the per-player season summary equals the manually computed sums; also seed one `player_id: null` row and assert it never appears anywhere on the page
 
 ### Implementation for User Story 1
 
-- [ ] T008 [P] [US1] Add `fetchPlayerAnalysisStats(accessToken, { veoMatchIds })` to `app/server/utils/veo/client.ts` — `POST .../analysis/stats/` with `{ type: 'cross_match', group_by: 'player', match_ids }`, no `team_id` (research.md §1)
-- [ ] T009 [P] [US1] Implement `app/server/utils/veo/mapPlayerStats.ts` — pure function: Veo player-stats payload + active roster (`{ id, jerseyNumber }[]`) → `veo_player_match_stats` row objects; matches by `jersey_number`, keeps only the nine curated `stat_type`s (research.md §3), sets `player_id: null` (not dropped) when no active roster player matches (makes T006 pass)
-- [ ] T010 [US1] Extend `app/server/api/veo/sync.post.ts`: fetch each team's active roster once before its match loop (research.md §5); per match, call T008 *before* opening the transaction (so a fetch failure skips the whole match — match + team stats included, FR-015/research.md §13, same as an incomplete Veo analysis), lock the match row, reserve existing jersey-number assignments before mapping new rows, and ensure a new jersey-number group does not auto-assign a player already claimed by another jersey number. Upsert into `veo_player_match_stats` with `ON CONFLICT (match_id, veo_jersey_number, stat_type) DO UPDATE`: set `player_id` on insert and preserve it unchanged on conflict, regardless of `matched_manually`; refresh only Veo-controlled values on conflict (research.md §10). Keep this inside the same per-match transaction as the existing match/team-stats upsert (depends on T001-T004, T008, T009)
-- [ ] T011 [P] [US1] Extend `app/composables/useVeoAnalytics.ts`: keep `listMatches()`'s member-facing nested select limited to assigned rows (`veo_player_match_stats(veo_jersey_number, player_id, matched_manually, stat_type, category, value, players(id, name, jersey_number))` with `player_id is not null`); add a separate trainer-only path for unassigned rows and their jersey numbers; add `computePlayerSeasonSummary(matches)`, summing `value` by `player_id`/`stat_type` across assigned rows only (research.md §6, same pattern as `computeSeasonSummary`)
-- [ ] T012 [P] [US1] Implement `app/components/veo/VeoPlayerSeasonSummary.vue` — one row per roster player with season-summed curated stats
-- [ ] T013 [US1] Render `VeoPlayerSeasonSummary` on `app/pages/t/[slug]/dashboard.vue` (depends on T011, T012; makes T007 pass)
+- [X] T008 [P] [US1] Add `fetchPlayerAnalysisStats(accessToken, { veoMatchIds })` to `app/server/utils/veo/client.ts` — `POST .../analysis/stats/` with `{ type: 'cross_match', group_by: 'player', match_ids }`, no `team_id` (research.md §1)
+- [X] T009 [P] [US1] Implement `app/server/utils/veo/mapPlayerStats.ts` — pure function: Veo player-stats payload + active roster (`{ id, jerseyNumber }[]`) → `veo_player_match_stats` row objects; matches by `jersey_number`, keeps only the nine curated `stat_type`s (research.md §3), sets `player_id: null` (not dropped) when no active roster player matches (makes T006 pass)
+- [X] T010 [US1] Extend `app/server/api/veo/sync.post.ts`: fetch each team's active roster once before its match loop (research.md §5); per match, call T008 *before* opening the transaction (so a fetch failure skips the whole match — match + team stats included, FR-015/research.md §13, same as an incomplete Veo analysis), lock the match row, reserve existing jersey-number assignments before mapping new rows, and ensure a new jersey-number group does not auto-assign a player already claimed by another jersey number. Upsert into `veo_player_match_stats` with `ON CONFLICT (match_id, veo_jersey_number, stat_type) DO UPDATE`: set `player_id` on insert and preserve it unchanged on conflict, regardless of `matched_manually`; refresh only Veo-controlled values on conflict (research.md §10). Keep this inside the same per-match transaction as the existing match/team-stats upsert (depends on T001-T004, T008, T009)
+- [X] T011 [P] [US1] Extend `app/composables/useVeoAnalytics.ts`: keep `listMatches()`'s member-facing nested select limited to assigned rows (`veo_player_match_stats(veo_jersey_number, player_id, matched_manually, stat_type, category, value, players(id, name, jersey_number))` with `player_id is not null`); add a separate trainer-only path for unassigned rows and their jersey numbers; add `computePlayerSeasonSummary(matches)`, summing `value` by `player_id`/`stat_type` across assigned rows only (research.md §6, same pattern as `computeSeasonSummary`)
+- [X] T012 [P] [US1] Implement `app/components/veo/VeoPlayerSeasonSummary.vue` — one row per roster player with season-summed curated stats
+- [X] T013 [US1] Render `VeoPlayerSeasonSummary` on `app/pages/t/[slug]/dashboard.vue` (depends on T011, T012; makes T007 pass)
 
 **Checkpoint**: User Story 1 fully functional and independently testable.
 
@@ -95,11 +95,11 @@ number never appears as a row.
 
 ### Tests for User Story 2 ⚠️ write first, confirm they fail before implementing
 
-- [ ] T014 [P] [US2] Add a per-match player breakdown scenario to `tests/e2e/veo-analytics-flow.spec.ts`: seed one match as described above, assert the match card shows exactly the two assigned players' curated stats and no row for the unassigned jersey number
+- [X] T014 [P] [US2] Add a per-match player breakdown scenario to `tests/e2e/veo-analytics-flow.spec.ts`: seed one match as described above, assert the match card shows exactly the two assigned players' curated stats and no row for the unassigned jersey number
 
 ### Implementation for User Story 2
 
-- [ ] T015 [US2] Extend `app/components/veo/VeoMatchCard.vue` to render a per-player breakdown block using that match's `veo_player_match_stats` entries (already present per-match from T011's query; `player_id`-not-null only) (depends on T011; makes T014 pass)
+- [X] T015 [US2] Extend `app/components/veo/VeoMatchCard.vue` to render a per-player breakdown block using that match's `veo_player_match_stats` entries (already present per-match from T011's query; `player_id`-not-null only) (depends on T011; makes T014 pass)
 
 **Checkpoint**: US1 and US2 both independently functional.
 
@@ -121,15 +121,15 @@ player (non-trainer) of the same team, the route returns 403.
 
 ### Tests for User Story 3 ⚠️ write first, confirm they fail before implementing
 
-- [ ] T016 [P] [US3] Add negative tests: `tests/e2e/rls-negative-single-team.spec.ts` — a player (non-trainer) gets 403 from `POST /api/veo/matches/[matchId]/player-assignment` (P4); `tests/e2e/rls-negative-cross-team.spec.ts` — a trainer of team A is denied for a match belonging to team B (P5); `tests/e2e/api-negative.spec.ts` — an unauthenticated caller gets 401 (P6)
-- [ ] T017 [P] [US3] Add correction scenarios to `tests/e2e/veo-analytics-flow.spec.ts`: as a trainer, assign an unmatched jersey number and correct a wrongly-matched one via the UI/API; assert both appear correctly in the dashboard season summary and the match breakdown; assign a player who is already assigned to a *different* jersey number in the same match and assert the old jersey number's rows are cleared (`player_id: null`) while the new one takes effect (FR-016); then re-run the sync's upsert for that match with changed `value`/`category` for the same jersey numbers and assert `player_id` is unchanged afterward (SC-005)
+- [X] T016 [P] [US3] Add negative tests: `tests/e2e/rls-negative-single-team.spec.ts` — a player (non-trainer) gets 403 from `POST /api/veo/matches/[matchId]/player-assignment` (P4); `tests/e2e/rls-negative-cross-team.spec.ts` — a trainer of team A is denied for a match belonging to team B (P5); `tests/e2e/api-negative.spec.ts` — an unauthenticated caller gets 401 (P6)
+- [X] T017 [P] [US3] Add correction scenarios to `tests/e2e/veo-analytics-flow.spec.ts`: as a trainer, assign an unmatched jersey number and correct a wrongly-matched one via the UI/API; assert both appear correctly in the dashboard season summary and the match breakdown; assign a player who is already assigned to a *different* jersey number in the same match and assert the old jersey number's rows are cleared (`player_id: null`) while the new one takes effect (FR-016); then re-run the sync's upsert for that match with changed `value`/`category` for the same jersey numbers and assert `player_id` is unchanged afterward (SC-005)
 
 ### Implementation for User Story 3
 
-- [ ] T018 [US3] Implement `app/server/api/veo/matches/[matchId]/player-assignment.post.ts`: require a session (`serverSupabaseUser(event)`), validate body `{ team_id, veo_jersey_number, player_id }` (`player_id` nullable, for clearing a wrong assignment), `requireTrainer(useAdminDb(), team_id, userId)`, verify the match belongs to `team_id` and `player_id` (if not null) belongs to the same team, then in one `useAdminDb()` transaction first lock the shared `veo_matches` row with `FOR UPDATE` (the same lock used by sync), clear (`player_id = null`, `matched_manually = true`) that `player_id`'s rows under any other jersey number in the same match (FR-016, research.md §14), and update every `veo_player_match_stats` row sharing `(match_id, veo_jersey_number)` — set `player_id` and `matched_manually = true` (depends on Foundational; makes T016 pass)
-- [ ] T019 [P] [US3] Implement `app/composables/useVeoPlayerAssignment.ts` — calls T018
-- [ ] T020 [US3] Extend `app/components/veo/VeoMatchCard.vue`, trainer-only (`v-if="isTrainer"`): list that match's unassigned jersey numbers (`player_id: null` rows) with a "Spieler zuordnen" picker over the team's active roster, and an "Zuordnung ändern" action on already-assigned rows; wired to T019 (depends on T015, T019; makes T017's UI portion pass)
-- [ ] T021 [US3] Pass `isTrainer` and the team's active roster through from `app/pages/t/[slug]/analytics.vue` to `VeoMatchCard` (depends on T020)
+- [X] T018 [US3] Implement `app/server/api/veo/matches/[matchId]/player-assignment.post.ts`: require a session (`serverSupabaseUser(event)`), validate body `{ team_id, veo_jersey_number, player_id }` (`player_id` nullable, for clearing a wrong assignment), `requireTrainer(useAdminDb(), team_id, userId)`, verify the match belongs to `team_id` and `player_id` (if not null) belongs to the same team, then in one `useAdminDb()` transaction first lock the shared `veo_matches` row with `FOR UPDATE` (the same lock used by sync), clear (`player_id = null`, `matched_manually = true`) that `player_id`'s rows under any other jersey number in the same match (FR-016, research.md §14), and update every `veo_player_match_stats` row sharing `(match_id, veo_jersey_number)` — set `player_id` and `matched_manually = true` (depends on Foundational; makes T016 pass)
+- [X] T019 [P] [US3] Implement `app/composables/useVeoPlayerAssignment.ts` — calls T018
+- [X] T020 [US3] Extend `app/components/veo/VeoMatchCard.vue`, trainer-only (`v-if="isTrainer"`): list that match's unassigned jersey numbers (`player_id: null` rows) with a "Spieler zuordnen" picker over the team's active roster, and an "Zuordnung ändern" action on already-assigned rows; wired to T019 (depends on T015, T019; makes T017's UI portion pass)
+- [X] T021 [US3] Pass `isTrainer` and the team's active roster through from `app/pages/t/[slug]/analytics.vue` to `VeoMatchCard` (depends on T020)
 
 **Checkpoint**: All three user stories independently functional.
 
@@ -137,9 +137,17 @@ player (non-trainer) of the same team, the route returns 403.
 
 ## Final Phase: Polish & Cross-Cutting Concerns
 
-- [ ] T022 [P] Run `pnpm lint` and `pnpm typecheck`; fix any violations across all files touched by this feature
-- [ ] T023 Run `pnpm db:migrate` and `pnpm gen:types` locally to confirm the new migration applies cleanly end-to-end (quickstart.md)
+- [X] T022 [P] Run `pnpm lint` and `pnpm typecheck`; fix any violations across all files touched by this feature
+- [X] T023 Run `pnpm db:migrate` and `pnpm gen:types` locally to confirm the new migration applies cleanly end-to-end (quickstart.md)
 - [ ] T024 Capture one real `POST .../analysis/stats/` (`type: cross_match, group_by: player`) response from the live Veo account and diff it against T005's fixture / [research.md §2](./research.md#2-player-stats-response-shape)'s inferred shape; update the fixture, `mapPlayerStats.ts`'s Zod schema, and this doc if the real nesting differs
+
+  **Blocked**: this session has no live Veo account/session cookie to
+  capture against (research.md §2's explicitly-flagged inference risk).
+  T005's fixture and `mapPlayerStats.ts`'s Zod schema ship as-is,
+  fail-closed (a shape mismatch throws "Unexpected Veo player-stats
+  response shape" and fails that match's sync, per research.md §2) —
+  someone with Veo account access must do this five-minute check before
+  fully trusting production sync output.
 
 ---
 

@@ -312,6 +312,25 @@ test.describe('RLS negative — single team (SC-003)', () => {
     )
     expect(refetchedMapping!.public_stats_enabled).toBe(false)
 
+    // N16 — a player (non-trainer) cannot correct a Veo jersey-number
+    // assignment for their own team (004-veo-player-analytics, P4).
+    const [veoMatch] = await restInsert<{ id: string }>('veo_matches', [
+      {
+        team_id: teamId,
+        veo_match_id: `n16-${suffix}`,
+        played_at: new Date().toISOString(),
+        opponent_name: 'N16 Opponent',
+        own_score: 1,
+        opponent_score: 0,
+        home_or_away: 'home',
+      },
+    ])
+    const n16 = await playerPage.request.post(
+      `/api/veo/matches/${veoMatch!.id}/player-assignment`,
+      { data: { team_id: teamId, veo_jersey_number: 7, player_id: null } },
+    )
+    expect(n16.status()).toBe(403)
+
     await trainerCtx.close()
     await playerCtx.close()
   })
