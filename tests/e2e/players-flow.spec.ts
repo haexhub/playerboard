@@ -365,25 +365,25 @@ test.describe('US4 — trainer manages the player roster', () => {
     await trainerPage.goto(`/t/${teamSlug}/players/${player!.id}`, { waitUntil: 'networkidle' })
     await expect(trainerPage.getByTestId('player-detail-page')).toBeVisible()
 
-    // Edit affordance is trainer-visible and pre-fills the current values.
-    await trainerPage.getByTestId('player-detail-edit-button').click()
-    const editForm = trainerPage.getByTestId('player-detail-edit-form')
-    await expect(editForm).toBeVisible()
-    await expect(editForm.getByLabel('Name')).toHaveValue('Dana Detail')
-    await expect(editForm.getByLabel(/Trikotnummer/)).toHaveValue('5')
+    // Settings are always visible for trainers, pre-filled with the current values — no edit toggle.
+    const settings = trainerPage.getByTestId('player-detail-settings')
+    await expect(settings).toBeVisible()
+    await expect(settings.getByLabel('Name')).toHaveValue('Dana Detail')
+    await expect(settings.getByLabel(/Trikotnummer/)).toHaveValue('5')
 
-    // Change name, jersey number and photo consent, then save.
-    await editForm.getByLabel('Name').fill('Dana Detail II')
-    await editForm.getByLabel(/Trikotnummer/).fill('6')
-    const consentCheckbox = editForm.getByRole('checkbox', { name: 'Foto-Einwilligung' })
+    // Change name, jersey number and photo consent — changes save automatically, no Speichern button.
+    await settings.getByLabel('Name').fill('Dana Detail II')
+    await settings.getByLabel(/Trikotnummer/).fill('6')
+    const consentCheckbox = settings.getByRole('checkbox', { name: 'Foto-Einwilligung' })
     await consentCheckbox.check()
-    await trainerPage.getByTestId('player-detail-edit-submit').click()
+    await expect(settings.getByTestId('player-form-save-status')).toHaveText('Gespeichert', {
+      timeout: 10_000,
+    })
 
-    await expect(editForm).toBeHidden()
     const heading = trainerPage.getByRole('heading', { level: 1 })
     await expect(heading).toContainText('Dana Detail II')
     await expect(heading).toContainText('#6')
-    await expect(trainerPage.getByText('Foto-Einwilligung: Ja')).toBeVisible()
+    await expect(consentCheckbox).toBeChecked()
 
     // Consistency with the roster page: the same record reflects the change there too.
     await trainerPage.goto(`/t/${teamSlug}/players`, { waitUntil: 'networkidle' })

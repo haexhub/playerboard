@@ -2,7 +2,6 @@
 import { computed, ref, watch } from 'vue'
 import CategoryForm from '~/components/categories/CategoryForm.vue'
 import PlayerForm from '~/components/players/PlayerForm.vue'
-import ConsentWarningBanner from '~/components/trainings/ConsentWarningBanner.vue'
 import TrainingPhotoGallery from '~/components/trainings/TrainingPhotoGallery.vue'
 import TrainingPhotoUpload from '~/components/trainings/TrainingPhotoUpload.vue'
 import TrainingPointGrid from '~/components/trainings/TrainingPointGrid.vue'
@@ -297,8 +296,6 @@ const onDeleteTraining = async () => {
     </header>
 
     <template v-if="isTrainer">
-      <ConsentWarningBanner :players="players" />
-
       <TrainingPointGrid
         :training-id="training.id"
         :slug="slug"

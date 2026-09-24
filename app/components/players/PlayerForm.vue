@@ -1,22 +1,24 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
 import { z } from 'zod'
 import type { LinkCandidate } from '~/composables/usePlayers'
 import { errorMessage, pgErrorCode } from '~/utils/errors'
 
 type Mode = 'manual' | 'link' | 'invite'
 
-const props = defineProps<{
-  teamId: string
-  player?: {
-    id: string
-    name: string
-    jersey_number: number | null
-    position: string | null
-    photo_consent: boolean
-    active: boolean
-  } | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    teamId: string
+    player?: {
+      id: string
+      name: string
+      jersey_number: number | null
+      position: string | null
+      photo_consent: boolean
+      active: boolean
+    } | null
+  }>(),
+  { player: null },
+)
 
 const emit = defineEmits<{
   (e: 'saved'): void
@@ -66,6 +68,11 @@ const onCandidateChange = () => {
 }
 
 const jerseyNumberModel = useNullableNumberModel(jerseyNumber)
+
+const mapSaveError = (err: unknown) =>
+  pgErrorCode(err) === '23505'
+    ? 'Trikotnummer ist im aktiven Kader bereits vergeben. Zuerst den bisherigen Spieler deaktivieren.'
+    : errorMessage(err, 'Spieler konnte nicht gespeichert werden.')
 
 const submit = async () => {
   fieldErrors.value = {}
@@ -131,12 +138,7 @@ const submit = async () => {
       }
     }
     // SQLSTATE only: a 409 from issue() means a duplicate invitation, not a jersey clash.
-    if (pgErrorCode(err) === '23505') {
-      submitError.value =
-        'Trikotnummer ist im aktiven Kader bereits vergeben. Zuerst den bisherigen Spieler deaktivieren.'
-    } else {
-      submitError.value = errorMessage(err, 'Spieler konnte nicht gespeichert werden.')
-    }
+    submitError.value = mapSaveError(err)
   } finally {
     loading.value = false
   }

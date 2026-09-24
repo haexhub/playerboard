@@ -2,7 +2,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import CategoryForm from '~/components/categories/CategoryForm.vue'
 import PlayerForm from '~/components/players/PlayerForm.vue'
-import ConsentWarningBanner from '~/components/trainings/ConsentWarningBanner.vue'
 import TrainingPhotoUpload from '~/components/trainings/TrainingPhotoUpload.vue'
 import TrainingPointGrid from '~/components/trainings/TrainingPointGrid.vue'
 import { useCategories, type ActiveCategory } from '~/composables/useCategories'
@@ -195,8 +194,6 @@ const onSave = async () => {
         <ShadcnInput v-model="title" type="text" placeholder="z. B. Krafttraining" />
       </ShadcnLabel>
     </div>
-
-    <ConsentWarningBanner :players="players" />
 
     <p v-if="categoriesError" class="text-sm text-destructive" role="alert">
       {{ categoriesError }}

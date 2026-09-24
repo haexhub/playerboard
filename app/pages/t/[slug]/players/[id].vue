@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import PlayerForm from '~/components/players/PlayerForm.vue'
+import PlayerSettingsForm from '~/components/players/PlayerSettingsForm.vue'
 import PlayerProgressChart from '~/components/stats/PlayerProgressChart.vue'
 import TimeframePicker from '~/components/stats/TimeframePicker.vue'
 import { useCategories, type ActiveCategory } from '~/composables/useCategories'
@@ -48,10 +48,7 @@ const scores = ref<PlayerScoreWithTeamStats[]>([])
 const timeSeries = ref<Map<string, { date: string; value: number }[]>>(new Map())
 const isLoading = ref(false)
 const loadError = ref<string | null>(null)
-const isEditing = ref(false)
-const playerFormRef = ref<InstanceType<typeof PlayerForm> | null>(null)
 const playerReloadError = ref<string | null>(null)
-const isReloadingPlayer = ref(false)
 let latestLoad = 0
 
 const timeframe = useTimeframe(slug, seasonStart)
@@ -73,23 +70,18 @@ const loadStatic = async () => {
 
 const reloadPlayer = async () => {
   playerReloadError.value = null
-  isReloadingPlayer.value = true
   try {
     await loadStatic()
-    return true
   } catch (err) {
     playerReloadError.value = errorMessage(
       err,
       'Spieler konnte nach dem Speichern nicht neu geladen werden.',
     )
-    return false
-  } finally {
-    isReloadingPlayer.value = false
   }
 }
 
 const onPlayerSaved = async () => {
-  if (await reloadPlayer()) isEditing.value = false
+  await reloadPlayer()
 }
 
 const loadTimeframed = async () => {
@@ -142,53 +134,16 @@ watch(
           </span>
           {{ player.name }}
         </h1>
-        <ShadcnButton
-          v-if="isTrainer && !isEditing"
-          type="button"
-          variant="outline"
-          size="sm"
-          data-testid="player-detail-edit-button"
-          @click="isEditing = true"
-        >
-          Bearbeiten
-        </ShadcnButton>
       </div>
       <p v-if="player.position" class="text-sm text-neutral-600">Position: {{ player.position }}</p>
-      <p v-if="isTrainer" class="text-sm text-neutral-600">
-        Foto-Einwilligung: {{ player.photo_consent ? 'Ja' : 'Nein' }} ·
-        {{ player.active ? 'Aktiv' : 'Inaktiv' }}
-      </p>
     </header>
 
     <div
-      v-if="isEditing"
+      v-if="isTrainer"
       class="space-y-3 rounded-md border border-input p-4"
-      data-testid="player-detail-edit-form"
+      data-testid="player-detail-settings"
     >
-      <PlayerForm
-        ref="playerFormRef"
-        :team-id="player.team_id"
-        :player="player"
-        @saved="onPlayerSaved"
-      />
-      <div class="flex gap-2">
-        <ShadcnButton
-          type="button"
-          variant="outline"
-          :disabled="playerFormRef?.loading || isReloadingPlayer"
-          @click="isEditing = false"
-        >
-          Abbrechen
-        </ShadcnButton>
-        <ShadcnButton
-          type="submit"
-          form="player-form"
-          :disabled="playerFormRef?.loading || isReloadingPlayer"
-          data-testid="player-detail-edit-submit"
-        >
-          {{ playerFormRef?.loading ? 'Speichere…' : 'Speichern' }}
-        </ShadcnButton>
-      </div>
+      <PlayerSettingsForm :player="player" @saved="onPlayerSaved" />
     </div>
     <p v-if="playerReloadError" class="text-sm text-red-700" role="alert">
       {{ playerReloadError }}
