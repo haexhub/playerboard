@@ -27,6 +27,7 @@ const currentMapping = ref<{
 } | null>(null)
 onMounted(async () => {
   currentMapping.value = await getCurrentMapping(props.teamId)
+  if (currentMapping.value) step.value = 'done'
 })
 
 const email = ref('')
