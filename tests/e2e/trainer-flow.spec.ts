@@ -78,11 +78,11 @@ test.describe('US1 — trainer records point entries + at least one photo', () =
     // Save button is enabled as soon as the draft exists — photos are optional.
     await expect(page.getByTestId('training-save-button')).toBeEnabled({ timeout: 15_000 })
 
-    // Enter one point value → auto-save on blur → check mark shows up.
+    // Enter one point value → auto-save on blur → input border turns green.
     const aliceEinsatz = page.locator('input[aria-label*="Alice Anker"][aria-label*="Einsatz"]')
     await aliceEinsatz.first().fill('4')
     await aliceEinsatz.first().blur()
-    await expect(page.getByText('✓').first()).toBeVisible({ timeout: 10_000 })
+    await expect(aliceEinsatz.first()).toHaveClass(/border-green-500/, { timeout: 10_000 })
 
     // Upload one photo — optional, but exercises the storage path.
     await page.getByTestId('photo-upload-input').setInputFiles({
