@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.8.1](https://github.com/haexhub/playerboard/compare/v0.8.0...v0.8.1) (2026-09-24)
+
+
+### Bug Fixes
+
+* **trainings:** enlarge consent camera icon's touch target ([2160a02](https://github.com/haexhub/playerboard/commit/2160a029163209252fae93c11d39d9a9d4de1923))
+* **trainings:** remove redundant consent warning icon ([197ffb6](https://github.com/haexhub/playerboard/commit/197ffb6801786ca8238b1f0e9b25bcea4f2d1ed4))
+* **trainings:** remove redundant consent warning icon ([8187aa6](https://github.com/haexhub/playerboard/commit/8187aa6ea2997e7410ea7c5ae4b20fa2b93f5a12))
+* **veo:** default to summary view when team is already linked ([5c955ab](https://github.com/haexhub/playerboard/commit/5c955aba27625a0c813b60bde8edb688e67ab762))
+* **veo:** default to summary view when team is already linked ([71ba6a2](https://github.com/haexhub/playerboard/commit/71ba6a2ac2f0090c4d99e541289ce3278f84c7dd))
+
 ## [0.8.0](https://github.com/haexhub/playerboard/compare/v0.7.0...v0.8.0) (2026-09-24)
 
 
