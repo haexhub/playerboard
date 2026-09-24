@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AlertCircle, Camera } from '@lucide/vue'
+import { Camera } from '@lucide/vue'
 import { computed, reactive, ref, watch } from 'vue'
 import type { ActiveCategory } from '~/composables/useCategories'
 import type { ActivePlayer } from '~/composables/usePlayers'
@@ -258,55 +258,42 @@ const stepValue = (player: ActivePlayer, category: ActiveCategory, delta: number
         <tr v-for="(p, playerIndex) in players" :key="p.id" class="min-h-touch">
           <th
             scope="row"
-            class="relative sticky left-0 z-20 bg-white border-b border-r border-neutral-200 px-3 py-2 pr-9 text-left font-medium align-middle min-h-touch"
+            class="relative sticky left-0 z-20 bg-white border-b border-r border-neutral-200 px-3 py-2 pr-14 text-left font-medium align-middle min-h-touch"
           >
             <div class="flex items-center min-w-0">
               <span class="text-neutral-500 mr-1">{{ jerseyLabel(p) }}</span>
               <NuxtLink :to="`/t/${slug}/players/${p.id}`" class="underline">{{ p.name }}</NuxtLink>
-              <span
-                v-if="!p.photo_consent"
-                :class="[
-                  'relative inline-block align-text-bottom',
-                  dismissedConsentInfo !== p.id ? 'group' : '',
-                ]"
-                @mouseenter="resetConsentDismissal(p.id)"
-                @mouseleave="closeConsentInfo(p.id)"
-              >
-                <button
-                  type="button"
-                  class="ml-1 inline-flex size-4 items-center justify-center text-red-600"
-                  :aria-expanded="openConsentInfo === p.id"
-                  :aria-label="consentWarning(p.name)"
-                  :title="consentWarning(p.name)"
-                  data-testid="consent-missing-icon"
-                  @click="toggleConsentInfo(p.id)"
-                  @blur="closeConsentInfo(p.id)"
-                  @focus="resetConsentDismissal(p.id)"
-                  @keydown.esc="dismissConsentInfo(p.id)"
-                >
-                  <AlertCircle class="size-4" aria-hidden="true" />
-                </button>
-                <span
-                  role="tooltip"
-                  :class="[
-                    'pointer-events-none invisible absolute left-0 z-50 w-56 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-normal text-neutral-700 opacity-0 shadow-md transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100',
-                    playerIndex === players.length - 1 ? 'bottom-full mb-1' : 'top-full mt-1',
-                    openConsentInfo === p.id ? 'visible opacity-100' : '',
-                  ]"
-                >
-                  {{ consentWarning(p.name) }}
-                </span>
-              </span>
             </div>
-            <span
+            <button
               v-if="!p.photo_consent"
-              class="absolute right-2 top-1/2 -translate-y-1/2 text-red-600"
-              data-testid="consent-camera-icon"
+              type="button"
+              :class="[
+                'absolute right-2 top-1/2 -translate-y-1/2 inline-flex min-h-touch min-w-touch items-center justify-center text-red-600',
+                dismissedConsentInfo !== p.id ? 'group' : '',
+              ]"
+              :aria-expanded="openConsentInfo === p.id"
               :aria-label="consentWarning(p.name)"
               :title="consentWarning(p.name)"
+              data-testid="consent-camera-icon"
+              @click="toggleConsentInfo(p.id)"
+              @blur="closeConsentInfo(p.id)"
+              @focus="resetConsentDismissal(p.id)"
+              @keydown.esc="dismissConsentInfo(p.id)"
+              @mouseenter="resetConsentDismissal(p.id)"
+              @mouseleave="closeConsentInfo(p.id)"
             >
               <Camera class="size-4" aria-hidden="true" />
-            </span>
+              <span
+                role="tooltip"
+                :class="[
+                  'pointer-events-none invisible absolute right-0 z-50 w-56 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-normal text-neutral-700 opacity-0 shadow-md transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100',
+                  playerIndex === players.length - 1 ? 'bottom-full mb-1' : 'top-full mt-1',
+                  openConsentInfo === p.id ? 'visible opacity-100' : '',
+                ]"
+              >
+                {{ consentWarning(p.name) }}
+              </span>
+            </button>
           </th>
           <td
             v-for="c in categories"
