@@ -56,15 +56,29 @@ const jerseyLabel = (p: ActivePlayer) => (p.jersey_number !== null ? `#${p.jerse
 
 const consentWarning = (name: string) =>
   `Keine Foto-Einwilligung: Fotos mit ${name} werden für andere ausgeblendet.`
-// The warning icon's tooltip only surfaces on hover, which touch devices have no
-// equivalent for; make it a focusable button that toggles a visible panel instead,
-// closing on blur so tapping elsewhere (or the icon again) dismisses it.
+// The warning icon is a focusable button so the consent explanation works on both
+// pointer and touch devices. Dismissal temporarily disables the group-driven
+// hover/focus styles so Escape and a second click remain visually consistent.
 const openConsentInfo = ref<string | null>(null)
+const dismissedConsentInfo = ref<string | null>(null)
 const toggleConsentInfo = (playerId: string) => {
-  openConsentInfo.value = openConsentInfo.value === playerId ? null : playerId
+  if (openConsentInfo.value === playerId) {
+    openConsentInfo.value = null
+    dismissedConsentInfo.value = playerId
+    return
+  }
+  openConsentInfo.value = playerId
+  dismissedConsentInfo.value = null
 }
 const closeConsentInfo = (playerId: string) => {
   if (openConsentInfo.value === playerId) openConsentInfo.value = null
+}
+const dismissConsentInfo = (playerId: string) => {
+  openConsentInfo.value = null
+  dismissedConsentInfo.value = playerId
+}
+const resetConsentDismissal = (playerId: string) => {
+  if (dismissedConsentInfo.value === playerId) dismissedConsentInfo.value = null
 }
 
 const cellRevisions = new Map<CellKey, number>()
@@ -241,7 +255,7 @@ const stepValue = (player: ActivePlayer, category: ActiveCategory, delta: number
             Noch keine Spieler:innen.
           </td>
         </tr>
-        <tr v-for="p in players" :key="p.id" class="min-h-touch">
+        <tr v-for="(p, playerIndex) in players" :key="p.id" class="min-h-touch">
           <th
             scope="row"
             class="relative sticky left-0 z-20 bg-white border-b border-r border-neutral-200 px-3 py-2 pr-9 text-left font-medium align-middle min-h-touch"
@@ -249,7 +263,15 @@ const stepValue = (player: ActivePlayer, category: ActiveCategory, delta: number
             <div class="flex items-center min-w-0">
               <span class="text-neutral-500 mr-1">{{ jerseyLabel(p) }}</span>
               <NuxtLink :to="`/t/${slug}/players/${p.id}`" class="underline">{{ p.name }}</NuxtLink>
-              <span v-if="!p.photo_consent" class="group relative inline-block align-text-bottom">
+              <span
+                v-if="!p.photo_consent"
+                :class="[
+                  'relative inline-block align-text-bottom',
+                  dismissedConsentInfo !== p.id ? 'group' : '',
+                ]"
+                @mouseenter="resetConsentDismissal(p.id)"
+                @mouseleave="closeConsentInfo(p.id)"
+              >
                 <button
                   type="button"
                   class="ml-1 inline-flex size-4 items-center justify-center text-red-600"
@@ -259,14 +281,16 @@ const stepValue = (player: ActivePlayer, category: ActiveCategory, delta: number
                   data-testid="consent-missing-icon"
                   @click="toggleConsentInfo(p.id)"
                   @blur="closeConsentInfo(p.id)"
-                  @keydown.esc="closeConsentInfo(p.id)"
+                  @focus="resetConsentDismissal(p.id)"
+                  @keydown.esc="dismissConsentInfo(p.id)"
                 >
                   <AlertCircle class="size-4" aria-hidden="true" />
                 </button>
                 <span
                   role="tooltip"
                   :class="[
-                    'pointer-events-none invisible absolute left-0 top-full z-50 mt-1 w-56 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-normal text-neutral-700 opacity-0 shadow-md transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100',
+                    'pointer-events-none invisible absolute left-0 z-50 w-56 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-normal text-neutral-700 opacity-0 shadow-md transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100',
+                    playerIndex === players.length - 1 ? 'bottom-full mb-1' : 'top-full mt-1',
                     openConsentInfo === p.id ? 'visible opacity-100' : '',
                   ]"
                 >
