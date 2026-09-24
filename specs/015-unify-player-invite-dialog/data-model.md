@@ -1,6 +1,7 @@
 # Phase 1 Data Model: Einheitlicher Spieler-Dialog & direkte Einladungs-Aktionen
 
-One column added to the existing `players` table (specs/001-points-and-photos). No new tables. No
+One column is added to the existing `players` table (specs/001-points-and-photos), plus a small,
+short-lived `player_email_change_requests` table for owner-confirmed linked-account changes. No
 change to `invitations` beyond behavior (research.md §3) — its schema is untouched. The migration
 must backfill known legacy addresses before creating the new unique index (see below).
 
@@ -33,13 +34,37 @@ deactivated player must not silently collide with a since-created player using t
 |---|---|---|
 | `linked_user_id is null`, `email is null` | Never invited, no address on file. | — |
 | `linked_user_id is null`, `email is not null` | Address on file, not yet accepted (or never invited). "Direkt einladen" checkbox is enabled. | Trainer, via `usePlayers().update()`/`.create()` (plain column write, RLS-gated). |
-| `linked_user_id is not null` | Player has an accepted account. "Direkt einladen" is hidden/disabled — nothing left to invite. A valid, non-empty email is required because it is also the Auth login email. | Trainer, via the new `POST /api/players/[player_id]/email` route only (keeps the Auth login email and this column in sync — see contracts/rls-policies.md). Never written directly through `usePlayers().update()` once linked. |
+| `linked_user_id is not null` | Player has an accepted account. "Direkt einladen" is hidden/disabled — nothing left to invite. A valid, non-empty email is required because it is also the Auth login email. | A trainer creates an owner-confirmed change request; only the linked account owner can complete the Auth email change. The confirmation callback then updates `players.email`. Never written directly through `usePlayers().update()` once linked. |
 
 This split is enforced client-side (`PlayerForm.vue` branches on `props.player?.linked_user_id`)
-and server-side by the new route only ever being called for the linked case; a direct
-`usePlayers().update({ email })` call for a linked player would still succeed under RLS (the
-policy is column-agnostic) but would desynchronize `players.email` from the real login email, so
-the client simply never does that once `linked_user_id` is set.
+and at the write boundary. A database trigger rejects an `email` change on a linked player when
+the request runs as the normal `authenticated` role, so a direct `usePlayers().update({ email })`
+cannot desynchronize the Auth login email. The owner-confirmation callback uses the privileged
+server path after Auth has completed the secure change.
+
+## `player_email_change_requests`
+
+Short-lived server-owned requests bridge the trainer's request and the account owner's
+confirmation:
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `uuid`, primary key | Request identifier. |
+| `player_id` | `uuid`, not null | References `players(id)` with cascade delete. |
+| `linked_user_id` | `uuid`, not null | Snapshot of the linked Auth user; must match the player. |
+| `requested_email` | `text`, not null | Normalized lower-case target address. |
+| `token_hash` | `text`, unique, not null | One-time confirmation token hash; the raw token is never stored. |
+| `expires_at` | `timestamptz`, not null | Short expiry, e.g. 30 minutes. |
+| `confirmed_at` | `timestamptz`, nullable | Set once after Auth reports the new email as confirmed. |
+| `created_at` | `timestamptz`, not null | Audit timestamp. |
+
+RLS is enabled. The service route owns writes; an owner-scoped read policy may expose only the
+owner's own pending request if the confirmation UI needs it. No trainer or player may write this
+table directly.
+
+The migration also adds a `players_linked_email_guard` trigger: when `linked_user_id` is not null,
+an `email` change made by the normal `authenticated` role is rejected. The privileged confirmation
+route performs the final synchronized write after verifying the owner confirmation.
 
 ## Migration/backfill
 
@@ -76,8 +101,9 @@ all pre-existing.
 
 ## RLS
 
-No new policy. `players.email` is read/written through the same `players_read_member` (select) /
-`players_write_trainer` (all) policies already covering every other column on `players` — both are
-`for all`/`for select` on the whole row, not column-scoped. See
-[contracts/rls-policies.md](./contracts/rls-policies.md) for the two route contracts that need
-`service_role` instead (the idempotent `issue.post.ts` and the new email-correction route).
+`players.email` is read/written through the same `players_read_member` (select) /
+`players_write_trainer` (all) policies already covering every other column on `players`; the
+linked-email trigger closes the column-level invariant that row-scoped RLS cannot express. The new
+request table has RLS enabled with an owner-scoped read policy and no client write policy. See
+[contracts/rls-policies.md](./contracts/rls-policies.md) for the invitation route and the
+owner-confirmed email-change routes that need `service_role` on the server.

@@ -69,9 +69,10 @@ E-Mail eintragen, "Direkt einladen" ankreuzen, speichern — eine Einladung wird
    (`linked_user_id` gesetzt), **Then** ist die "Direkt einladen"-Checkbox nicht sichtbar bzw.
    deaktiviert, da nichts mehr einzuladen ist.
 6. **Given** der Trainer ändert im Bearbeiten-Dialog die E-Mail eines bereits verknüpften Spielers
-   auf eine neue Adresse, **When** er speichert, **Then** wird die Login-E-Mail des bestehenden
-   Kontos direkt geändert (kein Löschen/Neuanlegen des Spielers), und Erfolg/Fehlschlag wird
-   angezeigt.
+   auf eine neue Adresse, **When** er speichert, **Then** wird eine kurze, kontoinhaber-bestätigte
+   E-Mail-Änderung gestartet. Die Login-E-Mail des bestehenden Kontos und `players.email` bleiben
+   bis zur Bestätigung unverändert; danach werden beide synchronisiert, ohne den Spieler zu
+   löschen oder neu anzulegen.
 
 ---
 
@@ -132,6 +133,11 @@ speichern — der Spieler erscheint in der Liste wieder als aktiv.
 - Die E-Mail eines bereits verknüpften Spielers wird auf eine Adresse geändert, die schon zu einem
   anderen Supabase-Auth-Konto gehört: Änderung wird abgelehnt, Fehlermeldung angezeigt, die zuvor
   gespeicherte E-Mail bleibt unverändert bestehen.
+- Die Änderung der E-Mail eines verknüpften Spielers wird erst nach Bestätigung des Kontoinhabers
+  wirksam. Bricht der Kontoinhaber ab oder läuft die Bestätigung ab, bleiben beide bisherigen
+  E-Mail-Werte erhalten.
+- Ein veralteter Spielerstamm-Tab versucht, eine Einladung mit einer früher gespeicherten E-Mail
+  zu senden: Der Server lehnt den Versand ab und verschickt keine Einladung.
 - Wenn der Versand einer erneuten Einladung fehlschlägt, bleiben die vorherige Einladung und ihr
   bisheriger Token gültig; ein fehlgeschlagener Versand darf keinen funktionierenden Einladungslink
   unbrauchbar machen.
@@ -162,10 +168,13 @@ speichern — der Spieler erscheint in der Liste wieder als aktiv.
   MUSS eine Einladung an die aktuell im Formular stehende E-Mail verschickt werden — auch dann,
   wenn für diesen Spieler bereits eine offene Einladung existiert (siehe FR-009).
 - **FR-007**: Wird bei einem bereits verknüpften Spieler (`linked_user_id` gesetzt) die E-Mail
-  geändert, MUSS die Login-E-Mail des bestehenden Kontos direkt angepasst werden — ohne den
-  Spieler-Datensatz zu löschen und neu anzulegen. Schlägt die Änderung fehl (z. B. Adresse bereits
-  vergeben oder leer/ungültig), DARF weder die Login-E-Mail noch die zuvor gespeicherte E-Mail
-  überschrieben werden und der Fehler MUSS dem Trainer angezeigt werden.
+  geändert, MUSS eine E-Mail-Änderung im Namen des Kontoinhabers angefordert werden — ohne den
+  Spieler-Datensatz zu löschen und neu anzulegen. Die Login-E-Mail DARF erst nach der Bestätigung
+  des Kontoinhabers über Supabase' sicheren E-Mail-Änderungsablauf geändert werden. Bis dahin
+  bleiben Login-E-Mail und `players.email` unverändert; der Trainer MUSS den ausstehenden Status
+  sehen. Schlägt die Änderung fehl (z. B. Adresse bereits vergeben oder leer/ungültig), DARF
+  weder die Login-E-Mail noch die zuvor gespeicherte E-Mail überschrieben werden und der Fehler
+  MUSS dem Trainer angezeigt werden.
 - **FR-008**: Der "Einladen"-Button im Spielerstamm DARF keinen Dialog mehr öffnen. Er MUSS
   stattdessen direkt eine (erneute) Einladung an die für den Spieler hinterlegte E-Mail auslösen.
 - **FR-009**: Der "Einladen"-Button MUSS deaktiviert sein, wenn der Spieler keine E-Mail hinterlegt
@@ -189,6 +198,10 @@ speichern — der Spieler erscheint in der Liste wieder als aktiv.
   bestehenden verknüpften Konten und Einladungen übernommen werden, sofern die Zuordnung innerhalb
   des Teams eindeutig ist. Mehrdeutige Altbestände DÜRFEN nicht willkürlich zugeordnet werden und
   MÜSSEN für eine spätere manuelle Nachpflege erkennbar bleiben.
+- **FR-014**: Eine Einladung mit `player_id` MUSS die normalisierte Request-E-Mail innerhalb der
+  gleichen Transaktion mit der aktuell gespeicherten `players.email` vergleichen. Bei fehlender
+  oder abweichender Adresse MUSS der Versand abgelehnt werden, damit ein veralteter Client keine
+  Einladung an eine nicht mehr hinterlegte Adresse verschickt.
 
 ### Key Entities
 
@@ -218,9 +231,9 @@ speichern — der Spieler erscheint in der Liste wieder als aktiv.
 
 ## Assumptions
 
-- Die Änderung der Login-E-Mail eines bereits verknüpften Spielers erfolgt serverseitig direkt
-  (`updateUserById`, sofort wirksam ohne Bestätigungs-E-Mail an die neue Adresse) statt über
-  Löschen und Neuanlegen — bestätigt durch den Auftraggeber.
+- Die Änderung der Login-E-Mail eines bereits verknüpften Spielers erfolgt über einen
+  kontoinhaberbestätigten Supabase-E-Mail-Änderungsablauf. Ein Trainer darf keine globale Auth-
+  Login-Adresse direkt per Service-Role auf eine eigene Adresse umstellen.
 - Bei einem bereits verknüpften Spieler ist die E-Mail im Formular weiterhin erforderlich; nur
   bei nicht verknüpften Spielern ist sie optional.
 - `players.email` ist pro Team eindeutig (Groß-/Kleinschreibung ignorierend) — bestätigt durch den
@@ -239,3 +252,6 @@ speichern — der Spieler erscheint in der Liste wieder als aktiv.
   Auth-Konten und, sofern dort nicht vorhanden, aus den neuesten Einladungen übernommen. Bei
   nicht eindeutig auflösbaren Altbeständen bleibt das Feld leer, statt eine Adresse willkürlich
   einem Spieler zuzuordnen.
+- Die ausstehende E-Mail-Änderung wird in einer kurzlebigen, serverseitig geschützten Anfrage
+  gespeichert. Nur der verknüpfte Kontoinhaber darf sie bestätigen; der Trainer erhält keinen
+  Auth-Token und keine direkte Änderungsmöglichkeit.

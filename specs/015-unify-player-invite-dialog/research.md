@@ -52,9 +52,11 @@ invitation for the given `player_id` first; if one exists, `UPDATE` its `email`/
 
 The transaction locks the referenced player row before this lookup, so two concurrent resend
 requests for a player cannot both observe "no open invitation" and race into the partial unique
-index. The update path snapshots the previous invitation values. If mail delivery fails after the
-transaction commits, the route restores the previous values; the existing invitation must not be
-silently invalidated by an unsuccessful resend.
+index. Inside that lock, the normalized request email must match the current `players.email`; a
+missing or stale value is rejected before any invitation or mail write. The update path snapshots
+the previous invitation values. If mail delivery fails after the transaction commits, the route
+restores the previous values only with `WHERE token = <this resend's token>`. If another resend has
+already replaced that token, the failed attempt leaves the newer invitation untouched.
 
 **Rationale**: Both the dialog's "Direkt einladen" checkbox and the list's dialog-free "Einladen"
 button need to work whether or not a prior invitation is still open — that's the whole point of
@@ -74,40 +76,40 @@ button need to work whether or not a prior invitation is still open — that's t
   the case where the trainer corrected a typo'd email and needs the *new* address to receive the
   link.
 
-## 4. Correcting a linked player's login email
+## 4. Owner-confirmed linked-player email changes
 
-**Decision**: New trainer-gated, service-role route,
-`POST /api/players/[player_id]/email`, calling
-`admin.auth.admin.updateUserById(linked_user_id, { email, email_confirm: true })`, then syncing
-`players.email` on success.
+**Decision**: `POST /api/players/[player_id]/email` creates a short-lived,
+trainer-authorized `player_email_change_requests` row but does not mutate Auth. The linked account
+owner completes the change with the normal authenticated Supabase email-change flow; a separate
+owner-only confirmation route updates `players.email` only after Auth reports the new address as
+confirmed.
 
-The route trims and lowercases a valid non-empty email before doing any external or database
-write. It checks the per-team uniqueness constraint before changing Auth, then uses compensating
-rollback if the subsequent `players.email` update fails: restore the Auth user's previous email
-and leave the player row unchanged. This is required because the Auth API and the database do not
-share one transaction.
+The request trims and lowercases a valid non-empty email, serializes by `linked_user_id`, and
+checks per-team uniqueness before storing the pending request. The client-side owner flow uses
+`auth.updateUser({ email })` with Secure Email Change enabled, so the current and new addresses
+must confirm. `auth.admin.updateUserById(..., { email, email_confirm: true })` is explicitly not
+allowed because it changes a global login identity without proving that the account owner asked
+for it.
 
-**Rationale**: Confirmed with the operator: apply immediately, no confirmation round-trip to the
-new address, no delete-and-recreate of the player. `email_confirm: true` matches "trainer already
-verified this is correct" — the same trust level `profile/moderate.post.ts` already extends to a
-trainer acting on a team member's account (display name reset, avatar removal).
+The final confirmation route re-acquires the same linked-user lock, verifies the authenticated
+caller is the linked user and that Auth now reports the requested address, then updates
+`players.email` and marks the request confirmed in one database transaction. Until then, both
+previous email values remain intact.
+
+**Rationale**: The application uses passwordless magic-link login. A trainer-controlled direct
+Auth update would let a trainer redirect another user's global login to an address they control,
+including access to that account's other teams. Owner confirmation is therefore a security
+invariant, not an optional UX tradeoff.
 
 **Alternatives considered**:
 - *Delete the player row and recreate it with the new email*: this was the operator's original
-  fallback question; rejected once `updateUserById` was confirmed to work — deleting would orphan
-  or cascade-affect the player's existing points/photos/stats history tied to `player_id`, which
-  `updateUserById` avoids entirely by leaving the player row's identity untouched.
-- *Let Supabase's default double-opt-in email change flow run* (`email_confirm` omitted/`false`,
-  sending a confirmation to the new address before it takes effect): rejected per the operator's
-  stated preference for an immediate, direct change; also would leave the roster displaying a
-  "pending" email with no UI in scope to represent that intermediate state.
-- **Known tradeoff, surfaced but not blocking**: `updateUserById` changes the person's *global*
-  Supabase Auth login email, not something scoped to this team. If that same auth account is also
-  a linked player/member on another team (structurally possible, not excluded by the schema), a
-  trainer of *this* team correcting the email changes their login for every team. No requirement
-  in scope addresses multi-team accounts, and the operator confirmed proceeding with
-  `updateUserById` regardless — noted here so it's a known, accepted tradeoff rather than an
-  unexamined one.
+  fallback question; rejected because deleting would orphan or cascade-affect the player's
+  existing points/photos/stats history tied to `player_id`. The owner-confirmed flow leaves the
+  player row's identity untouched.
+- *Allow the trainer to call `updateUserById` with `email_confirm: true`*: rejected — the service
+  role bypasses account ownership and would turn a trainer into an account takeover authority.
+- *Update only `players.email` and leave Auth unchanged*: rejected — the roster would display a
+  login address that does not match the linked account and future invitations would be misleading.
 
 ## 5. No compensating rollback of the player row on invite-send failure
 

@@ -18,8 +18,9 @@ create policy players_write_trainer on public.players
   with check (public.is_trainer(team_id));
 ```
 
-Both are row-scoped, not column-scoped, so no migration is needed on the policy side — only the
-Drizzle-generated column + index migration from data-model.md.
+Both are row-scoped, not column-scoped, so no policy change is needed for `players`; the migration
+also adds the request table's RLS policies and the linked-email write-boundary trigger described in
+data-model.md.
 
 ## `POST /api/invitations/issue` (trainer-only, `service_role`) — behavior change only
 
@@ -34,6 +35,10 @@ Same authorization and request shape as today (unchanged):
 player row and checks for an existing open invitation (`accepted_at is null`) for that `player_id`
 *before* inserting. The row lock serializes concurrent resend requests for the same player:
 
+- Inside that lock, normalize the request email and compare it with the current
+  `players.email`. A missing stored email or mismatch returns `409` and sends no mail; the handler
+  must never trust a stale email copied from a previously loaded roster row.
+
 - **Found** → `UPDATE invitations SET email = $email, token = <fresh token>, expires_at = default
   WHERE id = $found.id`, then send the magic-link email to `$email` as today. Returns
   `{ id: found.id }`.
@@ -46,41 +51,52 @@ player row and checks for an existing open invitation (`accepted_at is null`) fo
 No change to the `409` for "this person is already a member of the team," nor to the `player_id`
 ↔ `team_id` ownership check.
 
-## `POST /api/players/[player_id]/email` (trainer-only, `service_role`) — new
+## `POST /api/players/[player_id]/email` (trainer-only, request phase) — new
 
-Mirrors `app/server/api/profile/moderate.post.ts`'s shape: verify the caller in Drizzle first,
-then act with `serverSupabaseServiceRole`.
+Mirrors `app/server/api/profile/moderate.post.ts`'s authorization shape: verify the caller in
+Drizzle first, then use the privileged server database only to create a pending request. This
+route MUST NOT call `auth.admin.updateUserById` and MUST NOT change the Auth email.
 
 **Request body**: `{ team_id: uuid, email: string }`
 
 The route applies the same validation as `/api/invitations/issue`: trim, lowercase, and require a
 valid non-empty email before any write.
 
-**Authorization** (both MUST hold, else the stated error):
+**Authorization** (all MUST hold, else the stated error):
 1. Caller has a `memberships` row for `team_id` with `role = 'trainer'` (`requireTrainer`) → `403`.
-2. `player_id` belongs to `team_id` → `400` (same check `issue.post.ts` already does for its own
-   `player_id`).
-3. The player's `linked_user_id` is not null → `400` ("player is not linked to an account"). This
-   route is only ever called by the client for already-linked players (data-model.md); a
-   not-yet-linked player's email is written directly through `usePlayers().update()` instead.
+2. `player_id` belongs to `team_id` → `400`.
+3. The player's `linked_user_id` is not null → `400`.
 
 **Behavior**:
-- Calls `serverSupabaseServiceRole<Database>(event).auth.admin.updateUserById(linked_user_id, {
-  email, email_confirm: true })`.
-- Before changing Auth, check that no other player in `team_id` already owns the normalized email;
-  return `409` for a collision.
-- After Auth succeeds, run `UPDATE players SET email = $email WHERE id = $player_id`, return
-  `{ ok: true }` only after both changes succeed.
-- If the Auth update fails (e.g. `email` already belongs to another Auth user), do **not** touch
-  `players.email`; propagate the Supabase error message with `409` if it indicates a conflict,
-  else `500`.
-- If the database update fails despite the preflight (for example, a concurrent unique conflict),
-  restore the Auth user's previous email before returning the error. The player row and Auth record
-  must either both contain the new address or both retain the old address; log and return `500` if
-  compensation itself fails.
-- The trainer sees the error and the form keeps showing the previously saved email. Unique
-  violations use the existing `pgError`/`pgErrorCode` handling in
-  `app/server/utils/pg-error.ts` / `app/utils/errors.ts`.
+- Acquire the linked-user advisory lock before loading the current Auth/player email and checking
+  per-team uniqueness. This lock spans request creation and prevents two trainer requests for the
+  same linked account from interleaving.
+- If another player in `team_id` already owns the normalized email, return `409`.
+- Create a short-lived, one-time `player_email_change_requests` row and return
+  `{ status: 'confirmation_required', request_id }`. The previous Auth and player emails remain
+  unchanged.
+- The request is visible only to the linked account owner. The trainer receives a pending status,
+  never an Auth token or a direct Auth mutation capability.
+
+## `POST /api/players/[player_id]/email/confirm` (linked account owner) — new
+
+The linked account owner invokes this route after completing Supabase's secure email-change flow
+with the normal authenticated client (`auth.updateUser({ email })`). Secure email change MUST be
+configured so the current and new addresses are confirmed before the Auth email changes; an admin
+update with `email_confirm: true` is explicitly forbidden here.
+
+**Request body**: `{ request_id: uuid }`
+
+**Authorization**: the authenticated caller MUST be the request's `linked_user_id`; trainers are
+not sufficient unless they are also that account owner → `403`.
+
+**Behavior**:
+- Acquire the same linked-user advisory lock and load the unexpired, unconfirmed request.
+- Verify the caller's current Auth email equals the normalized `requested_email`. If confirmation
+  is incomplete, return `409` and leave `players.email` unchanged.
+- Update `players.email` and mark the request `confirmed_at` in one database transaction. The
+  privileged route is the only allowed write path past the linked-email trigger.
+- Return `{ ok: true }`. Expired or already-used requests return `409` without changing anything.
 
 ### Negative-test matrix addition
 
@@ -91,6 +107,8 @@ Alongside the existing `rls-negative-*` Playwright suites:
 | N1 | Player-role member | `POST /api/players/[id]/email` for any player | 403 (not a trainer) |
 | N2 | Trainer of Team A | `POST /api/players/[id]/email` targeting a Team B player | 400 (player doesn't belong to `team_id`) |
 | N3 | Trainer of the player's own team | `POST /api/players/[id]/email` for a not-yet-linked player | 400 (`linked_user_id` is null) |
-| N4 | Trainer of the player's own team | `POST /api/players/[id]/email` to an address already used by another Auth user | 409 |
+| N4 | Trainer of the player's own team | `POST /api/players/[id]/email` to an address already used by another Auth user | 409 after owner confirmation; no Auth/player change before then |
 | N5 | Player-role member | `update players set email = ... where id <> <own linked player>` directly via PostgREST | Denied (RLS, `players_write_trainer`) |
 | N6 | Trainer of the player's own team | `POST /api/players/[id]/email` with an empty or malformed email | 400; Auth and `players.email` unchanged |
+| N7 | Trainer of the player's own team | Direct PostgREST update of `players.email` for a linked player | Denied by the linked-email write-boundary trigger |
+| N8 | Trainer A and trainer B | Concurrent linked-email requests for the same linked user | Serialized by advisory lock; no Auth/player divergence |
