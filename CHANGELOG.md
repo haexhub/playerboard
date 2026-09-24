@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.7.0](https://github.com/haexhub/playerboard/compare/v0.6.1...v0.7.0) (2026-09-24)
+
+
+### Features
+
+* **players:** auto-save profile settings, drop edit toggle ([b6c2b8f](https://github.com/haexhub/playerboard/commit/b6c2b8fa054ddda484043794a28f51cbce8e8188))
+* **players:** unify player dialog and add direct invite/email-change flows ([0f7765f](https://github.com/haexhub/playerboard/commit/0f7765f4beef59b1f9a27eef50dc08d07cf3e337))
+* **players:** unify player dialog and add direct invite/email-change flows ([1d5ff95](https://github.com/haexhub/playerboard/commit/1d5ff95cd8482f7b5422e6f44ced4f1098bde5d6))
+* **trainings:** replace consent banner with inline warning icon ([ec4cbf6](https://github.com/haexhub/playerboard/commit/ec4cbf630536d2217298c5bf37beb23e06d1bb66))
+
+
+### Bug Fixes
+
+* address Veo analytics review findings ([a3a8e5f](https://github.com/haexhub/playerboard/commit/a3a8e5f253efa9c39f469203b5a1671815ad87c7))
+* **db:** match generated type output ([8afbdca](https://github.com/haexhub/playerboard/commit/8afbdca3a63e0d06baebeffbe0b0d661ec59065e))
+* **db:** refresh generated Supabase types ([449e311](https://github.com/haexhub/playerboard/commit/449e311d3bed5da1c3adde285790c5c6689c93d9))
+* **players:** address PR review findings ([6780685](https://github.com/haexhub/playerboard/commit/6780685f5d543973b9076f338d9697da9ccf2dfc))
+* **players:** serialize autosave writes to prevent races ([73fff86](https://github.com/haexhub/playerboard/commit/73fff8607928d424d9fafa0b4716f54b58d7d0af))
+* **trainings:** make consent tooltip reachable on touch ([d55b374](https://github.com/haexhub/playerboard/commit/d55b37401a4761c82db354c8c7cd5e1967ffb319))
+
 ## [0.6.1](https://github.com/haexhub/playerboard/compare/v0.6.0...v0.6.1) (2026-09-24)
 
 
