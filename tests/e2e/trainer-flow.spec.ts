@@ -69,13 +69,12 @@ test.describe('US1 — trainer records point entries + at least one photo', () =
     await page.goto(`/t/${teamSlug}/trainings/new`, { waitUntil: 'networkidle' })
     await expect(page.getByTestId('trainings-new-page')).toBeVisible()
 
-    // Missing photo consent surfaces as a red icon next to the player's name in the grid.
+    // Missing photo consent surfaces as a red camera icon next to the player's name in the grid.
     const brunoRow = page.locator('tr', { hasText: 'Bruno' })
-    await expect(brunoRow.getByTestId('consent-missing-icon')).toBeVisible()
-    await expect(brunoRow.getByTestId('consent-camera-icon')).toBeVisible()
-    await expect(brunoRow.getByTestId('consent-camera-icon')).toHaveCSS('position', 'absolute')
-    await expect(brunoRow.getByTestId('consent-camera-icon')).toHaveCSS('right', '8px')
-    const brunoConsentIcon = brunoRow.getByTestId('consent-missing-icon')
+    const brunoConsentIcon = brunoRow.getByTestId('consent-camera-icon')
+    await expect(brunoConsentIcon).toBeVisible()
+    await expect(brunoConsentIcon).toHaveCSS('position', 'absolute')
+    await expect(brunoConsentIcon).toHaveCSS('right', '8px')
     const brunoTooltip = brunoRow.getByRole('tooltip')
     await brunoConsentIcon.click()
     await expect(brunoTooltip).toHaveClass(/bottom-full/)
@@ -86,7 +85,6 @@ test.describe('US1 — trainer records point entries + at least one photo', () =
     await brunoConsentIcon.press('Escape')
     await expect(brunoTooltip).toBeHidden()
     const aliceRow = page.locator('tr', { hasText: 'Alice' })
-    await expect(aliceRow.getByTestId('consent-missing-icon')).toHaveCount(0)
     await expect(aliceRow.getByTestId('consent-camera-icon')).toHaveCount(0)
 
     // Save button is enabled as soon as the draft exists — photos are optional.
