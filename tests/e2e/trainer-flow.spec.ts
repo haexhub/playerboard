@@ -84,6 +84,23 @@ test.describe('US1 — trainer records point entries + at least one photo', () =
     await aliceEinsatz.first().blur()
     await expect(aliceEinsatz.first()).toHaveClass(/border-green-500/, { timeout: 10_000 })
 
+    // Dedicated stepper buttons update the value and disable at the category bounds.
+    const aliceIncrease = page.getByRole('button', { name: 'Alice Anker — Einsatz erhöhen' })
+    const aliceDecrease = page.getByRole('button', { name: 'Alice Anker — Einsatz verringern' })
+    await aliceIncrease.click()
+    await expect(aliceEinsatz.first()).toHaveValue('5')
+    await expect(aliceIncrease).toBeDisabled()
+    await expect(aliceEinsatz.first()).toHaveClass(/border-green-500/, { timeout: 10_000 })
+    await aliceDecrease.click()
+    await expect(aliceEinsatz.first()).toHaveValue('4')
+
+    const brunoEinsatz = page.locator('input[aria-label*="Bruno Bereit"][aria-label*="Einsatz"]')
+    const brunoDecrease = page.getByRole('button', { name: 'Bruno Bereit — Einsatz verringern' })
+    await brunoDecrease.click()
+    await expect(brunoEinsatz.first()).toHaveValue('0')
+    await expect(brunoDecrease).toBeDisabled()
+    await expect(brunoEinsatz.first()).toHaveClass(/border-green-500/, { timeout: 10_000 })
+
     // Upload one photo — optional, but exercises the storage path.
     await page.getByTestId('photo-upload-input').setInputFiles({
       name: 'training.png',

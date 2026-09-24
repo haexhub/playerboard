@@ -274,7 +274,7 @@ const stepValue = (player: ActivePlayer, category: ActiveCategory, delta: number
                   :max="c.value_max"
                   :step="1"
                   :aria-label="`${p.name} — ${c.name} (Slider)`"
-                  class="flex-1 **:data-[slot=slider-track]:h-3 **:data-[slot=slider-thumb]:size-8"
+                  class="flex-1 **:data-[slot=slider-track]:h-3 **:data-[slot=slider-thumb]:size-11"
                   :class="{ 'opacity-40': cells[key(p.id, c.id)]?.value === null }"
                   @update:model-value="onSliderInput(p.id, c.id, $event)"
                   @value-commit="onSliderCommit(p, c)"
@@ -290,13 +290,11 @@ const stepValue = (player: ActivePlayer, category: ActiveCategory, delta: number
                   +
                 </button>
               </div>
-              <div v-if="cells[key(p.id, c.id)]?.status === 'error'" class="flex items-center gap-1 pl-1">
-                <span
-                  class="text-xs text-red-700"
-                  :title="cells[key(p.id, c.id)]?.error"
-                >
-                  !
-                </span>
+              <div
+                v-if="cells[key(p.id, c.id)]?.status === 'error'"
+                class="flex items-center gap-1 pl-1"
+              >
+                <span class="text-xs text-red-700" :title="cells[key(p.id, c.id)]?.error"> ! </span>
               </div>
             </div>
           </td>
