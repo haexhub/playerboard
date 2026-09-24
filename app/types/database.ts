@@ -143,11 +143,53 @@ export type Database = {
           },
         ]
       }
+      player_email_change_requests: {
+        Row: {
+          confirmed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          linked_user_id: string
+          player_id: string
+          requested_email: string
+          token_hash: string
+        }
+        Insert: {
+          confirmed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          linked_user_id: string
+          player_id: string
+          requested_email: string
+          token_hash: string
+        }
+        Update: {
+          confirmed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          linked_user_id?: string
+          player_id?: string
+          requested_email?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_email_change_requests_player_id_players_id_fk"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       players: {
         Row: {
           active: boolean
           created_at: string
           created_by: string | null
+          email: string | null
           id: string
           jersey_number: number | null
           last_updated_at: string
@@ -162,6 +204,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           created_by?: string | null
+          email?: string | null
           id?: string
           jersey_number?: number | null
           last_updated_at?: string
@@ -176,6 +219,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           created_by?: string | null
+          email?: string | null
           id?: string
           jersey_number?: number | null
           last_updated_at?: string
@@ -794,6 +838,7 @@ export type Database = {
       is_profile_visible: { Args: { p_profile: string }; Returns: boolean }
       is_trainer: { Args: { p_team: string }; Returns: boolean }
       is_veo_enabled: { Args: { p_team: string }; Returns: boolean }
+      players_auth_email: { Args: { user_id: string }; Returns: string }
       reorder_point_categories: {
         Args: { p_items: Json; p_team: string }
         Returns: undefined

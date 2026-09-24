@@ -1,6 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { countMailsTo, fetchLatestMagicLink, signInWithMagicLink } from './helpers/magic-link'
-import { SUPABASE_SERVICE_KEY, SUPABASE_URL } from './helpers/supabase-rest'
+import { restGet, SUPABASE_SERVICE_KEY, SUPABASE_URL } from './helpers/supabase-rest'
 
 // Invitation mails against the local Supabase stack + Mailpit. Guards the
 // invitation endpoints: DB failures must map to their intended HTTP status
@@ -149,7 +149,7 @@ test.describe('invitation mail — trainer invites, Mailpit receives, invitee ac
     await inviteeCtx.close()
   })
 
-  test('inviting from the new-player dialog creates the player, mails the invite and links on accept', async ({
+  test('inviting from the unified player dialog creates the player, mails the invite and links on accept', async ({
     browser,
   }) => {
     test.setTimeout(120_000)
@@ -160,9 +160,9 @@ test.describe('invitation mail — trainer invites, Mailpit receives, invitee ac
     await trainerPage.getByTestId('player-new-button').click()
     const dialog = trainerPage.getByTestId('player-dialog')
     await expect(dialog).toBeVisible()
-    await dialog.getByLabel('Per E-Mail einladen').check()
-    await dialog.getByTestId('player-form-invite-email').fill(email)
     await dialog.getByLabel('Name').fill(playerName)
+    await dialog.getByTestId('player-form-email').fill(email)
+    await dialog.getByTestId('player-form-send-invite').check()
     await trainerPage.getByTestId('player-form-submit').click()
     await expect(dialog).toBeHidden()
 
@@ -189,9 +189,13 @@ test.describe('invitation mail — trainer invites, Mailpit receives, invitee ac
     await inviteeCtx.close()
   })
 
-  test('a duplicate invitation from the new-player dialog leaves no orphaned player', async () => {
+  test('a duplicate invitation from the unified dialog keeps the player (no rollback)', async () => {
+    // The old 3-mode dialog deleted a just-created player if its invite step
+    // failed, because "invite" was the only reason the player existed. Email
+    // is now a plain persistent field independent of invite outcome, so a
+    // failed invite must no longer delete the player (research.md §5).
     const email = `invitee-${suffix}-orphan@example.com`
-    const playerName = `Waise ${suffix}`
+    const playerName = `Kein Waise ${suffix}`
     await gotoMembers()
     expect((await submitInvite(trainerPage, email)).status()).toBe(200)
     await expect.poll(() => countMailsTo(email)).toBe(1)
@@ -200,18 +204,20 @@ test.describe('invitation mail — trainer invites, Mailpit receives, invitee ac
     await trainerPage.getByTestId('player-new-button').click()
     const dialog = trainerPage.getByTestId('player-dialog')
     await expect(dialog).toBeVisible()
-    await dialog.getByLabel('Per E-Mail einladen').check()
-    await dialog.getByTestId('player-form-invite-email').fill(email)
     await dialog.getByLabel('Name').fill(playerName)
+    await dialog.getByTestId('player-form-email').fill(email)
+    await dialog.getByTestId('player-form-send-invite').check()
     await trainerPage.getByTestId('player-form-submit').click()
 
-    await expect(dialog.getByRole('alert')).toContainText(DUPLICATE_MESSAGE)
-    await expect(dialog).toBeVisible()
+    // The player's own email doesn't collide with itself, but the email
+    // already has an open invitation from a different (non-player) invite
+    // above — that still 409s the invite step specifically.
+    await expect(dialog.getByRole('alert')).toBeVisible()
     expect(await countMailsTo(email)).toBe(1)
 
     await trainerPage.reload({ waitUntil: 'networkidle' })
     await expect(trainerPage.getByTestId('player-row').filter({ hasText: playerName })).toHaveCount(
-      0,
+      1,
     )
 
     await fetchLatestMagicLink(email)
@@ -254,5 +260,69 @@ test.describe('invitation mail — trainer invites, Mailpit receives, invitee ac
     const { status, body } = await acceptViaApi(trainerCtx, token)
     expect(status).toBe(410)
     expect(body.statusMessage).toBe('Invitation expired')
+  })
+
+  test('resending an already-open player invitation succeeds instead of 409ing', async () => {
+    const email = `invitee-${suffix}-player-resend@example.com`
+    const playerName = `Resend ${suffix}`
+    await trainerPage.goto(`/t/${teamSlug}/players`, { waitUntil: 'networkidle' })
+    await trainerPage.getByTestId('player-new-button').click()
+    const dialog = trainerPage.getByTestId('player-dialog')
+    await dialog.getByLabel('Name').fill(playerName)
+    await dialog.getByTestId('player-form-email').fill(email)
+    await trainerPage.getByTestId('player-form-submit').click()
+    await expect(dialog).toBeHidden()
+
+    const [team] = await restGet<{ id: string }>(`teams?select=id&slug=eq.${teamSlug}`)
+    const [player] = await restGet<{ id: string }>(
+      `players?select=id&team_id=eq.${team!.id}&name=eq.${encodeURIComponent(playerName)}`,
+    )
+    const issuePayload = { team_id: team!.id, email, role: 'player', player_id: player!.id }
+
+    const first = await trainerCtx.request.post('/api/invitations/issue', { data: issuePayload })
+    expect(first.status()).toBe(200)
+    const firstId = ((await first.json()) as { id: string }).id
+    await expect.poll(() => countMailsTo(email)).toBe(1)
+    const firstLink = await fetchLatestMagicLink(email)
+
+    // GoTrue's auth.email.max_frequency (1s locally) throttles repeat OTP
+    // sends to the same address — wait it out so this exercises the
+    // idempotent-resend logic itself, not an unrelated mail rate limit.
+    await new Promise((resolve) => setTimeout(resolve, 1200))
+
+    const second = await trainerCtx.request.post('/api/invitations/issue', { data: issuePayload })
+    expect(second.status()).toBe(200)
+    const secondId = ((await second.json()) as { id: string }).id
+    expect(secondId).toBe(firstId)
+    await expect.poll(() => countMailsTo(email)).toBe(1)
+    const secondLink = await fetchLatestMagicLink(email)
+    expect(secondLink).not.toBe(firstLink)
+  })
+
+  test('a resend with a stale/mismatched email is rejected and sends no mail', async () => {
+    const email = `invitee-${suffix}-stale@example.com`
+    const playerName = `Stale ${suffix}`
+    await trainerPage.goto(`/t/${teamSlug}/players`, { waitUntil: 'networkidle' })
+    await trainerPage.getByTestId('player-new-button').click()
+    const dialog = trainerPage.getByTestId('player-dialog')
+    await dialog.getByLabel('Name').fill(playerName)
+    await dialog.getByTestId('player-form-email').fill(email)
+    await trainerPage.getByTestId('player-form-submit').click()
+    await expect(dialog).toBeHidden()
+
+    const [team] = await restGet<{ id: string }>(`teams?select=id&slug=eq.${teamSlug}`)
+    const [player] = await restGet<{ id: string }>(
+      `players?select=id&team_id=eq.${team!.id}&name=eq.${encodeURIComponent(playerName)}`,
+    )
+
+    // A client that copied an older/edited-away email tries to invite it —
+    // must be rejected server-side rather than trusted (contracts/rls-policies.md).
+    const staleEmail = `invitee-${suffix}-stale-old@example.com`
+    const res = await trainerCtx.request.post('/api/invitations/issue', {
+      data: { team_id: team!.id, email: staleEmail, role: 'player', player_id: player!.id },
+    })
+    expect(res.status()).toBe(409)
+    expect(await countMailsTo(staleEmail)).toBe(0)
+    expect(await countMailsTo(email)).toBe(0)
   })
 })

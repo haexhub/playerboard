@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import InviteForm from '~/components/team/InviteForm.vue'
 import PlayerForm from '~/components/players/PlayerForm.vue'
 import PlayerList from '~/components/players/PlayerList.vue'
 
@@ -18,12 +17,13 @@ type PlayerRow = {
   position: string | null
   photo_consent: boolean
   active: boolean
+  email: string | null
+  linked_user_id: string | null
 }
 
 const playerList = ref<InstanceType<typeof PlayerList> | null>(null)
 const playerFormRef = ref<InstanceType<typeof PlayerForm> | null>(null)
 const isPlayerDialogOpen = ref(false)
-const isInviteDialogOpen = ref(false)
 const editingPlayer = ref<PlayerRow | null>(null)
 const dialogSeq = ref(0)
 
@@ -43,14 +43,6 @@ const onPlayerSaved = () => {
   isPlayerDialogOpen.value = false
   playerList.value?.reload?.()
 }
-
-const openInviteDialog = () => {
-  isInviteDialogOpen.value = true
-}
-
-const onInvited = () => {
-  isInviteDialogOpen.value = false
-}
 </script>
 
 <template>
@@ -64,13 +56,7 @@ const onInvited = () => {
       Neuer Spieler
     </ShadcnButton>
 
-    <PlayerList
-      v-if="teamId"
-      ref="playerList"
-      :team-id="teamId"
-      @edit="openEditDialog"
-      @invite="openInviteDialog"
-    />
+    <PlayerList v-if="teamId" ref="playerList" :team-id="teamId" @edit="openEditDialog" />
 
     <ShadcnDialog v-model:open="isPlayerDialogOpen">
       <ShadcnDialogContent>
@@ -100,22 +86,6 @@ const onInvited = () => {
             >
               {{ playerFormRef?.loading ? 'Speichere…' : 'Speichern' }}
             </ShadcnButton>
-          </ShadcnDialogFooter>
-        </div>
-      </ShadcnDialogContent>
-    </ShadcnDialog>
-
-    <ShadcnDialog v-model:open="isInviteDialogOpen">
-      <ShadcnDialogContent>
-        <div data-testid="player-invite-dialog">
-          <ShadcnDialogHeader>
-            <ShadcnDialogTitle>Spieler einladen</ShadcnDialogTitle>
-          </ShadcnDialogHeader>
-          <InviteForm v-if="teamId" :team-id="teamId" default-role="player" @issued="onInvited" />
-          <ShadcnDialogFooter>
-            <ShadcnDialogClose as-child>
-              <ShadcnButton type="button" variant="outline">Schließen</ShadcnButton>
-            </ShadcnDialogClose>
           </ShadcnDialogFooter>
         </div>
       </ShadcnDialogContent>

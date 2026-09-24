@@ -15,6 +15,13 @@ const bodySchema = z.object({
 
 const generateToken = () => randomBytes(24).toString('base64url')
 
+type InvitationSnapshot = {
+  id: string
+  email: string
+  token: string
+  expiresAt: Date
+}
+
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)
   const userId = user?.sub
@@ -55,22 +62,62 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  if (player_id) {
-    const [player] = await db
-      .select({ teamId: schema.players.teamId })
-      .from(schema.players)
-      .where(eq(schema.players.id, player_id))
-      .limit(1)
-    if (!player || player.teamId !== team_id) {
-      throw createError({ statusCode: 400, statusMessage: 'player_id does not belong to team_id' })
-    }
-  }
-
   const token = generateToken()
-
   let invitationId: string
+  // Set when the update-in-place path ran, so a failed mail-send can restore
+  // the invitation's previous state instead of leaving the fresh (unsent)
+  // token in place (research.md §3).
+  let restoreOnMailFailure: InvitationSnapshot | null = null
+
   try {
     const result = await db.transaction(async (tx) => {
+      if (player_id) {
+        // Locks the player row for the rest of this transaction, so two
+        // concurrent resend requests for the same player cannot both observe
+        // "no open invitation" and race into invitations_player_open_uniq.
+        const [player] = await tx
+          .select({ teamId: schema.players.teamId, email: schema.players.email })
+          .from(schema.players)
+          .where(eq(schema.players.id, player_id))
+          .for('update')
+        if (!player || player.teamId !== team_id) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: 'player_id does not belong to team_id',
+          })
+        }
+        // Never trust an email the client copied from a previously loaded
+        // roster row — only the currently stored value may receive mail.
+        if (!player.email || player.email.toLowerCase() !== email) {
+          throw createError({
+            statusCode: 409,
+            statusMessage: "Request email does not match the player's current stored email",
+          })
+        }
+
+        const [openInvitation] = await tx
+          .select({
+            id: schema.invitations.id,
+            email: schema.invitations.email,
+            token: schema.invitations.token,
+            expiresAt: schema.invitations.expiresAt,
+          })
+          .from(schema.invitations)
+          .where(
+            and(eq(schema.invitations.playerId, player_id), isNull(schema.invitations.acceptedAt)),
+          )
+          .limit(1)
+
+        if (openInvitation) {
+          restoreOnMailFailure = openInvitation
+          await tx
+            .update(schema.invitations)
+            .set({ email, token, expiresAt: sql`now() + interval '14 days'` })
+            .where(eq(schema.invitations.id, openInvitation.id))
+          return { id: openInvitation.id }
+        }
+      }
+
       await tx
         .delete(schema.invitations)
         .where(
@@ -98,6 +145,7 @@ export default defineEventHandler(async (event) => {
     })
     invitationId = result.id
   } catch (err) {
+    if (err && typeof err === 'object' && 'statusCode' in err) throw err
     const e = pgError(err)
     if (e.code === '23505') {
       throw createError({
@@ -119,7 +167,17 @@ export default defineEventHandler(async (event) => {
     },
   })
   if (mailErr) {
-    await db.delete(schema.invitations).where(eq(schema.invitations.id, invitationId))
+    if (restoreOnMailFailure) {
+      const snapshot: InvitationSnapshot = restoreOnMailFailure
+      // Only restore if nothing else has since resent this same invitation —
+      // a concurrent resend that already committed a newer token must win.
+      await db
+        .update(schema.invitations)
+        .set({ email: snapshot.email, token: snapshot.token, expiresAt: snapshot.expiresAt })
+        .where(and(eq(schema.invitations.id, snapshot.id), eq(schema.invitations.token, token)))
+    } else {
+      await db.delete(schema.invitations).where(eq(schema.invitations.id, invitationId))
+    }
     throw createError({ statusCode: 500, statusMessage: mailErr.message })
   }
 

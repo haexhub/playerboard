@@ -1,5 +1,4 @@
 import type { Database } from '~/types/database'
-import { assertRowsAffected } from '~/utils/errors'
 
 export type ActivePlayer = {
   id: string
@@ -12,9 +11,17 @@ export type ActivePlayer = {
 export type Player = ActivePlayer & {
   active: boolean
   linked_user_id: string | null
+  email: string | null
 }
 
 export type LinkCandidate = { user_id: string; display_name: string | null }
+
+export type PendingEmailChangeRequest = {
+  id: string
+  player_id: string
+  requested_email: string
+  expires_at: string
+}
 
 export const usePlayers = () => {
   const client = useSupabaseClient<Database>()
@@ -41,7 +48,7 @@ export const usePlayers = () => {
   const list = async (team_id: string): Promise<Player[]> => {
     const { data, error } = await client
       .from('players')
-      .select('id, name, active, jersey_number, position, photo_consent, linked_user_id')
+      .select('id, name, active, jersey_number, position, photo_consent, linked_user_id, email')
       .eq('team_id', team_id)
     if (error) throw error
     const rows = (data ?? []) as Player[]
@@ -65,6 +72,7 @@ export const usePlayers = () => {
       position: string | null
       photo_consent: boolean
       active: boolean
+      email?: string | null
     },
   ) => {
     const { data, error } = await client
@@ -84,11 +92,13 @@ export const usePlayers = () => {
       position: string | null
       photo_consent: boolean
       active: boolean
+      email: string | null
     }>,
   ) => {
-    const { data, error } = await client.from('players').update(payload).eq('id', id).select('id')
-    if (error) throw error
-    assertRowsAffected(data)
+    await $fetch<{ id: string }>(`/api/players/${id}`, {
+      method: 'PUT',
+      body: payload,
+    })
   }
 
   const remove = async (id: string) => {
@@ -133,6 +143,44 @@ export const usePlayers = () => {
     return (profiles ?? []).map((p) => ({ user_id: p.id, display_name: p.display_name }))
   }
 
+  // For an already-linked player: requests an owner-confirmed change of their
+  // real login email instead of writing `players.email` directly (blocked by
+  // the players_linked_email_guard trigger). Never returns an Auth token —
+  // only the linked account owner can complete the change.
+  const requestLinkedEmailChange = async (
+    id: string,
+    team_id: string,
+    email: string,
+  ): Promise<{ status: 'confirmation_required'; request_id: string }> => {
+    return await $fetch<{ status: 'confirmation_required'; request_id: string }>(
+      `/api/players/${id}/email`,
+      { method: 'POST', body: { team_id, email } },
+    )
+  }
+
+  // Owner-side of the flow above: the linked account owner reads their own
+  // pending request (RLS: player_email_change_requests_read_owner) and, once
+  // they've completed Supabase's own secure email change, finalizes it.
+  const getOwnPendingEmailChangeRequest = async (): Promise<PendingEmailChangeRequest | null> => {
+    const { data, error } = await client
+      .from('player_email_change_requests')
+      .select('id, player_id, requested_email, expires_at')
+      .is('confirmed_at', null)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (error) throw error
+    return data
+  }
+
+  const confirmLinkedEmailChange = async (player_id: string, request_id: string): Promise<void> => {
+    await $fetch(`/api/players/${player_id}/email/confirm`, {
+      method: 'POST',
+      body: { request_id },
+    })
+  }
+
   const linkUser = async (id: string, user_id: string) => {
     const { data: player, error: playerErr } = await client
       .from('players')
@@ -171,5 +219,8 @@ export const usePlayers = () => {
     setConsent,
     linkUser,
     listLinkCandidates,
+    requestLinkedEmailChange,
+    getOwnPendingEmailChangeRequest,
+    confirmLinkedEmailChange,
   }
 }

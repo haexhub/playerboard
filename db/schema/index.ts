@@ -133,6 +133,11 @@ export const players = pgTable(
     position: text('position'),
     linkedUserId: uuid('linked_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
     photoConsent: boolean('photo_consent').notNull().default(false),
+    // Durable "email on file" (specs/015-unify-player-invite-dialog), independent of any
+    // invitations row. For a linked player this is also, by construction, their Auth login
+    // email — kept in sync only via the owner-confirmed flow (players_linked_email_guard
+    // trigger blocks any other write path once linked_user_id is set).
+    email: text('email'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     createdBy: uuid('created_by').references(() => authUsers.id, { onDelete: 'set null' }),
     lastUpdatedAt: timestamp('last_updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -145,7 +150,37 @@ export const players = pgTable(
     uniqueIndex('players_linked_user_per_team_uniq')
       .on(t.teamId, t.linkedUserId)
       .where(sql`${t.linkedUserId} is not null`),
+    uniqueIndex('players_email_per_team_uniq')
+      .on(t.teamId, sql`lower(${t.email})`)
+      .where(sql`${t.email} is not null`),
     index('players_team_idx').on(t.teamId),
+  ],
+)
+
+// Bridges a trainer's request to correct a linked player's email and the account owner's
+// confirmation (specs/015-unify-player-invite-dialog, research.md §4). The trainer route only
+// ever inserts/reads here — it never touches auth.users. Short-lived and server-owned; RLS and
+// the players_linked_email_guard trigger are added by the hand-written migration alongside this
+// table (data-model.md), not expressed in this Drizzle definition.
+export const playerEmailChangeRequests = pgTable(
+  'player_email_change_requests',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    playerId: uuid('player_id')
+      .notNull()
+      .references(() => players.id, { onDelete: 'cascade' }),
+    linkedUserId: uuid('linked_user_id')
+      .notNull()
+      .references(() => authUsers.id, { onDelete: 'cascade' }),
+    requestedEmail: text('requested_email').notNull(),
+    tokenHash: text('token_hash').notNull().unique(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('player_email_change_requests_player_idx').on(t.playerId),
+    index('player_email_change_requests_linked_user_idx').on(t.linkedUserId),
   ],
 )
 
