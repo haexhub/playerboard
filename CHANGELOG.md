@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.9.0](https://github.com/haexhub/playerboard/compare/v0.8.1...v0.9.0) (2026-09-24)
+
+
+### Features
+
+* **players:** add email field to the detail page settings form ([77700ff](https://github.com/haexhub/playerboard/commit/77700ff262025894ccd5e180f42342e3cb204307))
+
+
+### Bug Fixes
+
+* **players:** address PR review feedback ([0817aef](https://github.com/haexhub/playerboard/commit/0817aeff386c13bf65964df4e9ec5ef14adb6397))
+* **trainings:** keep point grid header visible while scrolling ([f791853](https://github.com/haexhub/playerboard/commit/f7918536069580f9643baf76dbef7735dbc6170a))
+* **trainings:** raise app header above training grid's sticky layers ([0402f38](https://github.com/haexhub/playerboard/commit/0402f381a813801938b24bcee9c1f56c46b20ac7))
+* **trainings:** sticky header overlap + shadcn table grid ([dad5850](https://github.com/haexhub/playerboard/commit/dad585087938e334ea87583b7c26db489b8d2759))
+
 ## [0.8.1](https://github.com/haexhub/playerboard/compare/v0.8.0...v0.8.1) (2026-09-24)
 
 
