@@ -238,7 +238,7 @@ const stepValue = (player: ActivePlayer, category: ActiveCategory, delta: number
             <AlertCircle
               v-if="!p.photo_consent"
               class="inline size-4 text-red-600 ml-1 align-text-bottom"
-              :title="`Keine Foto-Einwilligung: ${p.name}`"
+              :title="`Keine Foto-Einwilligung: Fotos mit ${p.name} werden für andere ausgeblendet.`"
               data-testid="consent-missing-icon"
             />
           </th>

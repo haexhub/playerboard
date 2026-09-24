@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useDebounceFn } from '@vueuse/core'
-import { onMounted, ref, watch } from 'vue'
 import { z } from 'zod'
 import type { LinkCandidate } from '~/composables/usePlayers'
 import { errorMessage, pgErrorCode } from '~/utils/errors'
@@ -90,8 +89,7 @@ const lastSaved = ref(
     : null,
 )
 
-const doAutoSave = async () => {
-  if (!props.player) return
+const parseForm = () => {
   fieldErrors.value = {}
   const parsed = schema.safeParse({
     name: name.value,
@@ -106,14 +104,21 @@ const doAutoSave = async () => {
       if (key === 'name') fieldErrors.value.name = issue_.message
       if (key === 'jersey_number') fieldErrors.value.jersey_number = issue_.message
     }
-    return
+    return null
   }
-  if (JSON.stringify(parsed.data) === JSON.stringify(lastSaved.value)) return
+  return parsed.data
+}
+
+const doAutoSave = async () => {
+  if (!props.player) return
+  const parsed = parseForm()
+  if (!parsed) return
+  if (JSON.stringify(parsed) === JSON.stringify(lastSaved.value)) return
   submitError.value = null
   saveStatus.value = 'saving'
   try {
-    await update(props.player.id, parsed.data)
-    lastSaved.value = parsed.data
+    await update(props.player.id, parsed)
+    lastSaved.value = parsed
     saveStatus.value = 'saved'
     emit('saved')
   } catch (err) {
@@ -122,7 +127,35 @@ const doAutoSave = async () => {
   }
 }
 
-const debouncedAutoSave = useDebounceFn(doAutoSave, 600)
+// doAutoSave is triggered from two independent watchers (debounced text fields,
+// immediate checkboxes); serialize runs so a slower call can't resolve after and
+// clobber a newer one's saveStatus/lastSaved. A queued rerun re-reads the refs live,
+// so it always picks up whatever changed while the in-flight save was running.
+let autoSaveInFlight = false
+let autoSaveRerunQueued = false
+
+const runAutoSave = async () => {
+  if (autoSaveInFlight) {
+    autoSaveRerunQueued = true
+    return
+  }
+  autoSaveInFlight = true
+  try {
+    await doAutoSave()
+  } finally {
+    autoSaveInFlight = false
+    if (autoSaveRerunQueued) {
+      autoSaveRerunQueued = false
+      void runAutoSave()
+    }
+  }
+}
+
+const debouncedAutoSave = useDebounceFn(runAutoSave, 600)
+
+onBeforeUnmount(() => {
+  debouncedAutoSave.cancel()
+})
 
 watch([name, jerseyNumber, position], () => {
   if (!props.autoSave) return
@@ -130,27 +163,21 @@ watch([name, jerseyNumber, position], () => {
   debouncedAutoSave()
 })
 watch([consent, active], () => {
-  if (props.autoSave) doAutoSave()
+  if (props.autoSave) void runAutoSave()
 })
 
 const submit = async () => {
-  fieldErrors.value = {}
-  submitError.value = null
-  const parsed = schema.safeParse({
-    name: name.value,
-    jersey_number: jerseyNumber.value,
-    position: position.value.trim() === '' ? null : position.value.trim(),
-    photo_consent: consent.value,
-    active: active.value,
-  })
-  if (!parsed.success) {
-    for (const issue_ of parsed.error.issues) {
-      const key = issue_.path[0]
-      if (key === 'name') fieldErrors.value.name = issue_.message
-      if (key === 'jersey_number') fieldErrors.value.jersey_number = issue_.message
-    }
+  if (props.autoSave) {
+    // No submit button in autoSave mode, but the native form still submits on
+    // Enter: flush through the same guarded path instead of running a second,
+    // unguarded save that could race the debounced/immediate autosave watchers.
+    debouncedAutoSave.cancel()
+    await runAutoSave()
     return
   }
+  submitError.value = null
+  const parsed = parseForm()
+  if (!parsed) return
   let inviteEmailParsed: string | null = null
   if (!props.player && mode.value === 'invite') {
     const parsedEmail = inviteEmailSchema.safeParse(inviteEmail.value)
@@ -172,9 +199,9 @@ const submit = async () => {
   let createdPlayerId: string | null = null
   try {
     if (props.player) {
-      await update(props.player.id, parsed.data)
+      await update(props.player.id, parsed)
     } else {
-      const created = await create(props.teamId, parsed.data)
+      const created = await create(props.teamId, parsed)
       createdPlayerId = created.id
       if (mode.value === 'link') {
         await linkUser(created.id, selectedCandidateId.value)
