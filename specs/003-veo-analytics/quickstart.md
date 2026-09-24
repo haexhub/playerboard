@@ -45,7 +45,7 @@ real Veo API:
 ## Enabling a team for Veo sync (self-service, since 2026-09-22)
 
 **Superseded the original manual-SQL process below.** A trainer opens their
-team's Veo settings page (`/t/[slug]/team/veo`), enters their own Veo email
+team's Veo-Analytics page (`/t/[slug]/analytics`), enters their own Veo email
 and password, picks the matching club/team from the list the app fetches
 from their real Veo account, and confirms — see spec.md's User Story 4 and
 Clarifications (2026-09-22). This single action does what the two manual

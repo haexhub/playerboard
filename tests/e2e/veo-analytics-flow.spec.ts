@@ -438,7 +438,7 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
 
     expect((await fetchPublicVeoStats()).enabled).toBe(false)
 
-    await pageA.goto(`/t/${slugA}/team/veo`, { waitUntil: 'networkidle' })
+    await pageA.goto(`/t/${slugA}/analytics`, { waitUntil: 'networkidle' })
     const toggleInput = pageA.getByTestId('veo-public-stats-toggle-input')
     await expect(toggleInput).not.toBeChecked()
 

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import VeoMatchCard from '~/components/veo/VeoMatchCard.vue'
+import VeoLinkForm from '~/components/veo/VeoLinkForm.vue'
+import VeoPublicStatsToggle from '~/components/veo/VeoPublicStatsToggle.vue'
 import VeoSeasonSummary from '~/components/veo/VeoSeasonSummary.vue'
 import VeoSyncStatusBanner from '~/components/veo/VeoSyncStatusBanner.vue'
 import {
@@ -80,6 +82,23 @@ const seasonSummary = computed(() => computeSeasonSummary(matches.value))
         Ergebnisse und Team-Statistiken, automatisch aus der Veo-Kamera übernommen.
       </p>
     </header>
+
+    <section
+      v-if="isTrainer && currentTeam?.id"
+      class="space-y-8 rounded-lg border border-border bg-card p-4 sm:p-6"
+      data-testid="veo-analytics-settings"
+    >
+      <header class="space-y-1">
+        <h2 class="text-lg font-semibold text-neutral-900">Veo-Einstellungen</h2>
+        <p class="text-sm text-neutral-600">
+          Verknüpfe die Veo-Kamera und lege fest, ob die Saisonstatistiken öffentlich angezeigt
+          werden.
+        </p>
+      </header>
+
+      <VeoLinkForm :key="currentTeam.id" :team-id="currentTeam.id" />
+      <VeoPublicStatsToggle :key="`public-${currentTeam.id}`" :team-id="currentTeam.id" />
+    </section>
 
     <VeoSyncStatusBanner v-if="!isLoading && !loadError" :status="syncStatus" />
 
