@@ -258,7 +258,7 @@ const stepValue = (player: ActivePlayer, category: ActiveCategory, delta: number
         <tr v-for="(p, playerIndex) in players" :key="p.id" class="min-h-touch">
           <th
             scope="row"
-            class="relative sticky left-0 z-20 bg-white border-b border-r border-neutral-200 px-3 py-2 pr-9 text-left font-medium align-middle min-h-touch"
+            class="relative sticky left-0 z-20 bg-white border-b border-r border-neutral-200 px-3 py-2 pr-14 text-left font-medium align-middle min-h-touch"
           >
             <div class="flex items-center min-w-0">
               <span class="text-neutral-500 mr-1">{{ jerseyLabel(p) }}</span>
@@ -268,7 +268,7 @@ const stepValue = (player: ActivePlayer, category: ActiveCategory, delta: number
               v-if="!p.photo_consent"
               type="button"
               :class="[
-                'absolute right-2 top-1/2 -translate-y-1/2 inline-flex size-4 items-center justify-center text-red-600',
+                'absolute right-2 top-1/2 -translate-y-1/2 inline-flex min-h-touch min-w-touch items-center justify-center text-red-600',
                 dismissedConsentInfo !== p.id ? 'group' : '',
               ]"
               :aria-expanded="openConsentInfo === p.id"
