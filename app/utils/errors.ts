@@ -8,7 +8,10 @@ const nonEmptyString = (value: unknown): string | undefined =>
 export const pgErrorCode = (err: unknown): string | undefined => nonEmptyString(field(err, 'code'))
 
 export const errorMessage = (err: unknown, fallback: string): string =>
-  nonEmptyString(field(err, 'statusMessage')) ?? nonEmptyString(field(err, 'message')) ?? fallback
+  nonEmptyString(field(field(err, 'data'), 'statusMessage')) ??
+  nonEmptyString(field(err, 'statusMessage')) ??
+  nonEmptyString(field(err, 'message')) ??
+  fallback
 
 /** Postgres unique_violation from supabase-js, or a 409 from one of our API routes. */
 export const isUniqueViolation = (err: unknown): boolean =>

@@ -114,7 +114,7 @@ export default defineEventHandler(async (event) => {
     if (databaseError.code === '23505') {
       throw createError({
         statusCode: 409,
-        statusMessage: 'Player email or jersey number conflicts with an existing player',
+        statusMessage: `Player conflicts with an existing player (${databaseError.constraint_name ?? 'unknown constraint'})`,
       })
     }
     throw err

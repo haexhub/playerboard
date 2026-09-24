@@ -1,21 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { z } from 'zod'
-import { errorMessage, isUniqueViolation } from '~/utils/errors'
+import { errorMessage } from '~/utils/errors'
+import type { PlayerFormPlayer } from '~/composables/usePlayerFormFields'
 
 const props = withDefaults(
   defineProps<{
     teamId: string
-    player?: {
-      id: string
-      name: string
-      jersey_number: number | null
-      position: string | null
-      photo_consent: boolean
-      active: boolean
-      email: string | null
-      linked_user_id: string | null
-    } | null
+    player?: (PlayerFormPlayer & { id: string }) | null
   }>(),
   { player: null },
 )
@@ -24,76 +15,36 @@ const emit = defineEmits<{
   (e: 'saved'): void
 }>()
 
-const schema = z.object({
-  name: z.string().trim().min(1, 'Name ist erforderlich.'),
-  jersey_number: z
-    .number()
-    .int('Ganzzahl erforderlich.')
-    .min(0, 'Trikotnummer darf nicht negativ sein.')
-    .nullable(),
-  position: z.string().trim().min(1).nullable(),
-  photo_consent: z.boolean(),
-  active: z.boolean(),
-})
-
-const emailSchema = z.string().trim().toLowerCase().email('Bitte gültige E-Mail eingeben.')
-
 const { create, update, requestLinkedEmailChange } = usePlayers()
 const { issue } = useInvitations()
 
-const isLinked = computed(() => !!props.player?.linked_user_id)
+const {
+  isLinked,
+  name,
+  jerseyNumberModel,
+  position,
+  consent,
+  active,
+  email,
+  fieldErrors,
+  validate,
+  mapSaveError,
+} = usePlayerFormFields(props.player ?? null)
 
-const name = ref(props.player?.name ?? '')
-const jerseyNumber = ref<number | null>(props.player?.jersey_number ?? null)
-const position = ref(props.player?.position ?? '')
-const consent = ref(props.player?.photo_consent ?? false)
-const active = ref(props.player?.active ?? true)
-const email = ref(props.player?.email ?? '')
 const sendInvite = ref(false)
-const fieldErrors = ref<{ name?: string; jersey_number?: string; email?: string }>({})
 const submitError = ref<string | null>(null)
 const submitNotice = ref<string | null>(null)
 const loading = ref(false)
 
-const jerseyNumberModel = useNullableNumberModel(jerseyNumber)
-
 const canInvite = computed(() => !isLinked.value && email.value.trim() !== '')
 
 const submit = async () => {
-  fieldErrors.value = {}
   submitError.value = null
   submitNotice.value = null
 
-  const parsed = schema.safeParse({
-    name: name.value,
-    jersey_number: jerseyNumber.value,
-    position: position.value.trim() === '' ? null : position.value.trim(),
-    photo_consent: consent.value,
-    active: active.value,
-  })
-  if (!parsed.success) {
-    for (const issue_ of parsed.error.issues) {
-      const key = issue_.path[0]
-      if (key === 'name') fieldErrors.value.name = issue_.message
-      if (key === 'jersey_number') fieldErrors.value.jersey_number = issue_.message
-    }
-    return
-  }
-
-  const trimmedEmail = email.value.trim()
-  if (isLinked.value && trimmedEmail === '') {
-    fieldErrors.value.email = 'E-Mail ist erforderlich, da dieser Spieler bereits verknüpft ist.'
-    return
-  }
-  let emailParsed: string | null = null
-  if (trimmedEmail !== '') {
-    const parsedEmail = emailSchema.safeParse(trimmedEmail)
-    if (!parsedEmail.success) {
-      fieldErrors.value.email = parsedEmail.error.issues[0]?.message ?? 'Ungültige E-Mail.'
-      return
-    }
-    emailParsed = parsedEmail.data
-  }
+  const validated = validate()
+  if (!validated) return
+  const { core, email: emailParsed } = validated
 
   loading.value = true
   try {
@@ -101,7 +52,7 @@ const submit = async () => {
       // email is never part of this update — the linked-email guard trigger
       // would reject it, and correcting it goes through the owner-confirmed
       // request below instead.
-      await update(props.player!.id, parsed.data)
+      await update(props.player!.id, core)
 
       const currentEmail = (props.player!.email ?? '').toLowerCase()
       if (emailParsed !== currentEmail) {
@@ -122,9 +73,9 @@ const submit = async () => {
     let playerId: string
     if (props.player) {
       playerId = props.player.id
-      await update(playerId, { ...parsed.data, email: emailParsed })
+      await update(playerId, { ...core, email: emailParsed })
     } else {
-      const created = await create(props.teamId, { ...parsed.data, email: emailParsed })
+      const created = await create(props.teamId, { ...core, email: emailParsed })
       playerId = created.id
     }
 
@@ -144,14 +95,7 @@ const submit = async () => {
 
     emit('saved')
   } catch (err) {
-    if (isUniqueViolation(err)) {
-      const message = errorMessage(err, '')
-      submitError.value = message.includes('players_email_per_team_uniq')
-        ? 'Diese E-Mail ist im Team bereits einem anderen Spieler zugeordnet.'
-        : 'Trikotnummer ist im aktiven Kader bereits vergeben. Zuerst den bisherigen Spieler deaktivieren.'
-    } else {
-      submitError.value = errorMessage(err, 'Spieler konnte nicht gespeichert werden.')
-    }
+    submitError.value = mapSaveError(err)
   } finally {
     loading.value = false
   }
