@@ -144,8 +144,8 @@ test.describe('US2 — player dashboard + progress chart', () => {
       timeout: 15_000,
     })
     await expect(playerPage.getByTestId('player-detail-page')).toBeVisible()
-    // Non-trainer team members never get the trainer-only edit affordance.
-    await expect(playerPage.getByTestId('player-detail-edit-button')).toHaveCount(0)
+    // Non-trainer team members never get the trainer-only settings panel.
+    await expect(playerPage.getByTestId('player-detail-settings')).toHaveCount(0)
     await expect(playerPage.getByTestId(`player-progress-chart-${einsatz!.id}`)).toBeVisible()
     await expect(playerPage.getByTestId(`player-progress-chart-${technik!.id}`)).toBeVisible()
     await expect(playerPage.getByTestId(`player-progress-chart-${einsatz!.id}`)).toContainText(

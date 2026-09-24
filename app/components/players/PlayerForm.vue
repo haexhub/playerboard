@@ -1,22 +1,27 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { useDebounceFn } from '@vueuse/core'
+import { onMounted, ref, watch } from 'vue'
 import { z } from 'zod'
 import type { LinkCandidate } from '~/composables/usePlayers'
 import { errorMessage, pgErrorCode } from '~/utils/errors'
 
 type Mode = 'manual' | 'link' | 'invite'
 
-const props = defineProps<{
-  teamId: string
-  player?: {
-    id: string
-    name: string
-    jersey_number: number | null
-    position: string | null
-    photo_consent: boolean
-    active: boolean
-  } | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    teamId: string
+    player?: {
+      id: string
+      name: string
+      jersey_number: number | null
+      position: string | null
+      photo_consent: boolean
+      active: boolean
+    } | null
+    autoSave?: boolean
+  }>(),
+  { player: null, autoSave: false },
+)
 
 const emit = defineEmits<{
   (e: 'saved'): void
@@ -45,6 +50,7 @@ const active = ref(props.player?.active ?? true)
 const fieldErrors = ref<{ name?: string; jersey_number?: string; email?: string }>({})
 const submitError = ref<string | null>(null)
 const loading = ref(false)
+const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
 const candidates = ref<LinkCandidate[]>([])
 const selectedCandidateId = ref('')
 const mode = ref<Mode>('invite')
@@ -66,6 +72,66 @@ const onCandidateChange = () => {
 }
 
 const jerseyNumberModel = useNullableNumberModel(jerseyNumber)
+
+const mapSaveError = (err: unknown) =>
+  pgErrorCode(err) === '23505'
+    ? 'Trikotnummer ist im aktiven Kader bereits vergeben. Zuerst den bisherigen Spieler deaktivieren.'
+    : errorMessage(err, 'Spieler konnte nicht gespeichert werden.')
+
+const lastSaved = ref(
+  props.player
+    ? {
+        name: props.player.name,
+        jersey_number: props.player.jersey_number,
+        position: props.player.position,
+        photo_consent: props.player.photo_consent,
+        active: props.player.active,
+      }
+    : null,
+)
+
+const doAutoSave = async () => {
+  if (!props.player) return
+  fieldErrors.value = {}
+  const parsed = schema.safeParse({
+    name: name.value,
+    jersey_number: jerseyNumber.value,
+    position: position.value.trim() === '' ? null : position.value.trim(),
+    photo_consent: consent.value,
+    active: active.value,
+  })
+  if (!parsed.success) {
+    for (const issue_ of parsed.error.issues) {
+      const key = issue_.path[0]
+      if (key === 'name') fieldErrors.value.name = issue_.message
+      if (key === 'jersey_number') fieldErrors.value.jersey_number = issue_.message
+    }
+    return
+  }
+  if (JSON.stringify(parsed.data) === JSON.stringify(lastSaved.value)) return
+  submitError.value = null
+  saveStatus.value = 'saving'
+  try {
+    await update(props.player.id, parsed.data)
+    lastSaved.value = parsed.data
+    saveStatus.value = 'saved'
+    emit('saved')
+  } catch (err) {
+    saveStatus.value = 'error'
+    submitError.value = mapSaveError(err)
+  }
+}
+
+const debouncedAutoSave = useDebounceFn(doAutoSave, 600)
+
+watch([name, jerseyNumber, position], () => {
+  if (!props.autoSave) return
+  saveStatus.value = 'idle'
+  debouncedAutoSave()
+})
+watch([consent, active], () => {
+  if (props.autoSave) doAutoSave()
+})
 
 const submit = async () => {
   fieldErrors.value = {}
@@ -131,12 +197,7 @@ const submit = async () => {
       }
     }
     // SQLSTATE only: a 409 from issue() means a duplicate invitation, not a jersey clash.
-    if (pgErrorCode(err) === '23505') {
-      submitError.value =
-        'Trikotnummer ist im aktiven Kader bereits vergeben. Zuerst den bisherigen Spieler deaktivieren.'
-    } else {
-      submitError.value = errorMessage(err, 'Spieler konnte nicht gespeichert werden.')
-    }
+    submitError.value = mapSaveError(err)
   } finally {
     loading.value = false
   }
@@ -222,5 +283,13 @@ defineExpose({ loading })
       <span class="text-sm font-medium text-foreground">Aktiv im Kader</span>
     </label>
     <p v-if="submitError" class="text-sm text-destructive" role="alert">{{ submitError }}</p>
+    <p
+      v-if="autoSave && saveStatus !== 'idle' && saveStatus !== 'error'"
+      class="text-sm text-neutral-500"
+      aria-live="polite"
+      data-testid="player-form-save-status"
+    >
+      {{ saveStatus === 'saving' ? 'Speichert…' : 'Gespeichert' }}
+    </p>
   </form>
 </template>
