@@ -109,34 +109,38 @@ const fetchActiveRoster = async (db: Db, teamId: string): Promise<RosterPlayer[]
 // manual) last set player_id — used to stop a *new* jersey-number group from
 // auto-claiming a player already attributed to a different jersey number in
 // the same match (research.md §10/§14, FR-016).
-const fetchExistingAssignments = async (tx: Tx, matchId: string): Promise<Map<number, string>> => {
+const fetchExistingAssignments = async (
+  tx: Tx,
+  matchId: string,
+): Promise<Map<number, string | null>> => {
   const rows = await tx
     .select({
       veoJerseyNumber: schema.veoPlayerMatchStats.veoJerseyNumber,
       playerId: schema.veoPlayerMatchStats.playerId,
+      matchedManually: schema.veoPlayerMatchStats.matchedManually,
     })
     .from(schema.veoPlayerMatchStats)
-    .where(
-      and(
-        eq(schema.veoPlayerMatchStats.matchId, matchId),
-        isNotNull(schema.veoPlayerMatchStats.playerId),
-      ),
-    )
-  const byJersey = new Map<number, string>()
-  for (const row of rows) byJersey.set(row.veoJerseyNumber, row.playerId as string)
+    .where(eq(schema.veoPlayerMatchStats.matchId, matchId))
+  const byJersey = new Map<number, string | null>()
+  for (const row of rows) {
+    if (row.playerId !== null || row.matchedManually) {
+      byJersey.set(row.veoJerseyNumber, row.playerId)
+    }
+  }
   return byJersey
 }
 
 const reserveAssignments = (
   rows: VeoPlayerMatchStatRow[],
-  existingByJersey: Map<number, string>,
+  existingByJersey: Map<number, string | null>,
 ): VeoPlayerMatchStatRow[] => {
-  const existingJerseyNumbers = new Set(existingByJersey.keys())
   const claimedPlayerIds = new Set(existingByJersey.values())
   return rows.map((row) => {
     // An existing jersey-number group's player_id is preserved unchanged on
-    // conflict regardless of what we send — safe to leave as mapped.
-    if (existingJerseyNumbers.has(row.veoJerseyNumber)) return row
+    // conflict regardless of what we send, including a manual clear.
+    if (existingByJersey.has(row.veoJerseyNumber)) {
+      return { ...row, playerId: existingByJersey.get(row.veoJerseyNumber) ?? null }
+    }
     if (row.playerId !== null && claimedPlayerIds.has(row.playerId)) {
       return { ...row, playerId: null }
     }
@@ -178,32 +182,45 @@ const syncTeam = async (db: Db, mapping: TeamMapping) => {
     // Fetched once per team per run, not per match (research.md §5).
     const roster = await fetchActiveRoster(db, mapping.teamId)
 
+    let hasMatchFailure = false
+    let firstMatchError: unknown
+    let syncedMatches = 0
     for (const match of analyzable) {
-      const statsPayload = await fetchAnalysisStats(accessToken, {
-        veoTeamId: match.team__id,
-        veoMatchIds: [match.identifier],
-      })
-      // Fetched before the transaction, same as statsPayload above: a
-      // failure here must skip the whole match (match + team stats
-      // included), not just the player stats (FR-015, research.md §13).
-      const playerStatsPayload = await fetchPlayerAnalysisStats(accessToken, {
-        veoMatchIds: [match.identifier],
-      })
-      // One transaction per match: a malformed stats payload or a failure
-      // half-way through must not leave a freshly synced match row next to
-      // stale or partial stats (FR-008, fail closed).
-      await db.transaction(async (tx) => {
-        const matchId = await upsertMatch(tx, mapping.teamId, match)
-        await upsertStats(tx, mapAnalysisStatsToRows(statsPayload, matchId))
+      try {
+        const statsPayload = await fetchAnalysisStats(accessToken, {
+          veoTeamId: match.team__id,
+          veoMatchIds: [match.identifier],
+        })
+        // Fetched before the transaction, same as statsPayload above: a
+        // failure here must skip the whole match (match + team stats
+        // included), not just the player stats (FR-015, research.md §13).
+        const playerStatsPayload = await fetchPlayerAnalysisStats(accessToken, {
+          veoMatchIds: [match.identifier],
+        })
+        // One transaction per match: a malformed stats payload or a failure
+        // half-way through must not leave a freshly synced match row next to
+        // stale or partial stats (FR-008, fail closed).
+        await db.transaction(async (tx) => {
+          const matchId = await upsertMatch(tx, mapping.teamId, match)
+          await upsertStats(tx, mapAnalysisStatsToRows(statsPayload, matchId))
 
-        const mappedPlayerRows = mapPlayerStats(playerStatsPayload, matchId, roster)
-        const existingByJersey = await fetchExistingAssignments(tx, matchId)
-        await upsertPlayerStats(tx, reserveAssignments(mappedPlayerRows, existingByJersey))
-      })
+          const mappedPlayerRows = mapPlayerStats(playerStatsPayload, matchId, roster)
+          const existingByJersey = await fetchExistingAssignments(tx, matchId)
+          await upsertPlayerStats(tx, reserveAssignments(mappedPlayerRows, existingByJersey))
+        })
+        syncedMatches += 1
+      } catch (err) {
+        hasMatchFailure = true
+        if (firstMatchError === undefined) firstMatchError = err
+      }
     }
 
+    if (hasMatchFailure) {
+      await recordFailure(db, mapping.teamId, firstMatchError)
+      return { teamId: mapping.teamId, ok: false, matches: syncedMatches }
+    }
     await recordSuccess(db, mapping.teamId)
-    return { teamId: mapping.teamId, ok: true, matches: analyzable.length }
+    return { teamId: mapping.teamId, ok: true, matches: syncedMatches }
   } catch (err) {
     await recordFailure(db, mapping.teamId, err)
     return { teamId: mapping.teamId, ok: false }

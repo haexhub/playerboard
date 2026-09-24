@@ -61,6 +61,9 @@ export type VeoSeasonSummary = {
   categoryTotals: Record<string, number>
 }
 
+const MAX_STATS = new Set(['top_speed_kmh'])
+const MEAN_STATS = new Set(['average_speed_kmh'])
+
 /** Aggregates own-team results/stats across the given matches — season
  * overview for User Story 2. Computed on read, not stored (research.md §6). */
 export const computeSeasonSummary = (matches: VeoMatch[]): VeoSeasonSummary => {
@@ -86,6 +89,7 @@ export const computeSeasonSummary = (matches: VeoMatch[]): VeoSeasonSummary => {
  * §6). A player with no assigned rows anywhere simply never appears. */
 export const computePlayerSeasonSummary = (matches: VeoMatch[]): VeoPlayerSeasonTotals[] => {
   const byPlayer = new Map<string, VeoPlayerSeasonTotals>()
+  const meanCounts = new Map<string, number>()
   for (const match of matches) {
     for (const stat of match.player_stats) {
       const existing = byPlayer.get(stat.player_id) ?? {
@@ -94,7 +98,17 @@ export const computePlayerSeasonSummary = (matches: VeoMatch[]): VeoPlayerSeason
         jerseyNumber: stat.jersey_number,
         statTotals: {},
       }
-      existing.statTotals[stat.stat_type] = (existing.statTotals[stat.stat_type] ?? 0) + stat.value
+      const previous = existing.statTotals[stat.stat_type]
+      if (MAX_STATS.has(stat.stat_type)) {
+        existing.statTotals[stat.stat_type] = Math.max(previous ?? -Infinity, stat.value)
+      } else if (MEAN_STATS.has(stat.stat_type)) {
+        const countKey = `${stat.player_id}:${stat.stat_type}`
+        const count = (meanCounts.get(countKey) ?? 0) + 1
+        meanCounts.set(countKey, count)
+        existing.statTotals[stat.stat_type] = ((previous ?? 0) * (count - 1) + stat.value) / count
+      } else {
+        existing.statTotals[stat.stat_type] = (previous ?? 0) + stat.value
+      }
       byPlayer.set(stat.player_id, existing)
     }
   }

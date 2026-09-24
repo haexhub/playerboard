@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
+import { toast } from 'vue-sonner'
 import type { ActiveRosterPlayer, VeoMatch } from '~/composables/useVeoAnalytics'
 import { useVeoPlayerAssignment } from '~/composables/useVeoPlayerAssignment'
 import { categoryLabel, statLabel } from '~/utils/veoStatLabels'
@@ -105,18 +106,20 @@ const selections = reactive<Record<number, string>>({})
 const saving = reactive<Record<number, boolean>>({})
 
 const submitAssignment = async (jerseyNumber: number) => {
-  const playerId = selections[jerseyNumber]
-  if (!playerId || !props.teamId) return
+  const playerId = selections[jerseyNumber] ?? ''
+  if (!props.teamId) return
   saving[jerseyNumber] = true
   try {
     await assignPlayer({
       team_id: props.teamId,
       match_id: props.match.id,
       veo_jersey_number: jerseyNumber,
-      player_id: playerId,
+      player_id: playerId === '' ? null : playerId,
     })
     selections[jerseyNumber] = ''
     emit('reassigned')
+  } catch {
+    toast.error('Zuordnung konnte nicht gespeichert werden')
   } finally {
     saving[jerseyNumber] = false
   }
@@ -222,7 +225,9 @@ const submitAssignment = async (jerseyNumber: number) => {
           type="button"
           class="min-h-touch rounded border border-neutral-300 px-3 text-sm"
           :data-testid="`veo-assignment-submit-${group.jerseyNumber}`"
-          :disabled="!selections[group.jerseyNumber] || saving[group.jerseyNumber]"
+          :disabled="
+            saving[group.jerseyNumber] || (!selections[group.jerseyNumber] && !group.playerId)
+          "
           @click="submitAssignment(group.jerseyNumber)"
         >
           {{ group.playerId ? 'Zuordnung ändern' : 'Spieler zuordnen' }}

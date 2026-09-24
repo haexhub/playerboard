@@ -240,6 +240,22 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
         value: 10,
       },
       {
+        match_id: matchDrawId,
+        veo_jersey_number: 7,
+        stat_type: 'top_speed_kmh',
+        player_id: player7!.id,
+        category: 'physical',
+        value: 27.8,
+      },
+      {
+        match_id: matchDrawId,
+        veo_jersey_number: 7,
+        stat_type: 'average_speed_kmh',
+        player_id: player7!.id,
+        category: 'physical',
+        value: 18.2,
+      },
+      {
         match_id: matchWinId,
         veo_jersey_number: 7,
         stat_type: 'distance_total_meters',
@@ -254,6 +270,22 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
         player_id: player7!.id,
         category: 'physical',
         value: 12,
+      },
+      {
+        match_id: matchWinId,
+        veo_jersey_number: 7,
+        stat_type: 'top_speed_kmh',
+        player_id: player7!.id,
+        category: 'physical',
+        value: 26.1,
+      },
+      {
+        match_id: matchWinId,
+        veo_jersey_number: 7,
+        stat_type: 'average_speed_kmh',
+        player_id: player7!.id,
+        category: 'physical',
+        value: 19.4,
       },
       {
         match_id: matchWinId,
@@ -283,14 +315,20 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     const player7SeasonRow = seasonRows.filter({ hasText: '#7' })
     await expect(
       player7SeasonRow.getByTestId(`veo-player-season-stat-${player7!.id}-distance_total_meters`),
-    ).toHaveText('11000')
+    ).toHaveText('11.000')
     await expect(
       player7SeasonRow.getByTestId(`veo-player-season-stat-${player7!.id}-sprints_total`),
     ).toHaveText('22')
+    await expect(
+      player7SeasonRow.getByTestId(`veo-player-season-stat-${player7!.id}-top_speed_kmh`),
+    ).toHaveText('27,8')
+    await expect(
+      player7SeasonRow.getByTestId(`veo-player-season-stat-${player7!.id}-average_speed_kmh`),
+    ).toHaveText('18,8')
     const player10SeasonRow = seasonRows.filter({ hasText: '#10' })
     await expect(
       player10SeasonRow.getByTestId(`veo-player-season-stat-${player10!.id}-seconds_played_total`),
-    ).toHaveText('2700')
+    ).toHaveText('2.700')
     await expect(pageA.locator('body')).not.toContainText('#99')
 
     // US2 — per-match breakdown on the analytics page; jersey 99 stays
@@ -323,6 +361,21 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
       drawCard.getByTestId('veo-assignment-submit-99').click(),
     ])
     await expect(drawCard.getByTestId('veo-assignment-row-99')).toContainText('Jersey Twenty-Three')
+
+    // Trainers can clear an existing assignment by selecting the empty option.
+    await drawCard.getByTestId('veo-assignment-select-99').selectOption('')
+    await Promise.all([
+      pageA.waitForResponse(
+        (res) =>
+          res.url().includes(`/api/veo/matches/${matchDrawId}/player-assignment`) &&
+          res.request().method() === 'POST',
+      ),
+      drawCard.getByTestId('veo-assignment-submit-99').click(),
+    ])
+    const [clearedJersey99] = await restGet<{ player_id: string | null }>(
+      `veo_player_match_stats?match_id=eq.${matchDrawId}&veo_jersey_number=eq.99&stat_type=eq.football_goal_total&select=player_id`,
+    )
+    expect(clearedJersey99!.player_id).toBeNull()
 
     // FR-016 — assigning jersey 99 (same match) to player7, who already
     // holds jersey 7 in this exact match, must clear jersey 7's rows rather

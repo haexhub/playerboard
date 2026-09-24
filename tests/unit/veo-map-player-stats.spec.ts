@@ -39,6 +39,32 @@ describe('mapPlayerStats', () => {
     expect(rows.some((r) => r.statType === 'football_touches_total')).toBe(false)
   })
 
+  it('keeps only the first row for a duplicate jersey/stat key', () => {
+    const payload = {
+      items: [
+        {
+          player: { jersey_number: '7' },
+          stats: [{ category: { id: 'physical' }, value: 27.8, type: 'top_speed_kmh' }],
+        },
+        {
+          player: { jersey_number: '07' },
+          stats: [{ category: { id: 'physical' }, value: 26.1, type: 'top_speed_kmh' }],
+        },
+      ],
+    }
+
+    expect(mapPlayerStats(payload, MATCH_ID, ROSTER)).toEqual([
+      {
+        matchId: MATCH_ID,
+        veoJerseyNumber: 7,
+        statType: 'top_speed_kmh',
+        playerId: 'player-7',
+        category: 'physical',
+        value: 27.8,
+      },
+    ])
+  })
+
   it('maps an empty item list to no rows', () => {
     expect(mapPlayerStats({ items: [] }, MATCH_ID, ROSTER)).toEqual([])
   })

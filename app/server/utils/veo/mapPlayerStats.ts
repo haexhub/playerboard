@@ -56,19 +56,26 @@ export const mapPlayerStats = (
   }
   const playerIdByJersey = new Map(roster.map((p) => [p.jerseyNumber, p.id]))
 
-  return parsed.data.items.flatMap((item) => {
+  const rowsByKey = new Map<string, VeoPlayerMatchStatRow>()
+  for (const item of parsed.data.items) {
     const veoJerseyNumber = Number.parseInt(item.player.jersey_number, 10)
-    if (!Number.isFinite(veoJerseyNumber)) return []
+    if (!Number.isFinite(veoJerseyNumber)) continue
     const playerId = playerIdByJersey.get(veoJerseyNumber) ?? null
-    return item.stats
-      .filter((stat) => CURATED_STAT_TYPES.has(stat.type))
-      .map((stat) => ({
+    for (const stat of item.stats) {
+      if (!CURATED_STAT_TYPES.has(stat.type)) continue
+      const key = `${veoJerseyNumber}:${stat.type}`
+      // Keep the first occurrence so duplicate Veo rows have deterministic
+      // behavior without allowing them to collide at the database key.
+      if (rowsByKey.has(key)) continue
+      rowsByKey.set(key, {
         matchId,
         veoJerseyNumber,
         statType: stat.type,
         playerId,
         category: stat.category.id,
         value: stat.value,
-      }))
-  })
+      })
+    }
+  }
+  return [...rowsByKey.values()]
 }

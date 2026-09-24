@@ -48,7 +48,7 @@ const CURATED_STAT_ORDER = [
             class="text-right tabular-nums font-medium"
             :data-testid="`veo-player-season-stat-${player.playerId}-${statType}`"
           >
-            {{ player.statTotals[statType] }}
+            {{ player.statTotals[statType]!.toLocaleString('de-DE', { maximumFractionDigits: 1 }) }}
           </span>
         </template>
       </div>
