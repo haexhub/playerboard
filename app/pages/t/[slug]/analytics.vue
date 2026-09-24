@@ -6,6 +6,7 @@ import VeoSyncStatusBanner from '~/components/veo/VeoSyncStatusBanner.vue'
 import {
   computeSeasonSummary,
   useVeoAnalytics,
+  type ActiveRosterPlayer,
   type VeoMatch,
   type VeoSyncStatus,
 } from '~/composables/useVeoAnalytics'
@@ -14,13 +15,16 @@ definePageMeta({
   middleware: ['team-context'],
 })
 
-const { currentTeam } = useTeamContext()
-const { listMatches, getSyncStatus } = useVeoAnalytics()
+const { currentTeam, isTrainer } = useTeamContext()
+const { listMatches, getSyncStatus, listUnassignedJerseyNumbers, getActiveRoster } =
+  useVeoAnalytics()
 
 const matches = ref<VeoMatch[]>([])
 const syncStatus = ref<VeoSyncStatus | null>(null)
 const isLoading = ref(false)
 const loadError = ref<string | null>(null)
+const activeRoster = ref<ActiveRosterPlayer[]>([])
+const unassignedByMatch = ref<Record<string, number[]>>({})
 
 const load = async () => {
   const teamId = currentTeam.value?.id
@@ -36,6 +40,22 @@ const load = async () => {
     syncStatus.value = statusResult.status === 'fulfilled' ? statusResult.value : null
     if (matchesResult.status === 'rejected') throw matchesResult.reason
     matches.value = matchesResult.value
+
+    // US3 — trainer-only correction data, fetched alongside the match list
+    // but never mixed into the member-facing `matches` above.
+    if (isTrainer.value) {
+      const matchIds = matches.value.map((m) => m.id)
+      const [rosterResult, unassignedResult] = await Promise.allSettled([
+        getActiveRoster(teamId),
+        listUnassignedJerseyNumbers(matchIds),
+      ])
+      activeRoster.value = rosterResult.status === 'fulfilled' ? rosterResult.value : []
+      unassignedByMatch.value =
+        unassignedResult.status === 'fulfilled' ? unassignedResult.value : {}
+    } else {
+      activeRoster.value = []
+      unassignedByMatch.value = {}
+    }
   } catch (err) {
     loadError.value = err instanceof Error ? err.message : 'Konnte Veo-Daten nicht laden'
   } finally {
@@ -74,7 +94,16 @@ const seasonSummary = computed(() => computeSeasonSummary(matches.value))
     </p>
     <div v-else class="space-y-4">
       <VeoSeasonSummary :summary="seasonSummary" />
-      <VeoMatchCard v-for="match in matches" :key="match.id" :match="match" />
+      <VeoMatchCard
+        v-for="match in matches"
+        :key="match.id"
+        :match="match"
+        :team-id="currentTeam?.id"
+        :is-trainer="isTrainer"
+        :roster="activeRoster"
+        :unassigned-jersey-numbers="unassignedByMatch[match.id] ?? []"
+        @reassigned="load"
+      />
     </div>
   </section>
 </template>

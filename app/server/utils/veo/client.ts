@@ -107,6 +107,22 @@ const veoTeamSchema = z.object({
 export type VeoClub = z.infer<typeof veoClubSchema>
 export type VeoTeam = z.infer<typeof veoTeamSchema>
 
+/** POST .../api/app/analysis/stats/ for a batch of matches, grouped by
+ * player instead of team association (004-veo-player-analytics research.md
+ * §1) — no `team_id` field needed for this variant. */
+export const fetchPlayerAnalysisStats = async (
+  accessToken: string,
+  params: { veoMatchIds: string[] },
+): Promise<unknown> =>
+  veoFetch(accessToken, '/analysis/stats/', {
+    method: 'POST',
+    body: JSON.stringify({
+      type: 'cross_match',
+      group_by: 'player',
+      match_ids: params.veoMatchIds,
+    }),
+  })
+
 /** GET .../api/app/clubs/?filter=own — every club the token's Veo user
  * belongs to. Used only by the trainer-initiated linking flow
  * (`POST /api/veo/login`), never by the daily sync. */
