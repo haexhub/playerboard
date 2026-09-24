@@ -152,13 +152,19 @@ const onSliderCommit = (player: ActivePlayer, category: ActiveCategory) => {
   void commitCell(player.id, category.id, category)
 }
 
-const resetCell = (player: ActivePlayer, category: ActiveCategory) => {
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+
+const stepValue = (player: ActivePlayer, category: ActiveCategory, delta: number) => {
   const k = key(player.id, category.id)
   const cell = cells[k]
   if (!cell) return
+  const next =
+    cell.value === null
+      ? category.value_min
+      : clamp(cell.value + delta, category.value_min, category.value_max)
   cellRevisions.set(k, (cellRevisions.get(k) ?? 0) + 1)
   cell.status = 'idle'
-  cell.value = null
+  cell.value = next
   void commitCell(player.id, category.id, category)
 }
 </script>
@@ -235,8 +241,8 @@ const resetCell = (player: ActivePlayer, category: ActiveCategory) => {
             class="border-b border-neutral-200 px-1 py-1 align-middle"
             :data-testid="`cell-${p.id}-${c.id}`"
           >
-            <div class="flex flex-col gap-1 w-32">
-              <div class="flex items-center gap-1">
+            <div class="flex flex-col gap-1.5 w-72">
+              <div class="flex items-center gap-2">
                 <input
                   type="number"
                   inputmode="numeric"
@@ -244,7 +250,7 @@ const resetCell = (player: ActivePlayer, category: ActiveCategory) => {
                   :max="c.value_max"
                   :value="cells[key(p.id, c.id)]?.value ?? ''"
                   :aria-label="`${p.name} — ${c.name}`"
-                  class="min-h-touch w-14 rounded border border-neutral-300 px-2 py-1 text-right focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                  class="min-h-touch w-16 shrink-0 rounded border border-neutral-300 px-2 py-1 text-right focus:outline-none focus:ring-2 focus:ring-neutral-900"
                   :class="{
                     'border-red-500': cells[key(p.id, c.id)]?.status === 'error',
                     'border-green-500': cells[key(p.id, c.id)]?.status === 'saved',
@@ -253,46 +259,43 @@ const resetCell = (player: ActivePlayer, category: ActiveCategory) => {
                   @blur="onBlur(p, c)"
                 />
                 <button
-                  v-if="cells[key(p.id, c.id)]?.value !== null"
                   type="button"
-                  aria-label="Wert zurücksetzen"
-                  title="Wert zurücksetzen"
-                  class="min-h-touch min-w-touch inline-flex items-center justify-center text-neutral-400 hover:text-neutral-700"
-                  @click="resetCell(p, c)"
+                  :disabled="cells[key(p.id, c.id)]?.value === c.value_min"
+                  :aria-label="`${p.name} — ${c.name} verringern`"
+                  title="Verringern"
+                  class="flex h-12 w-12 shrink-0 items-center justify-center rounded border border-neutral-300 bg-white text-xl font-semibold text-neutral-700 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:pointer-events-none"
+                  @click="stepValue(p, c, -1)"
                 >
-                  ×
+                  −
                 </button>
-                <span
-                  v-if="cells[key(p.id, c.id)]?.status === 'saving'"
-                  class="text-xs text-neutral-500"
+                <ShadcnSlider
+                  :model-value="sliderValue(p.id, c.id, c)"
+                  :min="c.value_min"
+                  :max="c.value_max"
+                  :step="1"
+                  :aria-label="`${p.name} — ${c.name} (Slider)`"
+                  class="flex-1 **:data-[slot=slider-track]:h-3 **:data-[slot=slider-thumb]:size-11"
+                  :class="{ 'opacity-40': cells[key(p.id, c.id)]?.value === null }"
+                  @update:model-value="onSliderInput(p.id, c.id, $event)"
+                  @value-commit="onSliderCommit(p, c)"
+                />
+                <button
+                  type="button"
+                  :disabled="cells[key(p.id, c.id)]?.value === c.value_max"
+                  :aria-label="`${p.name} — ${c.name} erhöhen`"
+                  title="Erhöhen"
+                  class="flex h-12 w-12 shrink-0 items-center justify-center rounded border border-neutral-300 bg-white text-xl font-semibold text-neutral-700 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:pointer-events-none"
+                  @click="stepValue(p, c, 1)"
                 >
-                  …
-                </span>
-                <span
-                  v-else-if="cells[key(p.id, c.id)]?.status === 'saved'"
-                  class="text-xs text-green-700"
-                  aria-label="gespeichert"
-                >
-                  ✓
-                </span>
-                <span
-                  v-else-if="cells[key(p.id, c.id)]?.status === 'error'"
-                  class="text-xs text-red-700"
-                  :title="cells[key(p.id, c.id)]?.error"
-                >
-                  !
-                </span>
+                  +
+                </button>
               </div>
-              <ShadcnSlider
-                :model-value="sliderValue(p.id, c.id, c)"
-                :min="c.value_min"
-                :max="c.value_max"
-                :step="1"
-                :aria-label="`${p.name} — ${c.name} (Slider)`"
-                :class="{ 'opacity-40': cells[key(p.id, c.id)]?.value === null }"
-                @update:model-value="onSliderInput(p.id, c.id, $event)"
-                @value-commit="onSliderCommit(p, c)"
-              />
+              <div
+                v-if="cells[key(p.id, c.id)]?.status === 'error'"
+                class="flex items-center gap-1 pl-1"
+              >
+                <span class="text-xs text-red-700" :title="cells[key(p.id, c.id)]?.error"> ! </span>
+              </div>
             </div>
           </td>
         </tr>
