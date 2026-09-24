@@ -91,10 +91,18 @@ must confirm. `auth.admin.updateUserById(..., { email, email_confirm: true })` i
 allowed because it changes a global login identity without proving that the account owner asked
 for it.
 
-The final confirmation route re-acquires the same linked-user lock, verifies the authenticated
-caller is the linked user and that Auth now reports the requested address, then updates
-`players.email` and marks the request confirmed in one database transaction. Until then, both
-previous email values remain intact.
+The final confirmation route re-acquires the same lock, verifies the authenticated caller is the
+linked user and that Auth now reports the requested address, then updates `players.email` and
+marks the request confirmed in one database transaction. Until then, both previous email values
+remain intact.
+
+**Implementation note**: both routes lock by `pg_advisory_xact_lock(hashtext(player_id))` rather
+than `linked_user_id`. `player_id` is known from the route param before any row is read in both
+routes, so the lock can be acquired first and the row read fresh afterward under it; locking by
+`linked_user_id` would require reading the row (to learn `linked_user_id`) *before* acquiring the
+lock meant to guard that same read, which is a race. Locking by `player_id` serializes the same
+"one linked-email lifecycle at a time" outcome this decision requires, since a player has at most
+one `linked_user_id` at a time.
 
 **Rationale**: The application uses passwordless magic-link login. A trainer-controlled direct
 Auth update would let a trainer redirect another user's global login to an address they control,
@@ -179,3 +187,38 @@ being assigned arbitrarily.
 when the application already knows their invitation or login address. Their new edit form would
 show an empty email and the direct resend button would be disabled immediately after rollout.
 The unique index must be created after this cleanup so deployment cannot fail on legacy data.
+
+## 9. Owner-confirmation UI location
+
+**Decision**: The linked account owner sees and acts on a pending email-change request on the
+existing `/profile` page (specs/002-member-profile), not a new page. A small section reads the
+caller's own pending request (owner-scoped RLS read on `player_email_change_requests`), lets them
+trigger `supabase.auth.updateUser({ email: requestedEmail })` (Secure Email Change — both the
+current and new address must confirm before Auth's email actually changes), and once Auth reports
+the new address, a "Fertig" action calls `POST /api/players/[player_id]/email/confirm`.
+
+**Rationale**: Contracts (§ `POST /api/players/[player_id]/email/confirm`) fully specify the API
+shape but not where a human interacts with it — this was a real gap discovered during
+implementation, not an oversight in reading the spec. `/profile` already exists as this app's
+self-service account page (002-member-profile), is where a user already goes to manage their own
+account details, and already has the pattern this needs (an authenticated-self read/write section
+gated by the caller's own identity). Confirmed with the operator rather than assumed, since
+several equally reasonable placements existed (a dedicated notification, a banner on `/t/{slug}`,
+etc.) with different complexity/visibility tradeoffs.
+
+**Alternatives considered**:
+- *New dedicated page/route just for this*: rejected — one more page for a single, rare action;
+  `/profile` already exists for exactly this kind of self-service account action.
+- *Global banner shown on any page while a request is pending*: rejected — more moving parts
+  (needs to run on every route) for a flow the owner only needs to visit once per request.
+
+## 10. `requestLinkedEmailChange` naming
+
+**Decision**: The `usePlayers()` composable function for the trainer-initiated request is named
+`requestLinkedEmailChange`, not `updateLinkedEmail` as originally sketched in an earlier planning
+pass.
+
+**Rationale**: The function never updates anything — per decision §4, it only ever creates a
+pending `player_email_change_requests` row. `updateLinkedEmail` would misdescribe its own
+behavior to the next reader; the name was corrected during implementation to match what the code
+actually does (`tasks.md` T017/T018 updated to match).

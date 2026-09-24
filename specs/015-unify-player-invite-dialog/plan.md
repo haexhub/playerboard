@@ -98,11 +98,19 @@ app/
     │                           # magic link as today; if not found, insert as today (unchanged path)
     └── players/
         └── [player_id]/
-            └── email.post.ts  # New. Trainer-gated request phase: validates the player and creates a
-                                 # short-lived owner-confirmation request; it never mutates Auth.
-                └── email/confirm.post.ts  # New. Owner-gated finalization after normal Supabase
-                                           # email-change confirmation; verifies Auth email and updates
-                                           # `players.email` plus the request atomically.
+            ├── email.post.ts          # New. Trainer-gated request phase: validates the player and creates a
+            │                           # short-lived owner-confirmation request; it never mutates Auth.
+            └── email/
+                └── confirm.post.ts    # New. Owner-gated finalization after normal Supabase
+                                        # email-change confirmation; verifies Auth email and updates
+                                        # `players.email` plus the request atomically.
+
+app/pages/
+└── profile.vue                # (specs/002-member-profile) + a small section: reads the caller's own
+                                 # pending player_email_change_requests row (owner-scoped RLS), triggers
+                                 # supabase.auth.updateUser({ email }), and a "Fertig" action that calls
+                                 # the confirm route above (research.md §9 — location decided with the
+                                 # operator; contracts specified the API but not the UI surface)
 
 db/schema/index.ts               # + `email: text('email')` on `players`, + `players_email_per_team_uniq`
                                    # partial unique index, request table, RLS, and linked-email trigger

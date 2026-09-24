@@ -64,6 +64,7 @@ const submit = async () => {
         position: position.value.trim() || null,
         photo_consent: false,
         active: true,
+        email: parsed.data.email,
       })
       player_id = created.id
       createdPlayerId = created.id

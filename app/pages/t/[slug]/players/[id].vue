@@ -40,6 +40,8 @@ type PlayerInfo = {
   position: string | null
   photo_consent: boolean
   active: boolean
+  email: string | null
+  linked_user_id: string | null
 }
 
 const player = ref<PlayerInfo | null>(null)
@@ -62,7 +64,9 @@ const loadStatic = async () => {
   // and filtering on its empty id would render "nicht gefunden" for a real player.
   const { data: p, error } = await client
     .from('players')
-    .select('id, team_id, name, jersey_number, position, photo_consent, active')
+    .select(
+      'id, team_id, name, jersey_number, position, photo_consent, active, email, linked_user_id',
+    )
     .eq('id', playerId)
     .maybeSingle()
   if (error) throw error

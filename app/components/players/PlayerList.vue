@@ -9,10 +9,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'edit', player: PlayerRow): void
-  (e: 'invite'): void
 }>()
 
 const { list, setActive, setConsent, linkUser, listLinkCandidates } = usePlayers()
+const { issue } = useInvitations()
 
 type PlayerRow = Awaited<ReturnType<typeof list>>[number]
 
@@ -21,6 +21,7 @@ const candidates = ref<LinkCandidate[]>([])
 const linkSelection = ref<Record<string, string>>({})
 const loading = ref(false)
 const error = ref<string | null>(null)
+const notice = ref<string | null>(null)
 let latestLoad = 0
 
 const load = async () => {
@@ -68,6 +69,18 @@ const onDeactivate = async (row: PlayerRow) => {
   }
 }
 
+const onInvite = async (row: PlayerRow) => {
+  if (!row.email || row.linked_user_id) return
+  error.value = null
+  notice.value = null
+  try {
+    await issue({ team_id: props.teamId, email: row.email, role: 'player', player_id: row.id })
+    notice.value = `Einladung an ${row.email} gesendet.`
+  } catch (err) {
+    error.value = errorMessage(err, 'Einladung konnte nicht verschickt werden.')
+  }
+}
+
 const onLink = async (row: PlayerRow) => {
   const userId = linkSelection.value[row.id]
   if (!userId) return
@@ -85,6 +98,7 @@ defineExpose({ reload: load })
 <template>
   <div class="space-y-3" data-testid="player-list">
     <h3 class="text-sm font-semibold text-foreground">Spieler:innen</h3>
+    <p v-if="notice" class="text-sm text-foreground" role="status">{{ notice }}</p>
     <p v-if="loading" class="text-sm text-muted-foreground">Lade…</p>
     <p v-else-if="error" class="text-sm text-destructive" role="alert">{{ error }}</p>
     <p v-else-if="players.length === 0" class="text-sm text-muted-foreground">
@@ -184,7 +198,8 @@ defineExpose({ reload: load })
                 data-testid="player-invite-button"
                 variant="outline"
                 size="sm"
-                @click="emit('invite')"
+                :disabled="!row.email || !!row.linked_user_id"
+                @click="onInvite(row)"
               >
                 Einladen
               </ShadcnButton>
