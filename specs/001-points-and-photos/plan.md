@@ -95,7 +95,7 @@ app/
 │   ├── ui/                       # shadcn-vue primitives (button, input, dialog, alert…)
 │   ├── auth/                     # LoginMagicLink, OnboardingWizard, TeamCreateForm, InvitationAcceptCard
 │   ├── team/                     # TeamSwitcher, MembershipTable, InviteForm, InviteList
-│   ├── trainings/                # TrainingPointGrid, TrainingPhotoUpload, ConsentWarningBanner, TrainingPhotoGallery
+│   ├── trainings/                # TrainingPointGrid (incl. consent icon), TrainingPhotoUpload, TrainingPhotoGallery
 │   ├── players/                  # PlayerList, PlayerForm, ConsentToggle
 │   ├── categories/               # CategoryList, CategoryForm
 │   └── stats/                    # RankingTable, PlayerProgressChart, TimeframePicker

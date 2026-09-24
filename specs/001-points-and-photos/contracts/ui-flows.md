@@ -100,7 +100,8 @@ Identical to Round 1 in shape, but all IDs are team-scoped:
   current team; on save the category list reloads and the grid gains a
   column immediately, no navigation away from S1.
 - Photo upload writes to `training-photos/<team_id>/<training_id>/<uuid>.ext`.
-- Consent banner lists no-consent players of the current team.
+- Players without photo consent are flagged with a red warning icon
+  (tooltip) next to their name in the grid row.
 - Auto-save per cell; "Speichern" transitions status to `saved`.
 
 ### S2 — Player dashboard (`/t/:slug/dashboard`)

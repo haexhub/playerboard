@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { AlertCircle } from '@lucide/vue'
 import { computed, reactive, watch } from 'vue'
 import type { ActiveCategory } from '~/composables/useCategories'
 import type { ActivePlayer } from '~/composables/usePlayers'
@@ -234,6 +235,12 @@ const stepValue = (player: ActivePlayer, category: ActiveCategory, delta: number
           >
             <span class="text-neutral-500 mr-1">{{ jerseyLabel(p) }}</span>
             <NuxtLink :to="`/t/${slug}/players/${p.id}`" class="underline">{{ p.name }}</NuxtLink>
+            <AlertCircle
+              v-if="!p.photo_consent"
+              class="inline size-4 text-red-600 ml-1 align-text-bottom"
+              :title="`Keine Foto-Einwilligung: ${p.name}`"
+              data-testid="consent-missing-icon"
+            />
           </th>
           <td
             v-for="c in categories"
