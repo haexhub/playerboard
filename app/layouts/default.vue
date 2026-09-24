@@ -10,7 +10,7 @@ const { currentSlug, isTrainer } = useTeamContext()
 
 <template>
   <div class="min-h-screen bg-background">
-    <header class="border-b bg-card sticky top-0 z-10">
+    <header class="border-b bg-card sticky top-0 z-30">
       <div class="mx-auto max-w-4xl px-4 py-3 flex items-center justify-between gap-3">
         <NuxtLink
           v-if="currentSlug"

@@ -198,13 +198,16 @@ const stepValue = (player: ActivePlayer, category: ActiveCategory, delta: number
 </script>
 
 <template>
-  <div class="relative overflow-x-auto rounded border border-neutral-200 bg-white">
-    <table class="w-full text-sm border-collapse" data-testid="training-point-grid">
-      <thead class="sticky top-0 z-10 bg-neutral-100">
-        <tr>
-          <th
+  <div class="training-point-grid-scroll max-h-[calc(100dvh-12rem)] overflow-auto">
+    <ShadcnTable
+      class="rounded border border-neutral-200 bg-white"
+      data-testid="training-point-grid"
+    >
+      <ShadcnTableHeader class="sticky top-0 z-10 bg-neutral-100">
+        <ShadcnTableRow class="hover:bg-transparent">
+          <ShadcnTableHead
             scope="col"
-            class="sticky left-0 z-20 bg-neutral-100 border-b border-r border-neutral-200 px-3 py-2 text-left font-semibold min-w-[10rem]"
+            class="sticky left-0 z-20 bg-neutral-100 border-b border-r border-neutral-200 px-3 py-2 text-left font-semibold text-foreground min-w-[10rem]"
           >
             <div class="flex items-center gap-1">
               Spieler:in
@@ -219,19 +222,22 @@ const stepValue = (player: ActivePlayer, category: ActiveCategory, delta: number
                 +
               </button>
             </div>
-          </th>
-          <th
+          </ShadcnTableHead>
+          <ShadcnTableHead
             v-for="c in categories"
             :key="c.id"
             scope="col"
-            class="border-b border-neutral-200 px-2 py-2 text-left font-semibold whitespace-nowrap"
+            class="border-b border-neutral-200 px-2 py-2 text-left font-semibold text-foreground whitespace-nowrap"
           >
             {{ c.name }}
             <span class="block text-[10px] font-normal text-neutral-500">
               {{ c.value_min }}–{{ c.value_max }}
             </span>
-          </th>
-          <th scope="col" class="border-b border-neutral-200 px-2 py-2 text-left font-semibold">
+          </ShadcnTableHead>
+          <ShadcnTableHead
+            scope="col"
+            class="border-b border-neutral-200 px-2 py-2 text-left font-semibold text-foreground"
+          >
             <button
               type="button"
               aria-label="Kategorie hinzufügen"
@@ -242,20 +248,18 @@ const stepValue = (player: ActivePlayer, category: ActiveCategory, delta: number
             >
               +
             </button>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-if="!players.length">
-          <td
-            :colspan="categories.length + 2"
-            class="px-3 py-3 text-sm text-neutral-500"
-            data-testid="training-grid-empty-players"
-          >
-            Noch keine Spieler:innen.
-          </td>
-        </tr>
-        <tr v-for="(p, playerIndex) in players" :key="p.id" class="min-h-touch">
+          </ShadcnTableHead>
+        </ShadcnTableRow>
+      </ShadcnTableHeader>
+      <ShadcnTableBody>
+        <ShadcnTableEmpty
+          v-if="!players.length"
+          :colspan="categories.length + 2"
+          data-testid="training-grid-empty-players"
+        >
+          Noch keine Spieler:innen.
+        </ShadcnTableEmpty>
+        <ShadcnTableRow v-for="(p, playerIndex) in players" :key="p.id" class="min-h-touch">
           <th
             scope="row"
             class="relative sticky left-0 z-20 bg-white border-b border-r border-neutral-200 px-3 py-2 pr-14 text-left font-medium align-middle min-h-touch"
@@ -295,7 +299,7 @@ const stepValue = (player: ActivePlayer, category: ActiveCategory, delta: number
               </span>
             </button>
           </th>
-          <td
+          <ShadcnTableCell
             v-for="c in categories"
             :key="c.id"
             class="border-b border-neutral-200 px-1 py-1 align-middle"
@@ -357,9 +361,16 @@ const stepValue = (player: ActivePlayer, category: ActiveCategory, delta: number
                 <span class="text-xs text-red-700" :title="cells[key(p.id, c.id)]?.error"> ! </span>
               </div>
             </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+          </ShadcnTableCell>
+        </ShadcnTableRow>
+      </ShadcnTableBody>
+    </ShadcnTable>
   </div>
 </template>
+
+<style scoped>
+/* Let the outer wrapper own vertical scrolling so the sticky header can follow it. */
+:deep(.training-point-grid-scroll > div) {
+  overflow-y: clip;
+}
+</style>
