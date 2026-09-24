@@ -38,7 +38,7 @@ const lastSaved = ref({
   photo_consent: props.player.photo_consent,
   active: props.player.active,
 })
-const lastSavedEmail = ref<string | null>(props.player.email)
+const lastSavedEmail = ref<string | null>(props.player.email?.trim().toLowerCase() || null)
 
 const doAutoSave = async () => {
   submitNotice.value = null

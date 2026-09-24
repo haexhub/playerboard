@@ -63,7 +63,9 @@ describe('usePlayerFormFields', () => {
       const { mapSaveError } = usePlayerFormFields(basePlayer)
       const err = {
         statusCode: 409,
-        statusMessage: 'Player conflicts with an existing player (players_email_per_team_uniq)',
+        data: {
+          statusMessage: 'Player conflicts with an existing player (players_email_per_team_uniq)',
+        },
       }
 
       expect(mapSaveError(err)).toContain('E-Mail')

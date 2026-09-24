@@ -76,7 +76,7 @@ test.describe('trainer manages a player email from the detail page', () => {
     await trainerPage.goto(`/t/${teamSlug}/players/${finn!.id}`, { waitUntil: 'networkidle' })
     const finnSettings = trainerPage.getByTestId('player-detail-settings')
     await finnSettings.getByLabel('E-Mail').fill(`ERIN-NEW-${suffix}@example.com`)
-    await expect(finnSettings.getByRole('alert')).toContainText(/bereits vergeben/i)
+    await expect(finnSettings.getByRole('alert')).toContainText(/E-Mail ist im Team bereits/i)
     await trainerPage.reload({ waitUntil: 'networkidle' })
     await expect(finnSettings.getByLabel('E-Mail')).toHaveValue('')
   })
