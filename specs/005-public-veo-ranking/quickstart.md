@@ -14,8 +14,8 @@ environment variable, dependency, deployment step, or cron entry.
 - **Local dev**: after pulling this feature, run `pnpm db:migrate` (new
   `veo_team_mappings.public_stats_enabled` column + `get_public_veo_stats`
   function) and `pnpm gen:types`, same as any other schema change.
-- **Trying it out**: as a trainer, open the team's Veo settings page
-  (`/t/<slug>/team/veo`) and enable the new public-visibility toggle, then
+- **Trying it out**: as a trainer, open the team's Veo-Analytics page
+  (`/t/<slug>/analytics`) and enable the new public-visibility toggle, then
   open `/public/<slug>/ranking` in a private/incognito window and switch to
   the "Veo-Stats" tab.
 - **Backfill**: none needed — the toggle only changes what's exposed, not
