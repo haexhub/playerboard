@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.8.0](https://github.com/haexhub/playerboard/compare/v0.7.0...v0.8.0) (2026-09-24)
+
+
+### Features
+
+* **team:** surface public ranking link in team settings ([8185f5b](https://github.com/haexhub/playerboard/commit/8185f5bc973dfd2a259b84ca2c5bafc172177e48))
+* **team:** surface public ranking link in team settings ([495150c](https://github.com/haexhub/playerboard/commit/495150c3a023da6f94f19b6f30ae3b33eff568e9))
+
+
+### Bug Fixes
+
+* **trainings:** address consent tooltip review ([a79d6bd](https://github.com/haexhub/playerboard/commit/a79d6bdded2bcebd9af3765aa0fc45de4a7ec6dd))
+* **trainings:** show consent tooltip and camera indicator ([5efd083](https://github.com/haexhub/playerboard/commit/5efd08317e253024aa582929bc8132417edd21d4))
+* **trainings:** show consent tooltip and camera indicator ([d80b320](https://github.com/haexhub/playerboard/commit/d80b320cbb4379393d6c76a95887a301858ccaaa))
+
 ## [0.7.0](https://github.com/haexhub/playerboard/compare/v0.6.1...v0.7.0) (2026-09-24)
 
 
