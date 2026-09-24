@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import PlayerForm from '~/components/players/PlayerForm.vue'
+import PlayerSettingsForm from '~/components/players/PlayerSettingsForm.vue'
 import PlayerProgressChart from '~/components/stats/PlayerProgressChart.vue'
 import TimeframePicker from '~/components/stats/TimeframePicker.vue'
 import { useCategories, type ActiveCategory } from '~/composables/useCategories'
@@ -143,7 +143,7 @@ watch(
       class="space-y-3 rounded-md border border-input p-4"
       data-testid="player-detail-settings"
     >
-      <PlayerForm :team-id="player.team_id" :player="player" auto-save @saved="onPlayerSaved" />
+      <PlayerSettingsForm :player="player" @saved="onPlayerSaved" />
     </div>
     <p v-if="playerReloadError" class="text-sm text-red-700" role="alert">
       {{ playerReloadError }}

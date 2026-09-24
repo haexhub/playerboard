@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useDebounceFn } from '@vueuse/core'
 import { z } from 'zod'
 import type { LinkCandidate } from '~/composables/usePlayers'
 import { errorMessage, pgErrorCode } from '~/utils/errors'
@@ -17,9 +16,8 @@ const props = withDefaults(
       photo_consent: boolean
       active: boolean
     } | null
-    autoSave?: boolean
   }>(),
-  { player: null, autoSave: false },
+  { player: null },
 )
 
 const emit = defineEmits<{
@@ -49,7 +47,6 @@ const active = ref(props.player?.active ?? true)
 const fieldErrors = ref<{ name?: string; jersey_number?: string; email?: string }>({})
 const submitError = ref<string | null>(null)
 const loading = ref(false)
-const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
 const candidates = ref<LinkCandidate[]>([])
 const selectedCandidateId = ref('')
 const mode = ref<Mode>('invite')
@@ -77,20 +74,9 @@ const mapSaveError = (err: unknown) =>
     ? 'Trikotnummer ist im aktiven Kader bereits vergeben. Zuerst den bisherigen Spieler deaktivieren.'
     : errorMessage(err, 'Spieler konnte nicht gespeichert werden.')
 
-const lastSaved = ref(
-  props.player
-    ? {
-        name: props.player.name,
-        jersey_number: props.player.jersey_number,
-        position: props.player.position,
-        photo_consent: props.player.photo_consent,
-        active: props.player.active,
-      }
-    : null,
-)
-
-const parseForm = () => {
+const submit = async () => {
   fieldErrors.value = {}
+  submitError.value = null
   const parsed = schema.safeParse({
     name: name.value,
     jersey_number: jerseyNumber.value,
@@ -104,80 +90,8 @@ const parseForm = () => {
       if (key === 'name') fieldErrors.value.name = issue_.message
       if (key === 'jersey_number') fieldErrors.value.jersey_number = issue_.message
     }
-    return null
-  }
-  return parsed.data
-}
-
-const doAutoSave = async () => {
-  if (!props.player) return
-  const parsed = parseForm()
-  if (!parsed) return
-  if (JSON.stringify(parsed) === JSON.stringify(lastSaved.value)) return
-  submitError.value = null
-  saveStatus.value = 'saving'
-  try {
-    await update(props.player.id, parsed)
-    lastSaved.value = parsed
-    saveStatus.value = 'saved'
-    emit('saved')
-  } catch (err) {
-    saveStatus.value = 'error'
-    submitError.value = mapSaveError(err)
-  }
-}
-
-// doAutoSave is triggered from two independent watchers (debounced text fields,
-// immediate checkboxes); serialize runs so a slower call can't resolve after and
-// clobber a newer one's saveStatus/lastSaved. A queued rerun re-reads the refs live,
-// so it always picks up whatever changed while the in-flight save was running.
-let autoSaveInFlight = false
-let autoSaveRerunQueued = false
-
-const runAutoSave = async () => {
-  if (autoSaveInFlight) {
-    autoSaveRerunQueued = true
     return
   }
-  autoSaveInFlight = true
-  try {
-    await doAutoSave()
-  } finally {
-    autoSaveInFlight = false
-    if (autoSaveRerunQueued) {
-      autoSaveRerunQueued = false
-      void runAutoSave()
-    }
-  }
-}
-
-const debouncedAutoSave = useDebounceFn(runAutoSave, 600)
-
-onBeforeUnmount(() => {
-  debouncedAutoSave.cancel()
-})
-
-watch([name, jerseyNumber, position], () => {
-  if (!props.autoSave) return
-  saveStatus.value = 'idle'
-  debouncedAutoSave()
-})
-watch([consent, active], () => {
-  if (props.autoSave) void runAutoSave()
-})
-
-const submit = async () => {
-  if (props.autoSave) {
-    // No submit button in autoSave mode, but the native form still submits on
-    // Enter: flush through the same guarded path instead of running a second,
-    // unguarded save that could race the debounced/immediate autosave watchers.
-    debouncedAutoSave.cancel()
-    await runAutoSave()
-    return
-  }
-  submitError.value = null
-  const parsed = parseForm()
-  if (!parsed) return
   let inviteEmailParsed: string | null = null
   if (!props.player && mode.value === 'invite') {
     const parsedEmail = inviteEmailSchema.safeParse(inviteEmail.value)
@@ -199,9 +113,9 @@ const submit = async () => {
   let createdPlayerId: string | null = null
   try {
     if (props.player) {
-      await update(props.player.id, parsed)
+      await update(props.player.id, parsed.data)
     } else {
-      const created = await create(props.teamId, parsed)
+      const created = await create(props.teamId, parsed.data)
       createdPlayerId = created.id
       if (mode.value === 'link') {
         await linkUser(created.id, selectedCandidateId.value)
@@ -310,13 +224,5 @@ defineExpose({ loading })
       <span class="text-sm font-medium text-foreground">Aktiv im Kader</span>
     </label>
     <p v-if="submitError" class="text-sm text-destructive" role="alert">{{ submitError }}</p>
-    <p
-      v-if="autoSave && saveStatus !== 'idle' && saveStatus !== 'error'"
-      class="text-sm text-neutral-500"
-      aria-live="polite"
-      data-testid="player-form-save-status"
-    >
-      {{ saveStatus === 'saving' ? 'Speichert…' : 'Gespeichert' }}
-    </p>
   </form>
 </template>

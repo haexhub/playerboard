@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { AlertCircle } from '@lucide/vue'
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import type { ActiveCategory } from '~/composables/useCategories'
 import type { ActivePlayer } from '~/composables/usePlayers'
 import { useTrainings } from '~/composables/useTrainings'
@@ -53,6 +53,19 @@ const ensureCells = () => {
 watch(() => [props.players, props.categories], ensureCells, { immediate: true })
 
 const jerseyLabel = (p: ActivePlayer) => (p.jersey_number !== null ? `#${p.jersey_number}` : '')
+
+const consentWarning = (name: string) =>
+  `Keine Foto-Einwilligung: Fotos mit ${name} werden für andere ausgeblendet.`
+// The warning icon's tooltip only surfaces on hover, which touch devices have no
+// equivalent for; make it a focusable button that toggles a visible panel instead,
+// closing on blur so tapping elsewhere (or the icon again) dismisses it.
+const openConsentInfo = ref<string | null>(null)
+const toggleConsentInfo = (playerId: string) => {
+  openConsentInfo.value = openConsentInfo.value === playerId ? null : playerId
+}
+const closeConsentInfo = (playerId: string) => {
+  if (openConsentInfo.value === playerId) openConsentInfo.value = null
+}
 
 const cellRevisions = new Map<CellKey, number>()
 const cellQueues = new Map<CellKey, Promise<void>>()
@@ -235,12 +248,27 @@ const stepValue = (player: ActivePlayer, category: ActiveCategory, delta: number
           >
             <span class="text-neutral-500 mr-1">{{ jerseyLabel(p) }}</span>
             <NuxtLink :to="`/t/${slug}/players/${p.id}`" class="underline">{{ p.name }}</NuxtLink>
-            <AlertCircle
-              v-if="!p.photo_consent"
-              class="inline size-4 text-red-600 ml-1 align-text-bottom"
-              :title="`Keine Foto-Einwilligung: Fotos mit ${p.name} werden für andere ausgeblendet.`"
-              data-testid="consent-missing-icon"
-            />
+            <span v-if="!p.photo_consent" class="relative inline-block align-text-bottom">
+              <button
+                type="button"
+                class="ml-1 inline-flex size-4 items-center justify-center text-red-600"
+                :aria-expanded="openConsentInfo === p.id"
+                :aria-label="consentWarning(p.name)"
+                :title="consentWarning(p.name)"
+                data-testid="consent-missing-icon"
+                @click="toggleConsentInfo(p.id)"
+                @blur="closeConsentInfo(p.id)"
+              >
+                <AlertCircle class="size-4" aria-hidden="true" />
+              </button>
+              <span
+                v-if="openConsentInfo === p.id"
+                role="tooltip"
+                class="absolute left-0 top-full z-10 mt-1 w-56 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-normal text-neutral-700 shadow-md"
+              >
+                {{ consentWarning(p.name) }}
+              </span>
+            </span>
           </th>
           <td
             v-for="c in categories"
