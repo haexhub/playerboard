@@ -198,167 +198,179 @@ const stepValue = (player: ActivePlayer, category: ActiveCategory, delta: number
 </script>
 
 <template>
-  <ShadcnTable class="rounded border border-neutral-200 bg-white" data-testid="training-point-grid">
-    <ShadcnTableHeader class="sticky top-0 z-10 bg-neutral-100">
-      <ShadcnTableRow class="hover:bg-transparent">
-        <ShadcnTableHead
-          scope="col"
-          class="sticky left-0 z-20 bg-neutral-100 border-b border-r border-neutral-200 px-3 py-2 text-left font-semibold text-foreground min-w-[10rem]"
-        >
-          <div class="flex items-center gap-1">
-            Spieler:in
-            <button
-              type="button"
-              aria-label="Spieler:in hinzufügen"
-              title="Spieler:in hinzufügen"
-              data-testid="training-grid-add-player-button"
-              class="min-h-touch min-w-touch inline-flex items-center justify-center rounded border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50"
-              @click="$emit('add-player')"
-            >
-              +
-            </button>
-          </div>
-        </ShadcnTableHead>
-        <ShadcnTableHead
-          v-for="c in categories"
-          :key="c.id"
-          scope="col"
-          class="border-b border-neutral-200 px-2 py-2 text-left font-semibold text-foreground whitespace-nowrap"
-        >
-          {{ c.name }}
-          <span class="block text-[10px] font-normal text-neutral-500">
-            {{ c.value_min }}–{{ c.value_max }}
-          </span>
-        </ShadcnTableHead>
-        <ShadcnTableHead
-          scope="col"
-          class="border-b border-neutral-200 px-2 py-2 text-left font-semibold text-foreground"
-        >
-          <button
-            type="button"
-            aria-label="Kategorie hinzufügen"
-            title="Kategorie hinzufügen"
-            data-testid="training-grid-add-category-button"
-            class="min-h-touch min-w-touch inline-flex items-center justify-center rounded border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50"
-            @click="$emit('add-category')"
+  <div class="training-point-grid-scroll max-h-[calc(100dvh-12rem)] overflow-auto">
+    <ShadcnTable
+      class="rounded border border-neutral-200 bg-white"
+      data-testid="training-point-grid"
+    >
+      <ShadcnTableHeader class="sticky top-0 z-10 bg-neutral-100">
+        <ShadcnTableRow class="hover:bg-transparent">
+          <ShadcnTableHead
+            scope="col"
+            class="sticky left-0 z-20 bg-neutral-100 border-b border-r border-neutral-200 px-3 py-2 text-left font-semibold text-foreground min-w-[10rem]"
           >
-            +
-          </button>
-        </ShadcnTableHead>
-      </ShadcnTableRow>
-    </ShadcnTableHeader>
-    <ShadcnTableBody>
-      <ShadcnTableEmpty
-        v-if="!players.length"
-        :colspan="categories.length + 2"
-        data-testid="training-grid-empty-players"
-      >
-        Noch keine Spieler:innen.
-      </ShadcnTableEmpty>
-      <ShadcnTableRow v-for="(p, playerIndex) in players" :key="p.id" class="min-h-touch">
-        <th
-          scope="row"
-          class="relative sticky left-0 z-20 bg-white border-b border-r border-neutral-200 px-3 py-2 pr-14 text-left font-medium align-middle min-h-touch"
-        >
-          <div class="flex items-center min-w-0">
-            <span class="text-neutral-500 mr-1">{{ jerseyLabel(p) }}</span>
-            <NuxtLink :to="`/t/${slug}/players/${p.id}`" class="underline">{{ p.name }}</NuxtLink>
-          </div>
-          <button
-            v-if="!p.photo_consent"
-            type="button"
-            :class="[
-              'absolute right-2 top-1/2 -translate-y-1/2 inline-flex min-h-touch min-w-touch items-center justify-center text-red-600',
-              dismissedConsentInfo !== p.id ? 'group' : '',
-            ]"
-            :aria-expanded="openConsentInfo === p.id"
-            :aria-label="consentWarning(p.name)"
-            :title="consentWarning(p.name)"
-            data-testid="consent-camera-icon"
-            @click="toggleConsentInfo(p.id)"
-            @blur="closeConsentInfo(p.id)"
-            @focus="resetConsentDismissal(p.id)"
-            @keydown.esc="dismissConsentInfo(p.id)"
-            @mouseenter="resetConsentDismissal(p.id)"
-            @mouseleave="closeConsentInfo(p.id)"
-          >
-            <Camera class="size-4" aria-hidden="true" />
-            <span
-              role="tooltip"
-              :class="[
-                'pointer-events-none invisible absolute right-0 z-50 w-56 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-normal text-neutral-700 opacity-0 shadow-md transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100',
-                playerIndex === players.length - 1 ? 'bottom-full mb-1' : 'top-full mt-1',
-                openConsentInfo === p.id ? 'visible opacity-100' : '',
-              ]"
-            >
-              {{ consentWarning(p.name) }}
-            </span>
-          </button>
-        </th>
-        <ShadcnTableCell
-          v-for="c in categories"
-          :key="c.id"
-          class="border-b border-neutral-200 px-1 py-1 align-middle"
-          :data-testid="`cell-${p.id}-${c.id}`"
-        >
-          <div class="flex flex-col gap-1.5 w-72">
-            <div class="flex items-center gap-2">
-              <input
-                type="number"
-                inputmode="numeric"
-                :min="c.value_min"
-                :max="c.value_max"
-                :value="cells[key(p.id, c.id)]?.value ?? ''"
-                :aria-label="`${p.name} — ${c.name}`"
-                class="min-h-touch w-16 shrink-0 rounded border border-neutral-300 px-2 py-1 text-right focus:outline-none focus:ring-2 focus:ring-neutral-900"
-                :class="{
-                  'border-red-500': cells[key(p.id, c.id)]?.status === 'error',
-                  'border-green-500': cells[key(p.id, c.id)]?.status === 'saved',
-                }"
-                @input="onInput(p.id, c.id, $event)"
-                @blur="onBlur(p, c)"
-              />
+            <div class="flex items-center gap-1">
+              Spieler:in
               <button
                 type="button"
-                :disabled="cells[key(p.id, c.id)]?.value === c.value_min"
-                :aria-label="`${p.name} — ${c.name} verringern`"
-                title="Verringern"
-                class="flex h-12 w-12 shrink-0 items-center justify-center rounded border border-neutral-300 bg-white text-xl font-semibold text-neutral-700 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:pointer-events-none"
-                @click="stepValue(p, c, -1)"
-              >
-                −
-              </button>
-              <ShadcnSlider
-                :model-value="sliderValue(p.id, c.id, c)"
-                :min="c.value_min"
-                :max="c.value_max"
-                :step="1"
-                :aria-label="`${p.name} — ${c.name} (Slider)`"
-                class="flex-1 **:data-[slot=slider-track]:h-3 **:data-[slot=slider-thumb]:size-11"
-                :class="{ 'opacity-40': cells[key(p.id, c.id)]?.value === null }"
-                @update:model-value="onSliderInput(p.id, c.id, $event)"
-                @value-commit="onSliderCommit(p, c)"
-              />
-              <button
-                type="button"
-                :disabled="cells[key(p.id, c.id)]?.value === c.value_max"
-                :aria-label="`${p.name} — ${c.name} erhöhen`"
-                title="Erhöhen"
-                class="flex h-12 w-12 shrink-0 items-center justify-center rounded border border-neutral-300 bg-white text-xl font-semibold text-neutral-700 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:pointer-events-none"
-                @click="stepValue(p, c, 1)"
+                aria-label="Spieler:in hinzufügen"
+                title="Spieler:in hinzufügen"
+                data-testid="training-grid-add-player-button"
+                class="min-h-touch min-w-touch inline-flex items-center justify-center rounded border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50"
+                @click="$emit('add-player')"
               >
                 +
               </button>
             </div>
-            <div
-              v-if="cells[key(p.id, c.id)]?.status === 'error'"
-              class="flex items-center gap-1 pl-1"
+          </ShadcnTableHead>
+          <ShadcnTableHead
+            v-for="c in categories"
+            :key="c.id"
+            scope="col"
+            class="border-b border-neutral-200 px-2 py-2 text-left font-semibold text-foreground whitespace-nowrap"
+          >
+            {{ c.name }}
+            <span class="block text-[10px] font-normal text-neutral-500">
+              {{ c.value_min }}–{{ c.value_max }}
+            </span>
+          </ShadcnTableHead>
+          <ShadcnTableHead
+            scope="col"
+            class="border-b border-neutral-200 px-2 py-2 text-left font-semibold text-foreground"
+          >
+            <button
+              type="button"
+              aria-label="Kategorie hinzufügen"
+              title="Kategorie hinzufügen"
+              data-testid="training-grid-add-category-button"
+              class="min-h-touch min-w-touch inline-flex items-center justify-center rounded border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50"
+              @click="$emit('add-category')"
             >
-              <span class="text-xs text-red-700" :title="cells[key(p.id, c.id)]?.error"> ! </span>
+              +
+            </button>
+          </ShadcnTableHead>
+        </ShadcnTableRow>
+      </ShadcnTableHeader>
+      <ShadcnTableBody>
+        <ShadcnTableEmpty
+          v-if="!players.length"
+          :colspan="categories.length + 2"
+          data-testid="training-grid-empty-players"
+        >
+          Noch keine Spieler:innen.
+        </ShadcnTableEmpty>
+        <ShadcnTableRow v-for="(p, playerIndex) in players" :key="p.id" class="min-h-touch">
+          <th
+            scope="row"
+            class="relative sticky left-0 z-20 bg-white border-b border-r border-neutral-200 px-3 py-2 pr-14 text-left font-medium align-middle min-h-touch"
+          >
+            <div class="flex items-center min-w-0">
+              <span class="text-neutral-500 mr-1">{{ jerseyLabel(p) }}</span>
+              <NuxtLink :to="`/t/${slug}/players/${p.id}`" class="underline">{{ p.name }}</NuxtLink>
             </div>
-          </div>
-        </ShadcnTableCell>
-      </ShadcnTableRow>
-    </ShadcnTableBody>
-  </ShadcnTable>
+            <button
+              v-if="!p.photo_consent"
+              type="button"
+              :class="[
+                'absolute right-2 top-1/2 -translate-y-1/2 inline-flex min-h-touch min-w-touch items-center justify-center text-red-600',
+                dismissedConsentInfo !== p.id ? 'group' : '',
+              ]"
+              :aria-expanded="openConsentInfo === p.id"
+              :aria-label="consentWarning(p.name)"
+              :title="consentWarning(p.name)"
+              data-testid="consent-camera-icon"
+              @click="toggleConsentInfo(p.id)"
+              @blur="closeConsentInfo(p.id)"
+              @focus="resetConsentDismissal(p.id)"
+              @keydown.esc="dismissConsentInfo(p.id)"
+              @mouseenter="resetConsentDismissal(p.id)"
+              @mouseleave="closeConsentInfo(p.id)"
+            >
+              <Camera class="size-4" aria-hidden="true" />
+              <span
+                role="tooltip"
+                :class="[
+                  'pointer-events-none invisible absolute right-0 z-50 w-56 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-normal text-neutral-700 opacity-0 shadow-md transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100',
+                  playerIndex === players.length - 1 ? 'bottom-full mb-1' : 'top-full mt-1',
+                  openConsentInfo === p.id ? 'visible opacity-100' : '',
+                ]"
+              >
+                {{ consentWarning(p.name) }}
+              </span>
+            </button>
+          </th>
+          <ShadcnTableCell
+            v-for="c in categories"
+            :key="c.id"
+            class="border-b border-neutral-200 px-1 py-1 align-middle"
+            :data-testid="`cell-${p.id}-${c.id}`"
+          >
+            <div class="flex flex-col gap-1.5 w-72">
+              <div class="flex items-center gap-2">
+                <input
+                  type="number"
+                  inputmode="numeric"
+                  :min="c.value_min"
+                  :max="c.value_max"
+                  :value="cells[key(p.id, c.id)]?.value ?? ''"
+                  :aria-label="`${p.name} — ${c.name}`"
+                  class="min-h-touch w-16 shrink-0 rounded border border-neutral-300 px-2 py-1 text-right focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                  :class="{
+                    'border-red-500': cells[key(p.id, c.id)]?.status === 'error',
+                    'border-green-500': cells[key(p.id, c.id)]?.status === 'saved',
+                  }"
+                  @input="onInput(p.id, c.id, $event)"
+                  @blur="onBlur(p, c)"
+                />
+                <button
+                  type="button"
+                  :disabled="cells[key(p.id, c.id)]?.value === c.value_min"
+                  :aria-label="`${p.name} — ${c.name} verringern`"
+                  title="Verringern"
+                  class="flex h-12 w-12 shrink-0 items-center justify-center rounded border border-neutral-300 bg-white text-xl font-semibold text-neutral-700 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:pointer-events-none"
+                  @click="stepValue(p, c, -1)"
+                >
+                  −
+                </button>
+                <ShadcnSlider
+                  :model-value="sliderValue(p.id, c.id, c)"
+                  :min="c.value_min"
+                  :max="c.value_max"
+                  :step="1"
+                  :aria-label="`${p.name} — ${c.name} (Slider)`"
+                  class="flex-1 **:data-[slot=slider-track]:h-3 **:data-[slot=slider-thumb]:size-11"
+                  :class="{ 'opacity-40': cells[key(p.id, c.id)]?.value === null }"
+                  @update:model-value="onSliderInput(p.id, c.id, $event)"
+                  @value-commit="onSliderCommit(p, c)"
+                />
+                <button
+                  type="button"
+                  :disabled="cells[key(p.id, c.id)]?.value === c.value_max"
+                  :aria-label="`${p.name} — ${c.name} erhöhen`"
+                  title="Erhöhen"
+                  class="flex h-12 w-12 shrink-0 items-center justify-center rounded border border-neutral-300 bg-white text-xl font-semibold text-neutral-700 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:pointer-events-none"
+                  @click="stepValue(p, c, 1)"
+                >
+                  +
+                </button>
+              </div>
+              <div
+                v-if="cells[key(p.id, c.id)]?.status === 'error'"
+                class="flex items-center gap-1 pl-1"
+              >
+                <span class="text-xs text-red-700" :title="cells[key(p.id, c.id)]?.error"> ! </span>
+              </div>
+            </div>
+          </ShadcnTableCell>
+        </ShadcnTableRow>
+      </ShadcnTableBody>
+    </ShadcnTable>
+  </div>
 </template>
+
+<style scoped>
+/* Let the outer wrapper own vertical scrolling so the sticky header can follow it. */
+:deep(.training-point-grid-scroll > div) {
+  overflow-y: clip;
+}
+</style>
