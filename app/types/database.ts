@@ -838,6 +838,7 @@ export type Database = {
       is_profile_visible: { Args: { p_profile: string }; Returns: boolean }
       is_trainer: { Args: { p_team: string }; Returns: boolean }
       is_veo_enabled: { Args: { p_team: string }; Returns: boolean }
+      players_auth_email: { Args: { user_id: string }; Returns: string }
       reorder_point_categories: {
         Args: { p_items: Json; p_team: string }
         Returns: undefined
@@ -977,4 +978,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
