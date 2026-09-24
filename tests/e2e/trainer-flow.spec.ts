@@ -72,8 +72,22 @@ test.describe('US1 — trainer records point entries + at least one photo', () =
     // Missing photo consent surfaces as a red icon next to the player's name in the grid.
     const brunoRow = page.locator('tr', { hasText: 'Bruno' })
     await expect(brunoRow.getByTestId('consent-missing-icon')).toBeVisible()
+    await expect(brunoRow.getByTestId('consent-camera-icon')).toBeVisible()
+    await expect(brunoRow.getByTestId('consent-camera-icon')).toHaveCSS('position', 'absolute')
+    await expect(brunoRow.getByTestId('consent-camera-icon')).toHaveCSS('right', '8px')
+    const brunoConsentIcon = brunoRow.getByTestId('consent-missing-icon')
+    const brunoTooltip = brunoRow.getByRole('tooltip')
+    await brunoConsentIcon.click()
+    await expect(brunoTooltip).toHaveClass(/bottom-full/)
+    await expect(brunoTooltip).toBeVisible()
+    await brunoConsentIcon.click()
+    await expect(brunoTooltip).toBeHidden()
+    await brunoConsentIcon.click()
+    await brunoConsentIcon.press('Escape')
+    await expect(brunoTooltip).toBeHidden()
     const aliceRow = page.locator('tr', { hasText: 'Alice' })
     await expect(aliceRow.getByTestId('consent-missing-icon')).toHaveCount(0)
+    await expect(aliceRow.getByTestId('consent-camera-icon')).toHaveCount(0)
 
     // Save button is enabled as soon as the draft exists — photos are optional.
     await expect(page.getByTestId('training-save-button')).toBeEnabled({ timeout: 15_000 })
