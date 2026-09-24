@@ -1,15 +1,16 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-[specs/015-unify-player-invite-dialog/plan.md](specs/015-unify-player-invite-dialog/plan.md)
+[specs/004-veo-player-analytics/plan.md](specs/004-veo-player-analytics/plan.md)
 
 Companion artifacts:
 
-- Feature spec: [specs/015-unify-player-invite-dialog/spec.md](specs/015-unify-player-invite-dialog/spec.md)
-- Research decisions: [specs/015-unify-player-invite-dialog/research.md](specs/015-unify-player-invite-dialog/research.md)
-- Data model: [specs/015-unify-player-invite-dialog/data-model.md](specs/015-unify-player-invite-dialog/data-model.md)
-- RLS policies & route contracts: [specs/015-unify-player-invite-dialog/contracts/rls-policies.md](specs/015-unify-player-invite-dialog/contracts/rls-policies.md)
-- Quickstart: [specs/015-unify-player-invite-dialog/quickstart.md](specs/015-unify-player-invite-dialog/quickstart.md)
+- Feature spec: [specs/004-veo-player-analytics/spec.md](specs/004-veo-player-analytics/spec.md)
+- Research decisions: [specs/004-veo-player-analytics/research.md](specs/004-veo-player-analytics/research.md)
+- Data model: [specs/004-veo-player-analytics/data-model.md](specs/004-veo-player-analytics/data-model.md)
+- RLS policies contract: [specs/004-veo-player-analytics/contracts/rls-policies.md](specs/004-veo-player-analytics/contracts/rls-policies.md)
+- Quickstart: [specs/004-veo-player-analytics/quickstart.md](specs/004-veo-player-analytics/quickstart.md)
+- **Note**: Foundational schema (T001-T004) already landed via 005-public-veo-ranking; this feature builds the sync + UI on top of it (see [tasks.md](specs/004-veo-player-analytics/tasks.md)).
 
 Previous features (still shipping/maintained, not superseded):
 
@@ -21,14 +22,12 @@ Previous features (still shipping/maintained, not superseded):
 - Public Veo stats contract: [specs/005-public-veo-ranking/contracts/public-veo-stats.md](specs/005-public-veo-ranking/contracts/public-veo-stats.md)
 - Quickstart: [specs/005-public-veo-ranking/quickstart.md](specs/005-public-veo-ranking/quickstart.md)
 
-- Plan: [specs/004-veo-player-analytics/plan.md](specs/004-veo-player-analytics/plan.md)
-- Feature spec: [specs/004-veo-player-analytics/spec.md](specs/004-veo-player-analytics/spec.md)
-- Research decisions: [specs/004-veo-player-analytics/research.md](specs/004-veo-player-analytics/research.md)
-- Data model: [specs/004-veo-player-analytics/data-model.md](specs/004-veo-player-analytics/data-model.md)
-- RLS policies contract: [specs/004-veo-player-analytics/contracts/rls-policies.md](specs/004-veo-player-analytics/contracts/rls-policies.md)
-- Quickstart: [specs/004-veo-player-analytics/quickstart.md](specs/004-veo-player-analytics/quickstart.md)
-- **Note**: spec/plan/tasks only — implementation not started yet (005 depends on its foundational schema landing first, see 005/research.md §1).
-
+- Plan: [specs/015-unify-player-invite-dialog/plan.md](specs/015-unify-player-invite-dialog/plan.md)
+- Feature spec: [specs/015-unify-player-invite-dialog/spec.md](specs/015-unify-player-invite-dialog/spec.md)
+- Research decisions: [specs/015-unify-player-invite-dialog/research.md](specs/015-unify-player-invite-dialog/research.md)
+- Data model: [specs/015-unify-player-invite-dialog/data-model.md](specs/015-unify-player-invite-dialog/data-model.md)
+- RLS policies & route contracts: [specs/015-unify-player-invite-dialog/contracts/rls-policies.md](specs/015-unify-player-invite-dialog/contracts/rls-policies.md)
+- Quickstart: [specs/015-unify-player-invite-dialog/quickstart.md](specs/015-unify-player-invite-dialog/quickstart.md)
 - Plan: [specs/003-veo-analytics/plan.md](specs/003-veo-analytics/plan.md)
 - Feature spec: [specs/003-veo-analytics/spec.md](specs/003-veo-analytics/spec.md)
 - Research decisions: [specs/003-veo-analytics/research.md](specs/003-veo-analytics/research.md)

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { eq, sql } from 'drizzle-orm'
 import { serverSupabaseUser } from '#supabase/server'
 import { useAdminDb, schema } from '~/server/utils/db'
+import { pgError } from '~/server/utils/pg-error'
 
 const bodySchema = z.object({
   request_id: z.string().uuid(),
@@ -63,10 +64,20 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    await tx
-      .update(schema.players)
-      .set({ email: request.requestedEmail })
-      .where(eq(schema.players.id, playerIdCheck.data))
+    try {
+      await tx
+        .update(schema.players)
+        .set({ email: request.requestedEmail })
+        .where(eq(schema.players.linkedUserId, userId))
+    } catch (err) {
+      if (pgError(err).code === '23505') {
+        throw createError({
+          statusCode: 409,
+          statusMessage: 'Email already used by another player in this team',
+        })
+      }
+      throw err
+    }
 
     await tx
       .update(schema.playerEmailChangeRequests)

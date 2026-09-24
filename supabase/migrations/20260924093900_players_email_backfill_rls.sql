@@ -89,24 +89,51 @@ create policy player_email_change_requests_read_owner on public.player_email_cha
   for select to authenticated
   using (linked_user_id = auth.uid());
 
+-- The helper reads the Auth address while keeping auth.users out of the
+-- application's Drizzle schema. It is only callable by the trigger function.
+create function public.players_auth_email(user_id uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = pg_catalog, auth
+as $$
+  select lower(trim(email))
+  from auth.users
+  where id = user_id
+$$;
+
+revoke all on function public.players_auth_email(uuid) from public;
+
 -- players_linked_email_guard: once a player is linked, its email is also its
--- Auth login address, so an ordinary authenticated write (trainer via
--- usePlayers().update(), or anyone via PostgREST) must never change it
--- directly — only the privileged owner-confirmation route (useAdminDb(),
--- which connects as the `postgres` role) may. Checked via `rolbypassrls`,
--- not `rolsuper`: Supabase's local `postgres` login role is not a superuser
--- (rolsuper = false) but does have BYPASSRLS (rolbypassrls = true), which is
--- also the exact reason RLS policies don't apply to it in the first place —
--- confirmed empirically against the local stack (`select rolname, rolsuper,
--- rolbypassrls from pg_roles`), not assumed from the rolsuper precedent in
--- 20260915170000_public_ranking.sql / 20260923150000_public_veo_stats.sql,
--- which happens to work for its own unrelated purpose regardless of this.
+-- Auth login address. A new link gets the Auth address automatically, while
+-- an ordinary authenticated write must never change the address of a row that
+-- remains linked. The privileged owner-confirmation route connects as the
+-- `postgres` role and is allowed through the rolbypassrls check. This checks
+-- session_user because the trigger function is SECURITY DEFINER.
 create function public.players_linked_email_guard()
 returns trigger
 language plpgsql
+security definer
+set search_path = public, auth, pg_catalog
 as $$
 begin
-  if not (select rolbypassrls from pg_roles where rolname = current_user) then
+  if tg_op = 'INSERT' and new.linked_user_id is not null then
+    new.email := public.players_auth_email(new.linked_user_id);
+  elsif tg_op = 'UPDATE'
+    and new.linked_user_id is not null
+    and old.linked_user_id is distinct from new.linked_user_id then
+    new.email := public.players_auth_email(new.linked_user_id);
+  elsif tg_op = 'UPDATE'
+    and old.linked_user_id is not null
+    and new.linked_user_id is not null
+    and new.email is distinct from old.email
+    and not exists (
+      select 1
+      from pg_roles
+      where rolname = session_user
+        and rolbypassrls
+    ) then
     raise exception 'players.email for a linked player can only change through the owner-confirmed email change flow';
   end if;
   return new;
@@ -114,7 +141,6 @@ end;
 $$;
 
 create trigger players_linked_email_guard
-  before update on public.players
+  before insert or update on public.players
   for each row
-  when (old.linked_user_id is not null and new.email is distinct from old.email)
   execute function public.players_linked_email_guard();

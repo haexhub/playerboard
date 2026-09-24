@@ -3,19 +3,22 @@ import { computed, ref } from 'vue'
 import { z } from 'zod'
 import { errorMessage, isUniqueViolation } from '~/utils/errors'
 
-const props = defineProps<{
-  teamId: string
-  player?: {
-    id: string
-    name: string
-    jersey_number: number | null
-    position: string | null
-    photo_consent: boolean
-    active: boolean
-    email: string | null
-    linked_user_id: string | null
-  } | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    teamId: string
+    player?: {
+      id: string
+      name: string
+      jersey_number: number | null
+      position: string | null
+      photo_consent: boolean
+      active: boolean
+      email: string | null
+      linked_user_id: string | null
+    } | null
+  }>(),
+  { player: null },
+)
 
 const emit = defineEmits<{
   (e: 'saved'): void

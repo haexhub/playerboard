@@ -1,5 +1,4 @@
 import type { Database } from '~/types/database'
-import { assertRowsAffected } from '~/utils/errors'
 
 export type ActivePlayer = {
   id: string
@@ -96,9 +95,10 @@ export const usePlayers = () => {
       email: string | null
     }>,
   ) => {
-    const { data, error } = await client.from('players').update(payload).eq('id', id).select('id')
-    if (error) throw error
-    assertRowsAffected(data)
+    await $fetch<{ id: string }>(`/api/players/${id}`, {
+      method: 'PUT',
+      body: payload,
+    })
   }
 
   const remove = async (id: string) => {

@@ -114,6 +114,17 @@ test.describe('RLS negative — cross team (SC-008, SC-009)', () => {
     await restInsert('veo_team_mappings', [
       { team_id: teamBId, veo_club_slug: 'x', veo_team_slug: 'y', enabled: true },
     ])
+    const [veoMatchB] = await restInsert<{ id: string }>('veo_matches', [
+      {
+        team_id: teamBId,
+        veo_match_id: `x14-${suffix}`,
+        played_at: new Date().toISOString(),
+        opponent_name: 'X14 Opponent',
+        own_score: 1,
+        opponent_score: 0,
+        home_or_away: 'home',
+      },
+    ])
 
     // Real Storage object under team B's prefix, uploaded with the service
     // role (bypasses RLS — this is fixture setup, not the attack).
@@ -228,6 +239,17 @@ test.describe('RLS negative — cross team (SC-008, SC-009)', () => {
     await runAttackerChecks(trainerAToken)
     // X7 — same checks as PU_A.
     await runAttackerChecks(playerAToken)
+
+    // X14 — a trainer of team A cannot correct a Veo jersey-number
+    // assignment for a match belonging to team B (004-veo-player-analytics,
+    // P5). requireTrainer() checks the body's team_id against the caller's
+    // own membership, so this is denied before match ownership is even
+    // checked.
+    const x14 = await trainerAPage.request.post(
+      `/api/veo/matches/${veoMatchB!.id}/player-assignment`,
+      { data: { team_id: teamBId, veo_jersey_number: 9, player_id: null } },
+    )
+    expect(x14.status()).toBe(403)
 
     // Positive verification for X13 — team B's switch is still off despite
     // both attackers' attempts above.

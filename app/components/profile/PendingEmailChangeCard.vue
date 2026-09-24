@@ -28,7 +28,9 @@ const startChange = async () => {
   error.value = null
   loading.value = true
   try {
-    const { error: authErr } = await client.auth.updateUser({ email: request.value.requested_email })
+    const { error: authErr } = await client.auth.updateUser({
+      email: request.value.requested_email,
+    })
     if (authErr) throw authErr
   } catch (err) {
     error.value = errorMessage(err, 'E-Mail-Änderung konnte nicht gestartet werden.')

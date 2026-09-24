@@ -332,25 +332,25 @@ test.describe('US4 — trainer manages the player roster', () => {
     await trainerPage.goto(`/t/${teamSlug}/players/${player!.id}`, { waitUntil: 'networkidle' })
     await expect(trainerPage.getByTestId('player-detail-page')).toBeVisible()
 
-    // Edit affordance is trainer-visible and pre-fills the current values.
-    await trainerPage.getByTestId('player-detail-edit-button').click()
-    const editForm = trainerPage.getByTestId('player-detail-edit-form')
-    await expect(editForm).toBeVisible()
-    await expect(editForm.getByLabel('Name')).toHaveValue('Dana Detail')
-    await expect(editForm.getByLabel(/Trikotnummer/)).toHaveValue('5')
+    // Settings are always visible for trainers, pre-filled with the current values — no edit toggle.
+    const settings = trainerPage.getByTestId('player-detail-settings')
+    await expect(settings).toBeVisible()
+    await expect(settings.getByLabel('Name')).toHaveValue('Dana Detail')
+    await expect(settings.getByLabel(/Trikotnummer/)).toHaveValue('5')
 
-    // Change name, jersey number and photo consent, then save.
-    await editForm.getByLabel('Name').fill('Dana Detail II')
-    await editForm.getByLabel(/Trikotnummer/).fill('6')
-    const consentCheckbox = editForm.getByRole('checkbox', { name: 'Foto-Einwilligung' })
+    // Change name, jersey number and photo consent — changes save automatically, no Speichern button.
+    await settings.getByLabel('Name').fill('Dana Detail II')
+    await settings.getByLabel(/Trikotnummer/).fill('6')
+    const consentCheckbox = settings.getByRole('checkbox', { name: 'Foto-Einwilligung' })
     await consentCheckbox.check()
-    await trainerPage.getByTestId('player-detail-edit-submit').click()
+    await expect(settings.getByTestId('player-form-save-status')).toHaveText('Gespeichert', {
+      timeout: 10_000,
+    })
 
-    await expect(editForm).toBeHidden()
     const heading = trainerPage.getByRole('heading', { level: 1 })
     await expect(heading).toContainText('Dana Detail II')
     await expect(heading).toContainText('#6')
-    await expect(trainerPage.getByText('Foto-Einwilligung: Ja')).toBeVisible()
+    await expect(consentCheckbox).toBeChecked()
 
     // Consistency with the roster page: the same record reflects the change there too.
     await trainerPage.goto(`/t/${teamSlug}/players`, { waitUntil: 'networkidle' })
@@ -407,11 +407,38 @@ test.describe('US4 — trainer manages the player roster', () => {
     await expect(playerDialog).toBeHidden()
     await expect(elaRow.getByTestId('player-invite-button')).toBeEnabled()
 
+    // Changing an unlinked player's email also updates an already-open invite,
+    // even when the form is saved without checking "Direkt einladen" again.
+    const [team] = await restGet<{ id: string }>(`teams?select=id&slug=eq.${teamSlug}`)
+    const [ela] = await restGet<{ id: string }>(
+      `players?select=id&team_id=eq.${team!.id}&name=eq.Ela%20Erst`,
+    )
+    await elaRow.getByTestId('player-invite-button').click()
+    await expect(trainerPage.getByText(/gesendet/i)).toBeVisible()
+    await expect.poll(() => countMailsTo(sharedEmail)).toBe(1)
+    await fetchLatestMagicLink(sharedEmail)
+    const [oldInvitation] = await restGet<{ email: string; token: string }>(
+      `invitations?select=email,token&player_id=eq.${ela!.id}&accepted_at=is.null`,
+    )
+
+    const replacementEmail = `replacement-${suffix}@example.com`
+    await elaRow.getByTestId('player-edit-button').click()
+    await expect(playerDialog).toBeVisible()
+    await playerDialog.getByTestId('player-form-email').fill(replacementEmail)
+    await trainerPage.getByTestId('player-form-submit').click()
+    await expect(playerDialog).toBeHidden()
+    const [newInvitation] = await restGet<{ email: string; token: string }>(
+      `invitations?select=email,token&player_id=eq.${ela!.id}&accepted_at=is.null`,
+    )
+    expect(newInvitation!.email).toBe(replacementEmail)
+    expect(newInvitation!.token).not.toBe(oldInvitation!.token)
+    expect(await countMailsTo(replacementEmail)).toBe(0)
+
     // A second player in the same team cannot reuse that email (case-insensitive).
     await trainerPage.getByTestId('player-new-button').click()
     await expect(playerDialog).toBeVisible()
     await playerDialog.getByLabel('Name').fill('Zwo Zweiter')
-    await playerDialog.getByTestId('player-form-email').fill(sharedEmail.toUpperCase())
+    await playerDialog.getByTestId('player-form-email').fill(replacementEmail.toUpperCase())
     await trainerPage.getByTestId('player-form-submit').click()
     await expect(playerDialog.getByRole('alert')).toBeVisible()
     await expect(playerDialog).toBeVisible()

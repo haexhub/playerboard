@@ -9,7 +9,7 @@ const bodySchema = z.object({
   email: z.string().trim().toLowerCase().email(),
 })
 
-const REQUEST_TTL_MS = 30 * 60 * 1000
+const REQUEST_TTL_MS = 14 * 24 * 60 * 60 * 1000
 
 export default defineEventHandler(async (event) => {
   const user = await serverSupabaseUser(event)

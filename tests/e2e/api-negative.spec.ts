@@ -43,4 +43,21 @@ test.describe('API negative — unauthenticated callers', () => {
     // so 400-worthy) link_token is even checked — 401 still wins.
     expect(link.status()).toBe(401)
   })
+
+  // P6 (004-veo-player-analytics contracts/rls-policies.md).
+  test('POST /api/veo/matches/:matchId/player-assignment rejects an unauthenticated caller with 401', async ({
+    request,
+  }) => {
+    const res = await request.post(
+      '/api/veo/matches/00000000-0000-0000-0000-000000000000/player-assignment',
+      {
+        data: {
+          team_id: '00000000-0000-0000-0000-000000000000',
+          veo_jersey_number: 7,
+          player_id: null,
+        },
+      },
+    )
+    expect(res.status()).toBe(401)
+  })
 })

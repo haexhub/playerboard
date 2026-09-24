@@ -31,43 +31,49 @@ zurück zum Spielerstamm navigieren zu müssen.
 Detailseite (z. B. nach dem Antippen eines Spielers in der Rangliste) und sollen
 Korrekturen direkt dort vornehmen können, statt den Kontext zu wechseln.
 
-**Independent Test**: Als Trainer die Detailseite eines eigenen Spielers öffnen,
-Bearbeiten-Modus aktivieren, ein Feld ändern, speichern — die Änderung ist sofort
-auf derselben Seite sichtbar und im Spielerstamm konsistent.
+**Independent Test**: Als Trainer die Detailseite eines eigenen Spielers öffnen, ein
+Feld in den stets sichtbaren Einstellungen ändern — die Änderung wird automatisch
+gespeichert (bei Textfeldern debounced) und ist sofort auf derselben Seite sichtbar
+sowie im Spielerstamm konsistent.
 
 **Acceptance Scenarios**:
 
 1. **Given** ein Trainer betrachtet die Detailseite eines Spielers seines Teams,
-   **When** er den Bearbeiten-Modus aktiviert, **Then** werden Name, Trikotnummer,
-   Position, Foto-Einwilligung und Aktiv-Status als editierbare Felder mit den
-   aktuellen Werten angezeigt.
-2. **Given** der Trainer hat Felder geändert und klickt "Speichern", **When** das
-   Speichern erfolgreich ist, **Then** werden die neuen Werte inline angezeigt
-   (u. a. in der Überschrift mit Trikotnummer und Name) und der Bearbeiten-Modus
-   wird geschlossen.
+   **Then** werden Name, Trikotnummer, Position, Foto-Einwilligung und Aktiv-Status
+   sofort als editierbare Felder mit den aktuellen Werten angezeigt — ohne einen
+   separaten Bearbeiten-Modus aktivieren zu müssen.
+2. **Given** der Trainer ändert ein Feld, **When** die Eingabe gültig ist, **Then**
+   wird die Änderung automatisch gespeichert (Textfelder debounced, Checkboxen
+   sofort), ein kurzer Inline-Speicherstatus ("Speichert…" / "Gespeichert") erscheint,
+   und die neuen Werte werden angezeigt (u. a. in der Überschrift mit Trikotnummer
+   und Name) — ohne Speichern- oder Abbrechen-Button.
 3. **Given** der Trainer vergibt eine Trikotnummer, die bereits ein anderer aktiver
-   Spieler desselben Teams trägt, **When** er speichert, **Then** erscheint dieselbe
-   Fehlermeldung wie im Spielerstamm, und die eingegebenen Werte bleiben erhalten.
+   Spieler desselben Teams trägt, **When** die automatische Speicherung ausgelöst
+   wird, **Then** erscheint dieselbe Fehlermeldung wie im Spielerstamm, und die
+   eingegebenen Werte bleiben im Formular erhalten, ohne gespeichert zu werden.
 4. **Given** ein Teammitglied ohne Trainer-Rolle (Spieler) betrachtet dieselbe
-   Detailseite, **Then** ist keinerlei Bearbeiten-Steuerelement sichtbar — die Seite
-   verhält sich wie heute rein lesend.
+   Detailseite, **Then** ist der Einstellungen-Bereich (Name/Trikotnummer/Position/
+   Foto-Einwilligung/Aktiv-Status) nicht sichtbar — die Seite verhält sich wie heute
+   rein lesend.
 
 ---
 
 ### Edge Cases
 
 - Ungültige Eingabe (z. B. leerer Name, negative Trikotnummer): Inline-Validierungsfehler
-  wie im bestehenden Formular, Speichern wird verhindert.
+  wie im bestehenden Formular; die automatische Speicherung wird verhindert, bis der
+  Fehler behoben ist.
 - Trikotnummer-Konflikt mit einem anderen aktiven Spieler: gleiche Fehlermeldung wie
   im Spielerstamm ("Trikotnummer ist im aktiven Kader bereits vergeben...").
-- Speichervorgang läuft noch: Speichern-Button ist deaktiviert und zeigt einen
-  Ladezustand, Doppel-Submits werden verhindert.
+- Speichervorgang läuft noch: Ein Inline-Statustext zeigt "Speichert…"; es gibt keinen
+  expliziten Speichern-Button und damit keinen Doppel-Submit.
 - Rollenwechsel des Nutzers zwischen Laden der Seite und Speichern (z. B. Rolle wurde
   zwischenzeitlich auf "Spieler" geändert): Der Schreibzugriff wird durch die
   bestehende RLS-Policy ohnehin abgelehnt; die Seite zeigt die generische
   Fehlermeldung aus dem bestehenden Speicherpfad.
-- Abbrechen im Bearbeiten-Modus verwirft ungespeicherte Änderungen und zeigt wieder
-  die zuletzt gespeicherten Werte.
+- Tippen im Namens-, Trikotnummer- oder Positionsfeld: Die Speicherung ist debounced,
+  sodass nicht bei jedem Tastenanschlag ein Request ausgelöst wird, sondern erst nach
+  einer kurzen Pause ohne weitere Eingabe.
 
 ## Requirements *(mandatory)*
 
@@ -75,9 +81,11 @@ auf derselben Seite sichtbar und im Spielerstamm konsistent.
 
 - **FR-001**: Trainer MÜSSEN Name, Trikotnummer, Position, Foto-Einwilligung und
   Aktiv-Status eines Spielers direkt auf dessen Detailseite
-  (`/t/{slug}/players/{id}`) bearbeiten können, ohne zum Spielerstamm navigieren
-  zu müssen.
-- **FR-002**: Das Bearbeiten-Steuerelement MUSS ausschließlich für Nutzer mit
+  (`/t/{slug}/players/{id}`) als stets sichtbare, automatisch speichernde
+  Einstellungen bearbeiten können — ohne zum Spielerstamm zu navigieren, einen
+  separaten Bearbeiten-Modus zu aktivieren oder einen expliziten
+  Speichern-/Abbrechen-Button zu benutzen.
+- **FR-002**: Der Einstellungen-Bereich MUSS ausschließlich für Nutzer mit
   Trainer-Rolle im jeweiligen Team sichtbar sein; Teammitglieder ohne Trainer-Rolle
   sehen weiterhin nur die bestehende rein lesbare Ansicht.
 - **FR-003**: Feldset, Validierungsregeln und Trikotnummer-Konflikt-Behandlung
@@ -91,11 +99,15 @@ auf derselben Seite sichtbar und im Spielerstamm konsistent.
   Detailseite sichtbar sein.
 - **FR-005**: Die Detailseite MUSS zusätzlich zu den bereits geladenen Feldern
   (Name, Trikotnummer, Position) auch `photo_consent` und `active` laden, damit
-  der Bearbeiten-Modus mit den aktuellen Werten vorbefüllt werden kann.
+  der Einstellungen-Bereich mit den aktuellen Werten vorbefüllt werden kann.
 - **FR-006**: Für diese Fähigkeit DÜRFEN keine neuen Datenbanktabellen, -spalten
   oder RLS-Policies eingeführt werden; die Schreibautorisierung MUSS weiterhin
   ausschließlich über die bestehende trainer-write-RLS-Policy auf `players`
   erfolgen.
+- **FR-007**: Änderungen an Name, Trikotnummer und Position MÜSSEN debounced
+  automatisch gespeichert werden (kein Request pro Tastenanschlag); Änderungen an
+  Foto-Einwilligung und Aktiv-Status (Checkboxen) MÜSSEN sofort automatisch
+  gespeichert werden. Es gibt keinen expliziten Speichern- oder Abbrechen-Button.
 
 ### Key Entities
 
@@ -110,8 +122,8 @@ auf derselben Seite sichtbar und im Spielerstamm konsistent.
 - **SC-001**: Ein Trainer kann Name, Trikotnummer, Position, Foto-Einwilligung
   oder Aktiv-Status eines Spielers direkt von dessen Detailseite aus ändern, ohne
   die Seite zu verlassen.
-- **SC-002**: Nutzer ohne Trainer-Rolle sehen zu keinem Zeitpunkt ein
-  Bearbeiten-Steuerelement auf der Detailseite.
+- **SC-002**: Nutzer ohne Trainer-Rolle sehen zu keinem Zeitpunkt den
+  Einstellungen-Bereich auf der Detailseite.
 - **SC-003**: Trikotnummer-Konflikte werden auf der Detailseite mit derselben
   Fehlermeldung abgefangen wie im Spielerstamm, in 100 % der Fälle.
 - **SC-004**: Nach einem erfolgreichen Speichern auf der Detailseite zeigen sowohl

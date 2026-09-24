@@ -512,10 +512,10 @@ Foto-URLs schlägt fehl.
   Spieler ohne Consent im Foto markiert ist ODER kein Consent-Status
   vermerkt ist. (Eine gezielte Gesichts-/Personenerkennung ist NICHT Teil
   von v1 — siehe A12.)
-- **FR-046**: Beim Hochladen eines Fotos MUSS der Trainer eine Warnung
-  sehen, falls einer der aktuell aktiven Kaderspieler `photo_consent =
-  false` hat, mit dem Hinweis, dass Fotos mit diesem Spieler für andere
-  ausgeblendet werden.
+- **FR-046**: Im Trainings-Punkte-Raster MUSS jeder aktive Kaderspieler
+  ohne `photo_consent = true` durch ein rot eingefärbtes Warnsymbol neben
+  seinem Namen gekennzeichnet sein; ein Tooltip weist darauf hin, dass
+  Fotos mit diesem Spieler für andere ausgeblendet werden.
 
 **Auswertungen**
 
