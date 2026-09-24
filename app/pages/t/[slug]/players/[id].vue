@@ -147,7 +147,7 @@ watch(
       class="space-y-3 rounded-md border border-input p-4"
       data-testid="player-detail-settings"
     >
-      <PlayerSettingsForm :player="player" @saved="onPlayerSaved" />
+      <PlayerSettingsForm :player="player" :team-id="teamId" @saved="onPlayerSaved" />
     </div>
     <p v-if="playerReloadError" class="text-sm text-red-700" role="alert">
       {{ playerReloadError }}

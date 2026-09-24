@@ -1,52 +1,35 @@
 <script setup lang="ts">
 import { useDebounceFn } from '@vueuse/core'
-import { z } from 'zod'
-import { errorMessage, pgErrorCode } from '~/utils/errors'
+import type { PlayerFormPlayer } from '~/composables/usePlayerFormFields'
 
 const props = defineProps<{
-  player: {
-    id: string
-    name: string
-    jersey_number: number | null
-    position: string | null
-    photo_consent: boolean
-    active: boolean
-  }
+  teamId: string
+  player: PlayerFormPlayer & { id: string }
 }>()
 
 const emit = defineEmits<{
   (e: 'saved'): void
 }>()
 
-const schema = z.object({
-  name: z.string().trim().min(1, 'Name ist erforderlich.'),
-  jersey_number: z
-    .number()
-    .int('Ganzzahl erforderlich.')
-    .min(0, 'Trikotnummer darf nicht negativ sein.')
-    .nullable(),
-  position: z.string().trim().min(1).nullable(),
-  photo_consent: z.boolean(),
-  active: z.boolean(),
-})
+const { update, requestLinkedEmailChange } = usePlayers()
 
-const { update } = usePlayers()
+const {
+  isLinked,
+  name,
+  jerseyNumber,
+  jerseyNumberModel,
+  position,
+  consent,
+  active,
+  email,
+  fieldErrors,
+  validate,
+  mapSaveError,
+} = usePlayerFormFields(props.player)
 
-const name = ref(props.player.name)
-const jerseyNumber = ref<number | null>(props.player.jersey_number)
-const position = ref(props.player.position ?? '')
-const consent = ref(props.player.photo_consent)
-const active = ref(props.player.active)
-const fieldErrors = ref<{ name?: string; jersey_number?: string }>({})
 const submitError = ref<string | null>(null)
+const submitNotice = ref<string | null>(null)
 const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
-
-const jerseyNumberModel = useNullableNumberModel(jerseyNumber)
-
-const mapSaveError = (err: unknown) =>
-  pgErrorCode(err) === '23505'
-    ? 'Trikotnummer ist im aktiven Kader bereits vergeben. Zuerst den bisherigen Spieler deaktivieren.'
-    : errorMessage(err, 'Spieler konnte nicht gespeichert werden.')
 
 const lastSaved = ref({
   name: props.player.name,
@@ -55,31 +38,46 @@ const lastSaved = ref({
   photo_consent: props.player.photo_consent,
   active: props.player.active,
 })
+const lastSavedEmail = ref<string | null>(props.player.email)
 
 const doAutoSave = async () => {
-  fieldErrors.value = {}
-  const parsed = schema.safeParse({
-    name: name.value,
-    jersey_number: jerseyNumber.value,
-    position: position.value.trim() === '' ? null : position.value.trim(),
-    photo_consent: consent.value,
-    active: active.value,
-  })
-  if (!parsed.success) {
-    for (const issue_ of parsed.error.issues) {
-      const key = issue_.path[0]
-      if (key === 'name') fieldErrors.value.name = issue_.message
-      if (key === 'jersey_number') fieldErrors.value.jersey_number = issue_.message
-    }
-    return
-  }
-  if (JSON.stringify(parsed.data) === JSON.stringify(lastSaved.value)) return
+  submitNotice.value = null
+  const validated = validate()
+  if (!validated) return
+  const { core, email: emailParsed } = validated
+
+  const coreChanged = JSON.stringify(core) !== JSON.stringify(lastSaved.value)
+  const emailChanged = emailParsed !== lastSavedEmail.value
+  if (!coreChanged && !emailChanged) return
+
   submitError.value = null
   saveStatus.value = 'saving'
   try {
-    await update(props.player.id, parsed.data)
-    lastSaved.value = parsed.data
-    saveStatus.value = 'saved'
+    let coreSaved = false
+    if (isLinked.value) {
+      // email is never part of this update — the linked-email guard trigger
+      // would reject it, and correcting it goes through the owner-confirmed
+      // request below instead.
+      if (coreChanged) {
+        await update(props.player.id, core)
+        lastSaved.value = core
+        coreSaved = true
+      }
+      if (emailChanged) {
+        await requestLinkedEmailChange(props.player.id, props.teamId, emailParsed!)
+        lastSavedEmail.value = emailParsed
+        submitNotice.value =
+          'E-Mail-Änderung angefragt – wartet auf Bestätigung durch den Kontoinhaber im eigenen Profil.'
+      }
+    } else {
+      await update(props.player.id, { ...core, email: emailParsed })
+      lastSaved.value = core
+      lastSavedEmail.value = emailParsed
+      coreSaved = true
+    }
+    // A pending linked-email request alone isn't a completed save — only show
+    // "Gespeichert" when something was actually written to the player record.
+    saveStatus.value = coreSaved ? 'saved' : 'idle'
     emit('saved')
   } catch (err) {
     saveStatus.value = 'error'
@@ -117,7 +115,7 @@ onBeforeUnmount(() => {
   debouncedAutoSave.cancel()
 })
 
-watch([name, jerseyNumber, position], () => {
+watch([name, jerseyNumber, position, email], () => {
   saveStatus.value = 'idle'
   debouncedAutoSave()
 })
@@ -147,6 +145,13 @@ const flushPendingSave = async () => {
         fieldErrors.name
       }}</span>
     </ShadcnLabel>
+    <ShadcnLabel class="block space-y-1">
+      <span>E-Mail{{ isLinked ? '' : ' (optional)' }}</span>
+      <ShadcnInput v-model="email" type="email" :required="isLinked" />
+      <span v-if="fieldErrors.email" class="block text-sm text-destructive">{{
+        fieldErrors.email
+      }}</span>
+    </ShadcnLabel>
     <div class="flex gap-3">
       <ShadcnLabel class="flex-1 block space-y-1">
         <span>Trikotnummer (optional)</span>
@@ -168,6 +173,7 @@ const flushPendingSave = async () => {
       <ShadcnCheckbox v-model="active" class="min-w-touch" />
       <span class="text-sm font-medium text-foreground">Aktiv im Kader</span>
     </label>
+    <p v-if="submitNotice" class="text-sm text-foreground" role="status">{{ submitNotice }}</p>
     <p v-if="submitError" class="text-sm text-destructive" role="alert">{{ submitError }}</p>
     <p
       v-if="saveStatus !== 'idle' && saveStatus !== 'error'"
