@@ -22,10 +22,17 @@ const label = (p: ActivePlayer) => {
     <p class="font-semibold text-sm mb-1">Foto-Einwilligung fehlt ({{ withoutConsent.length }})</p>
     <p class="text-sm">
       Für folgende aktive Spieler:innen liegt keine Foto-Einwilligung vor. Bitte keine erkennbaren
-      Aufnahmen dieser Personen hochladen:
+      Aufnahmen dieser Personen hochladen.
     </p>
-    <ul class="mt-2 text-sm list-disc list-inside space-y-0.5">
-      <li v-for="p in withoutConsent" :key="p.id">{{ label(p) }}</li>
-    </ul>
+    <UiAccordion type="single" collapsible :unmount-on-hide="false" class="mt-1">
+      <UiAccordionItem value="players">
+        <UiAccordionTrigger class="text-sm">Betroffene Spieler:innen anzeigen</UiAccordionTrigger>
+        <UiAccordionContent>
+          <ul class="list-disc list-inside space-y-0.5">
+            <li v-for="p in withoutConsent" :key="p.id">{{ label(p) }}</li>
+          </ul>
+        </UiAccordionContent>
+      </UiAccordionItem>
+    </UiAccordion>
   </div>
 </template>

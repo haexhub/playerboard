@@ -22,6 +22,12 @@ Previous features (still shipping/maintained, not superseded):
 - Public Veo stats contract: [specs/005-public-veo-ranking/contracts/public-veo-stats.md](specs/005-public-veo-ranking/contracts/public-veo-stats.md)
 - Quickstart: [specs/005-public-veo-ranking/quickstart.md](specs/005-public-veo-ranking/quickstart.md)
 
+- Plan: [specs/015-unify-player-invite-dialog/plan.md](specs/015-unify-player-invite-dialog/plan.md)
+- Feature spec: [specs/015-unify-player-invite-dialog/spec.md](specs/015-unify-player-invite-dialog/spec.md)
+- Research decisions: [specs/015-unify-player-invite-dialog/research.md](specs/015-unify-player-invite-dialog/research.md)
+- Data model: [specs/015-unify-player-invite-dialog/data-model.md](specs/015-unify-player-invite-dialog/data-model.md)
+- RLS policies & route contracts: [specs/015-unify-player-invite-dialog/contracts/rls-policies.md](specs/015-unify-player-invite-dialog/contracts/rls-policies.md)
+- Quickstart: [specs/015-unify-player-invite-dialog/quickstart.md](specs/015-unify-player-invite-dialog/quickstart.md)
 - Plan: [specs/003-veo-analytics/plan.md](specs/003-veo-analytics/plan.md)
 - Feature spec: [specs/003-veo-analytics/spec.md](specs/003-veo-analytics/spec.md)
 - Research decisions: [specs/003-veo-analytics/research.md](specs/003-veo-analytics/research.md)

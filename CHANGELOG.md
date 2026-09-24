@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.6.1](https://github.com/haexhub/playerboard/compare/v0.6.0...v0.6.1) (2026-09-24)
+
+
+### Bug Fixes
+
+* **ci:** format accordion components ([fe7a3e9](https://github.com/haexhub/playerboard/commit/fe7a3e98e13e865adc6aed78f0d67b6727e88c29))
+* **ci:** format training point grid ([b04b01d](https://github.com/haexhub/playerboard/commit/b04b01dee643189afd469bf2310a53d4f620f669))
+* **trainings:** collapse consent warning list behind accordion ([96c2d0b](https://github.com/haexhub/playerboard/commit/96c2d0be9f359c2dafc1920403f7596ad0203715))
+* **trainings:** collapse consent warning list behind accordion ([da321e7](https://github.com/haexhub/playerboard/commit/da321e79cfce63ce5297d12223543d6aca5b8b8e))
+* **trainings:** mobile-friendly point entry grid ([3fc14ec](https://github.com/haexhub/playerboard/commit/3fc14ec016c4bb84528bef58a7fa23f37b72260d))
+* **trainings:** mobile-friendly point entry grid ([37465eb](https://github.com/haexhub/playerboard/commit/37465ebf984f093e90957207129f0beb31ed8a04))
+
+## [0.6.0](https://github.com/haexhub/playerboard/compare/v0.5.0...v0.6.0) (2026-09-23)
+
+
+### Features
+
+* **players:** edit player settings inline from the detail page ([3cc8169](https://github.com/haexhub/playerboard/commit/3cc81694203cdb14f003bc62c070a75d118e47f7))
+
 ## [0.5.0](https://github.com/haexhub/playerboard/compare/v0.4.0...v0.5.0) (2026-09-23)
 
 
