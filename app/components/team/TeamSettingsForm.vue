@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { z } from 'zod'
 import { errorMessage, isUniqueViolation } from '~/utils/errors'
 
@@ -33,6 +33,20 @@ const seasonStart = ref(props.seasonStart)
 const fieldErrors = ref<{ name?: string; slug?: string; season_start?: string }>({})
 const submitError = ref<string | null>(null)
 const loading = ref(false)
+
+const publicRankingUrl = computed(() => `${useRequestURL().origin}/public/${slug.value}/ranking`)
+const linkCopied = ref(false)
+const copyPublicLink = async () => {
+  try {
+    await navigator.clipboard.writeText(publicRankingUrl.value)
+    linkCopied.value = true
+    setTimeout(() => {
+      linkCopied.value = false
+    }, 2000)
+  } catch {
+    // Clipboard API unavailable or denied — the link is still visible and selectable.
+  }
+}
 
 const submit = async () => {
   fieldErrors.value = {}
@@ -99,6 +113,28 @@ const submit = async () => {
         Slug. Eine Änderung macht alte Links ungültig.
       </p>
     </ShadcnLabel>
+    <div class="space-y-1">
+      <span class="text-sm font-medium">Öffentlicher Link zur Rangliste</span>
+      <div class="flex gap-2">
+        <ShadcnInput
+          :model-value="publicRankingUrl"
+          type="text"
+          readonly
+          data-testid="team-settings-public-link-input"
+        />
+        <ShadcnButton
+          type="button"
+          variant="outline"
+          data-testid="team-settings-public-link-copy"
+          @click="copyPublicLink"
+        >
+          {{ linkCopied ? 'Kopiert' : 'Kopieren' }}
+        </ShadcnButton>
+      </div>
+      <p class="text-sm text-neutral-600">
+        Ohne Login abrufbar, zeigt nur Trikotnummern statt Namen.
+      </p>
+    </div>
     <ShadcnLabel class="block space-y-1">
       <span>Saisonstart</span>
       <ShadcnInput

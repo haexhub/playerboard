@@ -53,6 +53,9 @@ test.describe('T110 — team settings page', () => {
       `Settings Team ${suffix}`,
     )
     await expect(trainerPage.getByTestId('team-settings-slug-input')).toHaveValue(teamSlug)
+    await expect(trainerPage.getByTestId('team-settings-public-link-input')).toHaveValue(
+      new RegExp(`/public/${teamSlug}/ranking$`),
+    )
 
     // Rename + change the season start; slug stays the same, no redirect.
     // The settings PUT resolves near-instantly against local Supabase, so the
@@ -82,6 +85,9 @@ test.describe('T110 — team settings page', () => {
     await trainerPage.getByTestId('team-settings-submit').click()
     await trainerPage.waitForURL(new RegExp(`/t/${newSlug}/team/settings$`), { timeout: 15_000 })
     await expect(trainerPage.getByTestId('team-settings-slug-input')).toHaveValue(newSlug)
+    await expect(trainerPage.getByTestId('team-settings-public-link-input')).toHaveValue(
+      new RegExp(`/public/${newSlug}/ranking$`),
+    )
 
     // A player is denied and bounced to their own dashboard.
     await playerPage.goto(`/t/${newSlug}/team/settings`, { waitUntil: 'networkidle' })
