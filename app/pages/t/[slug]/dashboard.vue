@@ -58,8 +58,6 @@ const myRow = computed(() =>
     ? (ranking.value?.rows.find((r) => r.player_id === linkedPlayerId.value) ?? null)
     : null,
 )
-
-const topThree = computed(() => ranking.value?.rows.slice(0, 3) ?? [])
 </script>
 
 <template>
@@ -70,11 +68,6 @@ const topThree = computed(() => ranking.value?.rows.slice(0, 3) ?? [])
         <ShadcnBadge variant="secondary">
           {{ isTrainer ? 'Trainer-Ansicht' : 'Spieler-Ansicht' }}
         </ShadcnBadge>
-        <ShadcnButton v-if="isTrainer" as-child variant="outline" size="sm">
-          <NuxtLink :to="`/t/${slug}/analytics`" data-testid="dashboard-veo-link">
-            Veo-Analytics konfigurieren
-          </NuxtLink>
-        </ShadcnButton>
       </div>
     </header>
 
@@ -114,37 +107,10 @@ const topThree = computed(() => ranking.value?.rows.slice(0, 3) ?? [])
       </p>
     </template>
 
-    <section class="space-y-2" data-testid="top-three">
-      <h2 class="text-lg font-semibold text-foreground">Top 3</h2>
-      <p v-if="isLoading" class="text-sm text-muted-foreground">Lade…</p>
-      <p v-else-if="loadError" class="text-sm text-destructive" role="alert">{{ loadError }}</p>
-      <p v-else-if="topThree.length === 0" class="text-sm text-muted-foreground">
-        Noch keine Punkte im gewählten Zeitraum.
-      </p>
-      <ol v-else class="space-y-1.5">
-        <li v-for="row in topThree" :key="row.player_id">
-          <ShadcnCard class="py-0 gap-0">
-            <ShadcnCardContent class="flex items-center justify-between px-3 py-2">
-              <span class="flex items-center gap-2">
-                <ShadcnBadge variant="default" class="min-w-6 justify-center tabular-nums">
-                  {{ row.rank_position }}
-                </ShadcnBadge>
-                <span class="text-muted-foreground text-sm">
-                  {{ row.jersey_number !== null ? `#${row.jersey_number}` : '—' }}
-                </span>
-                {{ row.name }}
-              </span>
-              <ShadcnButton as-child variant="link" size="sm">
-                <NuxtLink :to="`/t/${slug}/players/${row.player_id}`"> Details </NuxtLink>
-              </ShadcnButton>
-            </ShadcnCardContent>
-          </ShadcnCard>
-        </li>
-      </ol>
-    </section>
-
+    <p v-if="isLoading" class="text-sm text-muted-foreground">Lade…</p>
+    <p v-else-if="loadError" class="text-sm text-destructive" role="alert">{{ loadError }}</p>
     <RankingTable
-      v-if="isTrainer && !isLoading && !loadError"
+      v-else
       :ranking="ranking"
       :slug="slug"
       :link-players="true"

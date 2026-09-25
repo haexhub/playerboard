@@ -17,6 +17,9 @@ export const errorMessage = (err: unknown, fallback: string): string =>
 export const isUniqueViolation = (err: unknown): boolean =>
   pgErrorCode(err) === '23505' || field(err, 'statusCode') === 409
 
+/** Postgres foreign_key_violation from supabase-js (e.g. deleting a still-referenced row). */
+export const isForeignKeyViolation = (err: unknown): boolean => pgErrorCode(err) === '23503'
+
 /** PostgREST answers 2xx with no rows when RLS filters every row of an update/delete. */
 export const assertRowsAffected = (rows: unknown[] | null): void => {
   if (!rows?.length) throw new Error('Änderung wurde nicht übernommen.')

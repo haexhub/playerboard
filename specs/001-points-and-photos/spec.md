@@ -157,10 +157,13 @@ die Kern-Wertschöpfung demonstrierbar.
 
 Ein Spieler loggt sich auf dem Handy ein. Er landet auf einem Dashboard, das
 seine aktuelle Rangposition im Team über den Standardzeitraum (Saison bzw.
-letzte 4 Wochen — siehe Assumptions) und die Top-3 des Teams zeigt. Von dort
-wechselt er zu "Meine Punkte" und sieht einen Zeitverlauf seiner Punkte pro
-Training, aufgesplittet nach Kategorie, mit einer Vergleichslinie
-Team-Durchschnitt und Team-Median.
+letzte 4 Wochen — siehe Assumptions) sowie die vollständige Rangliste zeigt
+(seit 2026-09-25: kein separates Top-3-Kästchen mehr — die Top 10 Plätze sind
+in der Rangliste selbst farblich hervorgehoben, Platz 1–3 markant als
+Gold/Silber/Bronze, die beiden letzten Plätze rot). Von dort wechselt er zu
+"Meine Punkte" und sieht einen Zeitverlauf seiner Punkte pro Training,
+aufgesplittet nach Kategorie, mit einer Vergleichslinie Team-Durchschnitt und
+Team-Median.
 
 **Why this priority**: Ohne einen konsumierenden Nutzer hat die Erfassung
 keinen Wert. Dieser Story macht die Erfassung für die Spieler sichtbar und
@@ -176,8 +179,9 @@ gleichzeitig aktiv sein muss.
 
 1. **Given** der Spieler ist eingeloggt und im Zeitraum liegen ≥1 Trainings
    mit Punkten, **When** er das Dashboard öffnet, **Then** sieht er seine
-   aktuelle Rangposition, seine Gesamtwertung im Zeitraum und die Top-3 des
-   Teams.
+   aktuelle Rangposition, seine Gesamtwertung im Zeitraum und die vollständige
+   Rangliste des Teams mit farblich hervorgehobenen Top-10-Plätzen (Platz 1–3
+   als Gold/Silber/Bronze, die letzten beiden Plätze rot).
 2. **Given** der Spieler wechselt auf "Meine Punkte", **When** die Seite
    lädt, **Then** sieht er pro aktiver Kategorie einen Zeitverlauf seiner
    eigenen Werte pro Training und zwei Vergleichslinien: Team-Durchschnitt
@@ -232,8 +236,9 @@ Deploy oder eine Code-Änderung nötig ist.
 
 Ein Trainer legt neue Spieler an (Name, optional Trikotnummer, Position),
 markiert sie als aktiv/inaktiv im Kader, und korrigiert bestehende Angaben.
-Ein einmal angelegter Spieler wird nie gelöscht — nur inaktiv gesetzt —, um
-die Historie der Punkte zu bewahren.
+Spieler mit historischer Punkte-Historie werden nicht gelöscht, sondern nur
+inaktiv gesetzt. Spieler ohne historische Punkte dürfen Trainer hingegen mit
+Sicherheitsabfrage dauerhaft aus der Spielerliste löschen.
 
 **Why this priority**: Ohne Spieler kein Kader, aber der initiale Kader kann
 im Seed angelegt werden. Selfservice ist nötig, sobald der Kader sich
@@ -485,9 +490,17 @@ Foto-URLs schlägt fehl.
 - **FR-030**: Spieler MÜSSEN mindestens `name` (Pflicht), `active` (bool),
   `jersey_number` (optional), `position` (optional) haben.
 - **FR-031**: Trainer MÜSSEN Spieler anlegen, editieren und aktiv/inaktiv
-  setzen können.
+  setzen können. Aktiv/Inaktiv wird seit 2026-09-25 direkt in der
+  Spielerliste per Checkbox in beide Richtungen umgeschaltet (kein separater
+  Aktivieren-/Deaktivieren-Button mehr); Bearbeiten (Name, Trikotnummer,
+  Position, E-Mail, Foto-Einwilligung) erfolgt ausschließlich über die
+  Spieler-Detailseite, zu der der Name in der Liste verlinkt.
 - **FR-032**: Spieler mit historischen Punkteinträgen DÜRFEN NICHT gelöscht
-  werden. Deaktivieren muss angeboten werden.
+  werden. Deaktivieren muss angeboten werden. Ein Trainer MUSS einen Spieler
+  OHNE historische Punkteinträge über die Spielerliste dauerhaft löschen
+  können (Sicherheitsabfrage erforderlich); der Versuch, einen Spieler MIT
+  Punkteinträgen zu löschen, MUSS mit einem Hinweis auf Deaktivieren
+  abgelehnt werden (seit 2026-09-25).
 - **FR-033**: Nur aktive Spieler MÜSSEN im Erfassungsformular neuer
   Trainings erscheinen; inaktive Spieler bleiben in Historie sichtbar.
 

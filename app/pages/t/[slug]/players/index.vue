@@ -7,34 +7,16 @@ definePageMeta({
   middleware: ['trainer-only'],
 })
 
-const { currentTeam } = useTeamContext()
+const { currentTeam, currentSlug } = useTeamContext()
 const teamId = computed(() => currentTeam.value?.id ?? '')
-
-type PlayerRow = {
-  id: string
-  name: string
-  jersey_number: number | null
-  position: string | null
-  photo_consent: boolean
-  active: boolean
-  email: string | null
-  linked_user_id: string | null
-}
+const slug = computed(() => currentSlug.value ?? '')
 
 const playerList = ref<InstanceType<typeof PlayerList> | null>(null)
 const playerFormRef = ref<InstanceType<typeof PlayerForm> | null>(null)
 const isPlayerDialogOpen = ref(false)
-const editingPlayer = ref<PlayerRow | null>(null)
 const dialogSeq = ref(0)
 
 const openCreateDialog = () => {
-  editingPlayer.value = null
-  dialogSeq.value += 1
-  isPlayerDialogOpen.value = true
-}
-
-const openEditDialog = (player: PlayerRow) => {
-  editingPlayer.value = player
   dialogSeq.value += 1
   isPlayerDialogOpen.value = true
 }
@@ -56,22 +38,19 @@ const onPlayerSaved = () => {
       Neuer Spieler
     </ShadcnButton>
 
-    <PlayerList v-if="teamId" ref="playerList" :team-id="teamId" @edit="openEditDialog" />
+    <PlayerList v-if="teamId" ref="playerList" :team-id="teamId" :slug="slug" />
 
     <ShadcnDialog v-model:open="isPlayerDialogOpen">
       <ShadcnDialogContent>
         <div data-testid="player-dialog" class="space-y-4">
           <ShadcnDialogHeader>
-            <ShadcnDialogTitle>
-              {{ editingPlayer ? 'Spieler bearbeiten' : 'Neuer Spieler' }}
-            </ShadcnDialogTitle>
+            <ShadcnDialogTitle>Neuer Spieler</ShadcnDialogTitle>
           </ShadcnDialogHeader>
           <PlayerForm
             v-if="teamId"
             ref="playerFormRef"
-            :key="`${dialogSeq}-${editingPlayer?.id ?? 'new'}`"
+            :key="dialogSeq"
             :team-id="teamId"
-            :player="editingPlayer"
             @saved="onPlayerSaved"
           />
           <ShadcnDialogFooter>

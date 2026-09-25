@@ -32,43 +32,70 @@ der nicht auf die angeklickte Zeile bezogen ist. Es gibt zudem keine Möglichkei
 Spieler über die Oberfläche wieder zu aktivieren — nur die "Aktiv im Kader"-Checkbox im
 Bearbeiten-Dialog erlaubt das indirekt.
 
-Diese Spec vereinheitlicht den Anlegen/Bearbeiten-Dialog auf ein einziges Formular, macht die E-Mail
-zu einem dauerhaft gespeicherten, jederzeit über "Bearbeiten" änderbaren Feld, und macht den
-"Einladen"-Button im Spielerstamm zu einer direkten Aktion ohne Dialog.
+Diese Spec vereinheitlicht das Formular zum Anlegen neuer Spieler, macht die E-Mail zu einem
+dauerhaft gespeicherten, auf der Spieler-Detailseite änderbaren Feld, und macht den "Einladen"-
+Button im Spielerstamm zu einer direkten Aktion ohne Dialog.
+
+## Clarifications
+
+### Session 2026-09-25
+
+- Q: US3 AC2 legt bewusst fest, dass Aktivieren/Deaktivieren über unterschiedliche Wege laufen
+  (Liste vs. Bearbeiten-Dialog). Soll das dabei bleiben? → A: Nein — Status (aktiv/inaktiv) wird
+  direkt in der Spielerliste per Checkbox in beide Richtungen umgeschaltet, wie schon die
+  Foto-Einwilligung. Der separate "Deaktivieren"-Button entfällt. US3 AC2 ist damit überholt (siehe
+  Durchstreichung dort).
+- Q: Wenn der "Bearbeiten"-Button aus der Liste fällt, wie wird ein Spieler dann noch bearbeitet? →
+  A: Der Name in der Spielerliste verlinkt auf die Spieler-Detailseite
+  ([specs/001-points-and-photos](../001-points-and-photos/spec.md) S4); Bearbeiten läuft
+  ausschließlich noch über das dort bereits vorhandene, autospeichernde Formular
+  (`PlayerSettingsForm.vue`). Der separate Bearbeiten-Dialog im Spielerstamm entfällt vollständig;
+  "Neuer Spieler" bleibt ein eigener (Anlegen-only) Dialog.
+- Q: Die Spieler-Detailseite hat kein Einladen — wie lädt ein Trainer einen Spieler ein, dessen
+  E-Mail gerade erst dort eingetragen wurde, ohne zurück zur Liste zu wechseln? → A: Ein
+  "Einladen"-Button neben dem E-Mail-Feld auf der Detailseite, disabled ohne E-Mail oder bei bereits
+  verknüpftem Spieler — exakt dieselbe Bedingung und derselbe `issue()`-Aufruf wie der Listenbutton.
+- Q: Spieler sollen komplett gelöscht werden können — wie verträgt sich das mit FR-032 (kein Löschen
+  bei historischen Punkteinträgen)? → A: Ein "Löschen"-Button pro Zeile in der Spielerliste, mit
+  Sicherheitsabfrage. `players.id` wird von `point_entries.player_id` per `ON DELETE RESTRICT`
+  geschützt (bereits im Schema vorhanden, siehe `db/schema/index.ts`); ein Löschversuch für einen
+  Spieler mit Punkteinträgen schlägt serverseitig fehl und die UI zeigt einen Hinweis, stattdessen zu
+  deaktivieren, statt den Fehler ungefiltert durchzureichen.
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Spieler über ein einheitliches Formular anlegen oder bearbeiten (Priority: P1)
+### User Story 1 - Spieler anlegen und auf der Detailseite bearbeiten (Priority: P1)
 
-Ein Trainer legt einen neuen Spieler an oder bearbeitet einen bestehenden über ein einziges
-Formular ohne Modus-Auswahl. Bei nicht verknüpften Spielern ist die E-Mail ein optionales Feld;
-ist sie ausgefüllt, kann der Trainer per Checkbox festlegen, ob beim Speichern sofort eine
-Einladung verschickt werden soll. Bei verknüpften Spielern bleibt eine gültige Login-E-Mail
+Ein Trainer legt einen neuen Spieler über ein create-only-Formular ohne Modus-Auswahl an.
+Bei nicht verknüpften Spielern ist die E-Mail ein optionales Feld. Bestehende Spieler werden auf
+der Spieler-Detailseite bearbeitet; dort kann ein Trainer einen nicht verknüpften Spieler mit
+hinterlegter E-Mail direkt einladen. Bei verknüpften Spielern bleibt eine gültige Login-E-Mail
 erforderlich.
 
 **Why this priority**: Kernanliegen der Anfrage — die aktuelle Drei-Modi-Auswahl beim Anlegen
-verwirrt und die Bearbeiten-Ansicht bietet heute keine E-Mail-Verwaltung.
+verwirrt und die Spieler-Detailseite soll die E-Mail-Verwaltung und Einladung bündeln.
 
 **Independent Test**: Als Trainer "Neuer Spieler" öffnen, nur Name eingeben und speichern (kein
-E-Mail-Feld nötig) — Spieler wird angelegt. Danach denselben Spieler über "Bearbeiten" öffnen,
-E-Mail eintragen, "Direkt einladen" ankreuzen, speichern — eine Einladung wird verschickt.
+E-Mail-Feld nötig) — Spieler wird angelegt. Danach den Namen in der Spielerliste öffnen, auf der
+Detailseite eine E-Mail eintragen und speichern — über "Einladen" wird eine Einladung verschickt.
 
 **Acceptance Scenarios**:
 
 1. **Given** der Trainer öffnet "Neuer Spieler", **When** das Formular angezeigt wird, **Then**
    sieht er ein einziges Formular mit Name (Pflichtfeld), E-Mail (optional), Trikotnummer
-   (optional), Position (optional), Foto-Einwilligung, Aktiv im Kader und "Direkt einladen" — ohne
-   Modus-Auswahl.
-2. **Given** das E-Mail-Feld ist leer, **Then** ist die "Direkt einladen"-Checkbox deaktiviert.
-3. **Given** der Trainer trägt eine E-Mail ein, **Then** wird die "Direkt einladen"-Checkbox
-   aktivierbar.
-4. **Given** die Checkbox ist beim Speichern angehakt, **When** das Speichern erfolgreich ist,
-   **Then** erhält der Spieler zusätzlich zum Anlegen/Aktualisieren eine (neue oder erneute)
-   Einladung an die eingetragene E-Mail.
-5. **Given** der Trainer bearbeitet einen bereits mit einem Konto verknüpften Spieler
-   (`linked_user_id` gesetzt), **Then** ist die "Direkt einladen"-Checkbox nicht sichtbar bzw.
-   deaktiviert, da nichts mehr einzuladen ist.
-6. **Given** der Trainer ändert im Bearbeiten-Dialog die E-Mail eines bereits verknüpften Spielers
+   (optional), Position (optional), Foto-Einwilligung und Aktiv im Kader — ohne Modus-Auswahl.
+2. **Given** das E-Mail-Feld ist leer, **Then** kann der neue Spieler ohne Einladung gespeichert
+   werden.
+3. **Given** der neue Spieler wurde mit einer E-Mail gespeichert, **Then** kann der Trainer ihn
+   auf der Detailseite über "Einladen" einladen; eine optionale Sofort-Einladung beim Anlegen darf
+   denselben Versand zusätzlich auslösen.
+4. **Given** ein bestehender, nicht verknüpfter Spieler hat auf der Detailseite eine E-Mail,
+   **When** der Trainer auf "Einladen" klickt, **Then** erhält der Spieler eine (neue oder
+   erneute) Einladung an die gespeicherte E-Mail.
+5. **Given** der Trainer öffnet die Detailseite eines bereits mit einem Konto verknüpften Spielers
+   (`linked_user_id` gesetzt), **Then** ist der "Einladen"-Button nicht sichtbar bzw. deaktiviert,
+   da nichts mehr einzuladen ist.
+6. **Given** der Trainer ändert auf der Spieler-Detailseite die E-Mail eines bereits verknüpften Spielers
    auf eine neue Adresse, **When** er speichert, **Then** wird eine kurze, kontoinhaber-bestätigte
    E-Mail-Änderung gestartet. Die Login-E-Mail des bestehenden Kontos und `players.email` bleiben
    bis zur Bestätigung unverändert; danach werden beide synchronisiert, ohne den Spieler zu
@@ -103,21 +130,27 @@ existierte).
 
 ### User Story 3 - Deaktivierten Spieler wieder aktivieren (Priority: P3)
 
+*(Aktualisiert 2026-09-25 — Acceptance Scenario 2 unten ist überholt und durch
+die neue Statuscheckbox in der Liste ersetzt; siehe Clarifications.)*
+
 Ein Trainer möchte einen zuvor deaktivierten Spieler wieder aktiv setzen.
 
 **Why this priority**: Behebt eine bestehende Lücke (keine Reaktivierung möglich), ist aber
 seltener nötig als Anlegen/Bearbeiten oder Einladen.
 
-**Independent Test**: Einen inaktiven Spieler über "Bearbeiten" öffnen, "Aktiv im Kader" ankreuzen,
-speichern — der Spieler erscheint in der Liste wieder als aktiv.
+**Independent Test**: In der Spielerliste die Status-Checkbox einer inaktiven Zeile anhaken —
+der Spieler erscheint sofort wieder als aktiv (alternativ weiterhin über die Checkbox "Aktiv im
+Kader" auf der Spieler-Detailseite, S4 in ui-flows.md).
 
 **Acceptance Scenarios**:
 
-1. **Given** ein Spieler ist inaktiv, **When** der Trainer ihn über "Bearbeiten" öffnet und "Aktiv
-   im Kader" ankreuzt und speichert, **Then** wird der Spieler wieder als aktiv geführt.
-2. **Given** die Spielerliste, **Then** existiert kein separater "Aktivieren"-Button — Aktivieren
+1. **Given** ein Spieler ist inaktiv, **When** der Trainer die Status-Checkbox der Zeile in der
+   Spielerliste anhakt, **Then** wird der Spieler ohne weitere Bestätigung wieder als aktiv
+   geführt.
+2. ~~**Given** die Spielerliste, **Then** existiert kein separater "Aktivieren"-Button — Aktivieren
    und Deaktivieren laufen über unterschiedliche Wege (Liste vs. Bearbeiten-Dialog), das ist so
-   beabsichtigt.
+   beabsichtigt.~~ *(entfällt seit 2026-09-25 — durch eine bidirektionale Status-Checkbox in der
+   Liste ersetzt, siehe Clarifications unten.)*
 
 ### Edge Cases
 
@@ -148,25 +181,28 @@ speichern — der Spieler erscheint in der Liste wieder als aktiv.
 
 ### Functional Requirements
 
-- **FR-001**: Der Anlegen/Bearbeiten-Dialog MUSS ein einziges Formular ohne Modus-Auswahl sein,
-  mit den Feldern Name (Pflicht), E-Mail (optional bei nicht verknüpften Spielern), Trikotnummer
-  (optional), Position (optional), Foto-Einwilligung, Aktiv im Kader und "Direkt einladen". Bei
-  verknüpften Spielern muss die E-Mail gültig und nicht leer sein.
+- **FR-001**: Der Dialog zum Anlegen eines Spielers MUSS ein einziges Formular ohne Modus-Auswahl
+  sein, mit den Feldern Name (Pflicht), E-Mail (optional), Trikotnummer (optional), Position
+  (optional), Foto-Einwilligung und Aktiv im Kader. Der Dialog ist ausschließlich zum Anlegen;
+  das Bearbeiten bestehender Spieler erfolgt auf der Spieler-Detailseite. Bei verknüpften Spielern
+  muss die E-Mail dort gültig und nicht leer sein.
 - **FR-002**: Der bisherige Modus "Bestehendes Konto verknüpfen" MUSS aus diesem Dialog entfernt
   werden; die Funktion bleibt ausschließlich über die bestehende Konto-Spalte im Spielerstamm
   erreichbar.
-- **FR-003**: Nicht verknüpfte Spieler MÜSSEN eine dauerhaft gespeicherte, über "Bearbeiten"
-  jederzeit änderbare E-Mail-Adresse haben können (auch ohne dass zu diesem Zeitpunkt eine
+- **FR-003**: Nicht verknüpfte Spieler MÜSSEN eine dauerhaft gespeicherte, auf der Spieler-
+  Detailseite jederzeit änderbare E-Mail-Adresse haben können (auch ohne dass zu diesem Zeitpunkt eine
   Einladung verschickt wird). Bei bereits verknüpften Spielern bleibt die E-Mail-Adresse ein
   gültiger, nicht-leerer Login-Bezug und darf nicht geleert werden.
 - **FR-004**: Die E-Mail-Adresse MUSS pro Team eindeutig sein (Groß-/Kleinschreibung ignorierend),
   analog zur bestehenden Eindeutigkeitsregel für Trikotnummern.
-- **FR-005**: Die "Direkt einladen"-Checkbox MUSS nur aktivierbar sein, wenn eine E-Mail
-  eingetragen ist UND der Spieler noch nicht mit einem Konto verknüpft ist; bei bereits
-  verknüpften Spielern MUSS sie ausgeblendet oder deaktiviert sein.
-- **FR-006**: Ist die "Direkt einladen"-Checkbox beim Speichern (Anlegen oder Bearbeiten) angehakt,
-  MUSS eine Einladung an die aktuell im Formular stehende E-Mail verschickt werden — auch dann,
-  wenn für diesen Spieler bereits eine offene Einladung existiert (siehe FR-009).
+- **FR-005**: Falls der Anlegen-Dialog eine optionale Sofort-Einladung anbietet, MUSS sie nur
+  aktivierbar sein, wenn eine E-Mail eingetragen ist; für bestehende Spieler wird sie nicht über
+  einen Bearbeiten-Dialog angeboten.
+- **FR-006**: Für einen bestehenden, nicht verknüpften Spieler MUSS der Trainer eine Einladung auf
+  der Spieler-Detailseite über den dortigen "Einladen"-Button an die aktuell gespeicherte E-Mail
+  auslösen können — auch dann, wenn bereits eine offene Einladung existiert (siehe FR-009). Beim
+  Anlegen eines neuen Spielers darf eine angebotene Sofort-Einladung zusätzlich direkt ausgelöst
+  werden.
 - **FR-007**: Wird bei einem bereits verknüpften Spieler (`linked_user_id` gesetzt) die E-Mail
   geändert, MUSS eine E-Mail-Änderung im Namen des Kontoinhabers angefordert werden — ohne den
   Spieler-Datensatz zu löschen und neu anzulegen. Die Login-E-Mail DARF erst nach der Bestätigung
@@ -181,12 +217,13 @@ speichern — der Spieler erscheint in der Liste wieder als aktiv.
   hat oder bereits mit einem Konto verknüpft ist. Existiert für den Spieler bereits eine offene,
   nicht abgelaufene Einladung, MUSS ein erneuter Klick diese Einladung erneut zustellen statt
   einen Fehler zu erzeugen.
-- **FR-010**: Reaktivierung eines deaktivierten Spielers MUSS ausschließlich über die "Aktiv im
-  Kader"-Checkbox im Bearbeiten-Dialog möglich sein; es MUSS kein zusätzlicher
-  "Aktivieren"-Button im Spielerstamm eingeführt werden.
+- **FR-010**: Ein deaktivierter Spieler MUSS wieder aktiviert werden können. Die Aktiv/Inaktiv-
+  Schaltung erfolgt direkt in der Spielerliste per Checkbox in beide Richtungen; die
+  Spieler-Detailseite darf den Status zusätzlich ändern.
 - **FR-011**: Die bisherige generische Einladungs-Dialog-Anbindung an den Spielerstamm (der
   separate "Spieler einladen"-Dialog samt zugehörigem Öffnen-Zustand) MUSS entfernt werden, da sie
-  durch das vereinheitlichte Formular und die direkte Einladen-Aktion redundant geworden ist. Die
+  durch das create-only Anlegeformular, das Detailseitenformular und die direkte Einladen-Aktion
+  redundant geworden ist. Die
   Komponente `InviteForm.vue` selbst bleibt für die Mitglieder-Seite (`team/members.vue`) samt
   ihrer optionalen "Spieler gleichzeitig anlegen"-Unterfunktion erhalten; wenn sie dort einen
   Spieler vorab anlegt, MUSS sie die Einladungs-E-Mail auch in `players.email` speichern, damit
@@ -226,8 +263,8 @@ speichern — der Spieler erscheint in der Liste wieder als aktiv.
   den externen Maildienst ist dabei nicht Teil des messbaren Anwendungsergebnisses.
 - **SC-004**: Kein Spieler kann nach dem Speichern eine E-Mail tragen, die im selben Team bereits
   einem anderen Spieler zugeordnet ist.
-- **SC-005**: Ein deaktivierter Spieler kann ausschließlich über den Bearbeiten-Dialog wieder
-  aktiviert werden, und diese Änderung ist unmittelbar in der Spielerliste sichtbar.
+- **SC-005**: Ein deaktivierter Spieler kann über die Status-Checkbox in der Spielerliste wieder
+  aktiviert werden, und diese Änderung ist unmittelbar sichtbar.
 
 ## Assumptions
 
