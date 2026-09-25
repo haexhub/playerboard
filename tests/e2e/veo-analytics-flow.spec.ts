@@ -329,6 +329,26 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
         category: 'attacking',
         value: 3,
       },
+      // Regression for the leaderboard's rank computation: player7 ties
+      // jersey 99 for 1st (both 3 goals), player10 is a clear-but-lower 2nd
+      // (1 goal) — a dense-rank bug once skipped straight to "3." here
+      // instead of "2." whenever two entries shared 1st place.
+      {
+        match_id: matchWinId,
+        veo_jersey_number: 7,
+        stat_type: 'football_goal_total',
+        player_id: player7!.id,
+        category: 'attacking',
+        value: 3,
+      },
+      {
+        match_id: matchWinId,
+        veo_jersey_number: 10,
+        stat_type: 'football_goal_total',
+        player_id: player10!.id,
+        category: 'attacking',
+        value: 1,
+      },
     ])
 
     // US1 — dashboard season summary sums across both matches; only one
@@ -366,15 +386,28 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     await expect(player7Rank).toHaveClass(/bg-yellow-100/)
     await expect(player10Rank).toHaveClass(/bg-slate-200/)
 
+    // Dense-rank regression: player7 and jersey 99 tie for 1st (3 goals
+    // each) — the next distinct value (player10, 1 goal) must be ranked
+    // "2." (silver), never skipped to "3." just because two entries share
+    // 1st place.
     const goalsLeaderboard = pageA.getByTestId('veo-leaderboard-football_goal_total')
     const jersey99Goals = goalsLeaderboard.getByTestId(
       'veo-leaderboard-entry-football_goal_total-jersey-99',
     )
+    const player7Goals = goalsLeaderboard.getByTestId(
+      `veo-leaderboard-entry-football_goal_total-${player7!.id}`,
+    )
+    const player10Goals = goalsLeaderboard.getByTestId(
+      `veo-leaderboard-entry-football_goal_total-${player10!.id}`,
+    )
     await expect(jersey99Goals).toContainText('#99 Nicht zugeordnet')
     await expect(jersey99Goals).toContainText('3')
-    // Sole entry for this metric — still ranked/colored 1st (gold).
     await expect(jersey99Goals).toContainText('1.')
     await expect(jersey99Goals).toHaveClass(/bg-yellow-100/)
+    await expect(player7Goals).toContainText('1.')
+    await expect(player7Goals).toHaveClass(/bg-yellow-100/)
+    await expect(player10Goals).toContainText('2.')
+    await expect(player10Goals).toHaveClass(/bg-slate-200/)
 
     // Comparing up to 4 players: add a second slot, pick player10 — both
     // now show side by side, and the higher shared metric (distance) is

@@ -92,26 +92,28 @@ const MEDAL_CLASS: Record<number, string> = {
 
 const medalClass = (rank: number) => MEDAL_CLASS[rank] ?? ''
 
-// Top 3 by value, but a tie at the 3rd-place value extends the list rather
-// than dropping tied entries. Rank is competition-style ("1224"): entries
-// tied on value share one rank, so a tie can never push rank past 3.
+// Top 3 by value, but a tie extends the list rather than dropping tied
+// entries. Rank is dense competition-style ("1223", not "1224"): a rank
+// only advances by exactly one per distinct value, so two 1st places are
+// followed by a 2nd, not a skipped-to 3rd — no medal slot goes unused.
 const leaderboardForStat = (statType: string): LeaderboardItem[] => {
   const ranked = props.entries
     .map((entry) => ({ entry, value: entry.statTotals[statType] }))
     .filter((e): e is { entry: VeoPlayerStatEntry; value: number } => e.value !== undefined)
     .sort((a, b) => b.value - a.value)
-  if (ranked.length === 0) return []
-  const cutoffValue = ranked[Math.min(LEADERBOARD_SIZE, ranked.length) - 1]!.value
-  const top = ranked.filter((e) => e.value >= cutoffValue)
+
+  const result: LeaderboardItem[] = []
   let rank = 0
   let previousValue: number | null = null
-  return top.map((item, index) => {
+  for (const item of ranked) {
     if (item.value !== previousValue) {
-      rank = index + 1
+      rank += 1
       previousValue = item.value
     }
-    return { ...item, rank }
-  })
+    if (rank > LEADERBOARD_SIZE) break
+    result.push({ ...item, rank })
+  }
+  return result
 }
 
 const leaderboardStatTypes = computed(() =>
