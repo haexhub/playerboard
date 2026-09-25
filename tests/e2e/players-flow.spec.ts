@@ -354,6 +354,17 @@ test.describe('US4 — trainer manages the player roster', () => {
     await expect(heading).toContainText('#6')
     await expect(consentCheckbox).toBeChecked()
 
+    const detailEmail = `player-det-${suffix}@example.com`
+    await settings.getByLabel(/E-Mail/).fill(detailEmail)
+    await expect(settings.getByTestId('player-form-save-status')).toHaveText('Gespeichert', {
+      timeout: 10_000,
+    })
+    await settings.getByTestId('player-detail-invite-button').click()
+    await expect(settings.getByRole('status')).toContainText(/gesendet/i, {
+      timeout: 10_000,
+    })
+    await expect.poll(() => countMailsTo(detailEmail)).toBe(1)
+
     // Consistency with the roster page: the same record reflects the change there too.
     await trainerPage.goto(`/t/${teamSlug}/players`, { waitUntil: 'networkidle' })
     await expect(

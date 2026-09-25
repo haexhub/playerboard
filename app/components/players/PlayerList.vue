@@ -19,6 +19,7 @@ const linkSelection = ref<Record<string, string>>({})
 const loading = ref(false)
 const error = ref<string | null>(null)
 const notice = ref<string | null>(null)
+const pendingActiveUpdates = ref<Record<string, boolean>>({})
 let latestLoad = 0
 
 const load = async () => {
@@ -58,12 +59,16 @@ const onToggleConsent = async (row: PlayerRow) => {
 }
 
 const onToggleActive = async (row: PlayerRow) => {
+  if (pendingActiveUpdates.value[row.id]) return
   const next = !row.active
+  pendingActiveUpdates.value[row.id] = true
   try {
     await setActive(row.id, next)
     row.active = next
   } catch (err) {
     error.value = errorMessage(err, 'Status konnte nicht geändert werden.')
+  } finally {
+    delete pendingActiveUpdates.value[row.id]
   }
 }
 
@@ -96,18 +101,20 @@ const isDeleting = ref(false)
 const deleteError = ref<string | null>(null)
 
 const openDeleteDialog = (row: PlayerRow) => {
+  if (isDeleting.value) return
   pendingDelete.value = row
   deleteError.value = null
   isDeleteDialogOpen.value = true
 }
 
 const onDelete = async () => {
-  if (!pendingDelete.value) return
+  if (!pendingDelete.value || isDeleting.value) return
+  const playerId = pendingDelete.value.id
   deleteError.value = null
   isDeleting.value = true
   try {
-    await remove(pendingDelete.value.id)
-    players.value = players.value.filter((p) => p.id !== pendingDelete.value!.id)
+    await remove(playerId)
+    players.value = players.value.filter((p) => p.id !== playerId)
     isDeleteDialogOpen.value = false
   } catch (err) {
     deleteError.value = isForeignKeyViolation(err)
@@ -176,6 +183,7 @@ defineExpose({ reload: load })
                 :checked="row.active"
                 :aria-label="`Status ${row.name}`"
                 class="h-5 w-5"
+                :disabled="pendingActiveUpdates[row.id]"
                 @change="onToggleActive(row)"
               />
               <ShadcnBadge :variant="row.active ? 'default' : 'secondary'">
@@ -250,7 +258,9 @@ defineExpose({ reload: load })
           <p v-if="deleteError" class="text-sm text-destructive" role="alert">{{ deleteError }}</p>
           <ShadcnDialogFooter>
             <ShadcnDialogClose as-child>
-              <ShadcnButton type="button" variant="outline">Abbrechen</ShadcnButton>
+              <ShadcnButton type="button" variant="outline" :disabled="isDeleting">
+                Abbrechen
+              </ShadcnButton>
             </ShadcnDialogClose>
             <ShadcnButton
               type="button"

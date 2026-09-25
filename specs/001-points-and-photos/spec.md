@@ -236,8 +236,9 @@ Deploy oder eine Code-Änderung nötig ist.
 
 Ein Trainer legt neue Spieler an (Name, optional Trikotnummer, Position),
 markiert sie als aktiv/inaktiv im Kader, und korrigiert bestehende Angaben.
-Ein einmal angelegter Spieler wird nie gelöscht — nur inaktiv gesetzt —, um
-die Historie der Punkte zu bewahren.
+Spieler mit historischer Punkte-Historie werden nicht gelöscht, sondern nur
+inaktiv gesetzt. Spieler ohne historische Punkte dürfen Trainer hingegen mit
+Sicherheitsabfrage dauerhaft aus der Spielerliste löschen.
 
 **Why this priority**: Ohne Spieler kein Kader, aber der initiale Kader kann
 im Seed angelegt werden. Selfservice ist nötig, sobald der Kader sich

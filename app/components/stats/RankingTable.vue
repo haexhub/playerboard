@@ -17,13 +17,15 @@ const scoreFor = (row: RankingRow, catId: string): number => Number(row.scores?.
 const totalFor = (row: RankingRow): number =>
   cats.value.reduce((sum, c) => sum + scoreFor(row, c.id), 0)
 
-const maxRank = computed(() => rows.value.reduce((max, r) => Math.max(max, r.rank_position), 0))
+const bottomRanks = computed(() =>
+  [...new Set(rows.value.map((row) => row.rank_position))].sort((a, b) => b - a).slice(0, 2),
+)
 
 const rowHighlightClass = (row: RankingRow): string => {
   if (row.rank_position === 1) return 'bg-yellow-200/70 hover:bg-yellow-200/90 font-semibold'
   if (row.rank_position === 2) return 'bg-slate-300/60 hover:bg-slate-300/80 font-semibold'
   if (row.rank_position === 3) return 'bg-orange-300/50 hover:bg-orange-300/70 font-semibold'
-  if (row.rank_position >= maxRank.value - 1) return 'bg-red-500/10 hover:bg-red-500/15'
+  if (bottomRanks.value.includes(row.rank_position)) return 'bg-red-500/10 hover:bg-red-500/15'
   if (row.rank_position <= 10) return 'bg-muted/50 hover:bg-muted/70'
   return ''
 }

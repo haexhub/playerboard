@@ -213,9 +213,9 @@ Kader" auf der Spieler-Detailseite, S4 in ui-flows.md).
   hat oder bereits mit einem Konto verknüpft ist. Existiert für den Spieler bereits eine offene,
   nicht abgelaufene Einladung, MUSS ein erneuter Klick diese Einladung erneut zustellen statt
   einen Fehler zu erzeugen.
-- **FR-010**: Reaktivierung eines deaktivierten Spielers MUSS ausschließlich über die "Aktiv im
-  Kader"-Checkbox im Bearbeiten-Dialog möglich sein; es MUSS kein zusätzlicher
-  "Aktivieren"-Button im Spielerstamm eingeführt werden.
+- **FR-010**: Ein deaktivierter Spieler MUSS wieder aktiviert werden können. Die Aktiv/Inaktiv-
+  Schaltung erfolgt direkt in der Spielerliste per Checkbox in beide Richtungen; die
+  Bearbeiten-Ansicht darf den Status zusätzlich ändern.
 - **FR-011**: Die bisherige generische Einladungs-Dialog-Anbindung an den Spielerstamm (der
   separate "Spieler einladen"-Dialog samt zugehörigem Öffnen-Zustand) MUSS entfernt werden, da sie
   durch das vereinheitlichte Formular und die direkte Einladen-Aktion redundant geworden ist. Die
@@ -258,8 +258,8 @@ Kader" auf der Spieler-Detailseite, S4 in ui-flows.md).
   den externen Maildienst ist dabei nicht Teil des messbaren Anwendungsergebnisses.
 - **SC-004**: Kein Spieler kann nach dem Speichern eine E-Mail tragen, die im selben Team bereits
   einem anderen Spieler zugeordnet ist.
-- **SC-005**: Ein deaktivierter Spieler kann ausschließlich über den Bearbeiten-Dialog wieder
-  aktiviert werden, und diese Änderung ist unmittelbar in der Spielerliste sichtbar.
+- **SC-005**: Ein deaktivierter Spieler kann über die Status-Checkbox in der Spielerliste wieder
+  aktiviert werden, und diese Änderung ist unmittelbar sichtbar.
 
 ## Assumptions
 

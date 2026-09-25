@@ -114,8 +114,8 @@ it again while that invitation is still open succeeds again instead of erroring.
 
 ## Phase 5: User Story 3 - Deaktivierten Spieler wieder aktivieren (Priority: P3)
 
-**Goal**: Confirm reactivation works exclusively through the edit dialog's existing "Aktiv im
-Kader" checkbox, with no separate "Aktivieren" button anywhere in the list.
+**Goal**: Confirm reactivation works through the roster's bidirectional status checkbox, with no
+separate "Aktivieren" button anywhere in the list.
 
 **Independent Test**: Deactivate a player, then reactivate them via "Bearbeiten" → "Aktiv im
 Kader" → save; the row shows "Aktiv" again.

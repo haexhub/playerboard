@@ -34,14 +34,17 @@ const submitNotice = ref<string | null>(null)
 const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
 const canInvite = computed(() => !isLinked.value && email.value.trim() !== '')
+const invitePending = ref(false)
 const inviteNotice = ref<string | null>(null)
 const inviteError = ref<string | null>(null)
 
 const onInvite = async () => {
-  if (!canInvite.value) return
+  if (!canInvite.value || invitePending.value) return
+  invitePending.value = true
   inviteError.value = null
   inviteNotice.value = null
   try {
+    if (!(await flushPendingSave())) return
     await issue({
       team_id: props.teamId,
       email: email.value.trim(),
@@ -51,6 +54,8 @@ const onInvite = async () => {
     inviteNotice.value = `Einladung an ${email.value.trim()} gesendet.`
   } catch (err) {
     inviteError.value = errorMessage(err, 'Einladung konnte nicht verschickt werden.')
+  } finally {
+    invitePending.value = false
   }
 }
 
@@ -63,15 +68,15 @@ const lastSaved = ref({
 })
 const lastSavedEmail = ref<string | null>(props.player.email?.trim().toLowerCase() || null)
 
-const doAutoSave = async () => {
+const doAutoSave = async (): Promise<boolean> => {
   submitNotice.value = null
   const validated = validate()
-  if (!validated) return
+  if (!validated) return false
   const { core, email: emailParsed } = validated
 
   const coreChanged = JSON.stringify(core) !== JSON.stringify(lastSaved.value)
   const emailChanged = emailParsed !== lastSavedEmail.value
-  if (!coreChanged && !emailChanged) return
+  if (!coreChanged && !emailChanged) return true
 
   submitError.value = null
   saveStatus.value = 'saving'
@@ -102,9 +107,11 @@ const doAutoSave = async () => {
     // "Gespeichert" when something was actually written to the player record.
     saveStatus.value = coreSaved ? 'saved' : 'idle'
     emit('saved')
+    return true
   } catch (err) {
     saveStatus.value = 'error'
     submitError.value = mapSaveError(err)
+    return false
   }
 }
 
@@ -112,24 +119,33 @@ const doAutoSave = async () => {
 // immediate checkboxes); serialize runs so a slower call can't resolve after and
 // clobber a newer one's saveStatus/lastSaved. A queued rerun re-reads the refs live,
 // so it always picks up whatever changed while the in-flight save was running.
-let autoSaveInFlight = false
 let autoSaveRerunQueued = false
+let autoSavePromise: Promise<boolean> | null = null
 
-const runAutoSave = async () => {
-  if (autoSaveInFlight) {
+const runAutoSave = (): Promise<boolean> => {
+  if (autoSavePromise) {
     autoSaveRerunQueued = true
-    return
+    return autoSavePromise
   }
-  autoSaveInFlight = true
-  try {
-    await doAutoSave()
-  } finally {
-    autoSaveInFlight = false
-    if (autoSaveRerunQueued) {
+
+  const promise = (async () => {
+    let saved: boolean
+    do {
       autoSaveRerunQueued = false
-      void runAutoSave()
-    }
-  }
+      saved = await doAutoSave()
+    } while (autoSaveRerunQueued)
+    return saved
+  })()
+  autoSavePromise = promise
+  promise.then(
+    () => {
+      if (autoSavePromise === promise) autoSavePromise = null
+    },
+    () => {
+      if (autoSavePromise === promise) autoSavePromise = null
+    },
+  )
+  return promise
 }
 
 const debouncedAutoSave = useDebounceFn(runAutoSave, 600)
@@ -146,11 +162,11 @@ watch([consent, active], () => {
   void runAutoSave()
 })
 
-const flushPendingSave = async () => {
-  // No submit button is rendered; this only runs on native Enter submission.
-  // Route it through the same guarded path instead of a second, unguarded save.
+const flushPendingSave = async (): Promise<boolean> => {
+  // No submit button is rendered; this runs on native Enter submission or
+  // before issuing an invitation. Wait for current and queued autosaves.
   debouncedAutoSave.cancel()
-  await runAutoSave()
+  return runAutoSave()
 }
 </script>
 
@@ -181,7 +197,7 @@ const flushPendingSave = async () => {
         variant="outline"
         size="sm"
         data-testid="player-detail-invite-button"
-        :disabled="!canInvite"
+        :disabled="!canInvite || invitePending"
         @click="onInvite"
       >
         Einladen
