@@ -78,6 +78,12 @@ test.describe('trainer manages a player email from the detail page', () => {
     await trainerPage.reload({ waitUntil: 'networkidle' })
     await expect(erinSettings.getByLabel('E-Mail')).toHaveValue(`erin-${suffix}@example.com`)
 
+    // Editing a saved address to something invalid must disable Einladen too —
+    // it must not stay enabled and invite the stale, no-longer-displayed value.
+    await erinSettings.getByLabel('E-Mail').fill(`erin-${suffix}@invalid`)
+    await expect(erinSettings.getByText('Bitte gültige E-Mail eingeben.')).toBeVisible()
+    await expect(erinInvite).toBeDisabled()
+
     // Editing to a new address also persists.
     await erinSettings.getByLabel('E-Mail').fill(`erin-new-${suffix}@example.com`)
     await expect(erinSettings.getByTestId('player-form-save-status')).toHaveText('Gespeichert', {

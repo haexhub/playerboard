@@ -134,7 +134,12 @@ const flushPendingSave = async () => {
 // Ties to lastSavedEmail, not the live email ref, so the button only appears
 // once the address is actually persisted — matching the invite route's check
 // against the stored players.email (015-unify-player-invite-dialog FR-014).
-const canInvite = computed(() => !isLinked.value && !!lastSavedEmail.value)
+// Also gated on fieldErrors.email: an invalid unsaved edit fails validate()
+// before lastSavedEmail is touched, so without this check the button would
+// stay enabled and invite the stale, no-longer-displayed saved address.
+const canInvite = computed(
+  () => !isLinked.value && !!lastSavedEmail.value && !fieldErrors.value.email,
+)
 const inviting = ref(false)
 
 const onInvite = async () => {
