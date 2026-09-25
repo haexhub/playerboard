@@ -33,11 +33,7 @@ watch(
     const stillValid = selectedKeys.value.filter(
       (key) => key !== null && entries.some((e) => e.key === key),
     )
-    selectedKeys.value = stillValid.length
-      ? stillValid
-      : entries.length
-        ? [entries[0]!.key]
-        : []
+    selectedKeys.value = stillValid.length ? stillValid : entries.length ? [entries[0]!.key] : []
   },
   { immediate: true },
 )
@@ -146,7 +142,9 @@ const leaderboardStatTypes = computed(() =>
             :data-rank="item.rank"
           >
             <span>{{ item.rank }}. {{ entryLabel(item.entry) }}</span>
-            <span class="tabular-nums font-medium">{{ formatStatValue(statType, item.value) }}</span>
+            <span class="tabular-nums font-medium">{{
+              formatStatValue(statType, item.value)
+            }}</span>
           </li>
         </ol>
       </div>

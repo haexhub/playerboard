@@ -40,7 +40,8 @@ describe('fetchPlayerAnalysisStats', () => {
   // (2026-09-25).
   it('includes team_id in the cross_match/player request body', async () => {
     const fetchMock = vi.fn(
-      async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }),
+      async () =>
+        new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }),
     )
     vi.stubGlobal('fetch', fetchMock)
 

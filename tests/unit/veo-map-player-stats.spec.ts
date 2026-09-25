@@ -39,6 +39,42 @@ describe('mapPlayerStats', () => {
     expect(rows.some((r) => r.statType === 'football_touches_total')).toBe(false)
   })
 
+  it('rejects non-numeric jersey numbers while accepting leading zeroes', () => {
+    expect(() =>
+      mapPlayerStats({ items: [{ jersey_number: '7x', stats: [] }] }, MATCH_ID, ROSTER),
+    ).toThrow('Unexpected Veo player-stats response shape')
+
+    expect(
+      mapPlayerStats(
+        { items: [{ jersey_number: '07', stats: [{ value: 1, type: 'sprints_total' }] }] },
+        MATCH_ID,
+        ROSTER,
+      ),
+    ).toMatchObject([{ veoJerseyNumber: 7, playerId: 'player-7', statType: 'sprints_total' }])
+  })
+
+  it('ignores inherited stat keys', () => {
+    const rows = mapPlayerStats(
+      {
+        items: [
+          {
+            jersey_number: '7',
+            stats: [
+              { value: 1, type: 'toString' },
+              { value: 2, type: '__proto__' },
+              { value: 3, type: 'sprints_total' },
+            ],
+          },
+        ],
+      },
+      MATCH_ID,
+      ROSTER,
+    )
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.statType).toBe('sprints_total')
+  })
+
   it('keeps only the first row for a duplicate jersey/stat key', () => {
     const payload = {
       items: [

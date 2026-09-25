@@ -12,7 +12,7 @@ const playerStatEntrySchema = z.object({
 // the app.veo.co frontend sends (2026-09-25); research.md's original,
 // never-verified fixture had assumed the nested shape.
 const playerItemSchema = z.object({
-  jersey_number: z.string(),
+  jersey_number: z.string().regex(/^\d+$/),
   stats: z.array(playerStatEntrySchema),
 })
 
@@ -65,11 +65,11 @@ export const mapPlayerStats = (
   const rowsByKey = new Map<string, VeoPlayerMatchStatRow>()
   for (const item of parsed.data.items) {
     const veoJerseyNumber = Number.parseInt(item.jersey_number, 10)
-    if (!Number.isFinite(veoJerseyNumber)) continue
     const playerId = playerIdByJersey.get(veoJerseyNumber) ?? null
     for (const stat of item.stats) {
+      if (!Object.prototype.hasOwnProperty.call(CURATED_STAT_CATEGORY, stat.type)) continue
       const category = CURATED_STAT_CATEGORY[stat.type]
-      if (!category) continue
+      if (category === undefined) continue
       const key = `${veoJerseyNumber}:${stat.type}`
       // Keep the first occurrence so duplicate Veo rows have deterministic
       // behavior without allowing them to collide at the database key.

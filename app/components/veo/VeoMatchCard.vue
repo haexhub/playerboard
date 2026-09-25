@@ -241,7 +241,9 @@ const submitAssignment = async (jerseyNumber: number) => {
         :data-testid="`veo-assignment-row-${selectedJerseyGroup.jerseyNumber}`"
       >
         <div class="flex flex-wrap items-center gap-2 text-sm">
-          <span class="w-10 tabular-nums text-neutral-500">#{{ selectedJerseyGroup.jerseyNumber }}</span>
+          <span class="w-10 tabular-nums text-neutral-500"
+            >#{{ selectedJerseyGroup.jerseyNumber }}</span
+          >
           <span class="flex-1 text-neutral-700">
             {{ selectedJerseyGroup.playerName ?? 'Nicht zugeordnet' }}
           </span>
@@ -275,7 +277,9 @@ const submitAssignment = async (jerseyNumber: number) => {
         >
           <template v-for="stat in selectedJerseyGroup.stats" :key="stat.statType">
             <span>{{ statLabel(stat.statType) }}</span>
-            <span class="text-right tabular-nums">{{ formatStatValue(stat.statType, stat.value) }}</span>
+            <span class="text-right tabular-nums">{{
+              formatStatValue(stat.statType, stat.value)
+            }}</span>
           </template>
         </div>
       </div>

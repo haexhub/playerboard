@@ -73,6 +73,7 @@ export type VeoSeasonSummary = {
 
 const MAX_STATS = new Set(['top_speed_kmh'])
 const MEAN_STATS = new Set(['average_speed_kmh'])
+const SUPABASE_PAGE_SIZE = 1000
 
 /** Aggregates own-team results/stats across the given matches — season
  * overview for User Story 2. Computed on read, not stored (research.md §6). */
@@ -242,22 +243,32 @@ export const useVeoAnalytics = () => {
     matchIds: string[],
   ): Promise<Record<string, VeoUnassignedJerseyStat[]>> => {
     if (matchIds.length === 0) return {}
-    const { data, error } = await client
-      .from('veo_player_match_stats')
-      .select('match_id, veo_jersey_number, stat_type, category, value')
-      .in('match_id', matchIds)
-      .is('player_id', null)
-    if (error) throw error
     const byMatch = new Map<string, VeoUnassignedJerseyStat[]>()
-    for (const row of data ?? []) {
-      const list = byMatch.get(row.match_id) ?? []
-      list.push({
-        veoJerseyNumber: row.veo_jersey_number,
-        statType: row.stat_type,
-        category: row.category,
-        value: row.value,
-      })
-      byMatch.set(row.match_id, list)
+
+    for (let from = 0; ; from += SUPABASE_PAGE_SIZE) {
+      const { data, error } = await client
+        .from('veo_player_match_stats')
+        .select('match_id, veo_jersey_number, stat_type, category, value')
+        .in('match_id', matchIds)
+        .is('player_id', null)
+        .order('match_id', { ascending: true })
+        .order('veo_jersey_number', { ascending: true })
+        .order('stat_type', { ascending: true })
+        .range(from, from + SUPABASE_PAGE_SIZE - 1)
+      if (error) throw error
+
+      for (const row of data ?? []) {
+        const list = byMatch.get(row.match_id) ?? []
+        list.push({
+          veoJerseyNumber: row.veo_jersey_number,
+          statType: row.stat_type,
+          category: row.category,
+          value: row.value,
+        })
+        byMatch.set(row.match_id, list)
+      }
+
+      if ((data?.length ?? 0) < SUPABASE_PAGE_SIZE) break
     }
     return Object.fromEntries(byMatch)
   }

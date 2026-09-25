@@ -44,9 +44,9 @@ await loadLinkedPlayer()
 
 const { listMatches, listUnassignedJerseyStats } = useVeoAnalytics()
 const veoPlayerSeasonSummary = ref<ReturnType<typeof computePlayerSeasonSummary>>([])
-const veoUnassignedJerseySeasonSummary = ref<ReturnType<typeof computeUnassignedJerseySeasonSummary>>(
-  [],
-)
+const veoUnassignedJerseySeasonSummary = ref<
+  ReturnType<typeof computeUnassignedJerseySeasonSummary>
+>([])
 
 const loadVeoPlayerStats = async () => {
   if (!teamId.value) return
@@ -57,11 +57,17 @@ const loadVeoPlayerStats = async () => {
     // Fetched before assigning either ref: a jersey number transitioning
     // between assigned/unassigned must never be briefly missing from both
     // at once (see the same fix in analytics.vue's `load()`).
-    const freshUnassigned = isTrainer.value
-      ? computeUnassignedJerseySeasonSummary(
+    let freshUnassigned: ReturnType<typeof computeUnassignedJerseySeasonSummary> = []
+    if (isTrainer.value) {
+      try {
+        freshUnassigned = computeUnassignedJerseySeasonSummary(
           await listUnassignedJerseyStats(matches.map((m) => m.id)),
         )
-      : []
+      } catch {
+        // Unassigned correction data is optional; keep the assigned summary
+        // visible when this trainer-only request fails.
+      }
+    }
     veoPlayerSeasonSummary.value = computePlayerSeasonSummary(matches)
     veoUnassignedJerseySeasonSummary.value = freshUnassigned
   } catch {

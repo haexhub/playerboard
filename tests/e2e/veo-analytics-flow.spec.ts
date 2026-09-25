@@ -188,7 +188,7 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     // Season summary aggregates both matches: 1 win, 1 draw, 0 losses;
     // own goals 2+9=11, own corners 3+5=8.
     await expect(pageA.getByTestId('veo-season-record')).toContainText(
-      '1 Siege, 1 Unentschieden, 0 Niederlagen',
+      '1 Sieg, 1 Unentschieden, 0 Niederlagen',
     )
     await expect(pageA.getByTestId('veo-season-total-football_goal_total')).toHaveText('11')
     await expect(pageA.getByTestId('veo-season-total-football_corner_total')).toHaveText('8')
@@ -338,16 +338,16 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     await expect(
       pageA.getByTestId(`veo-player-stat-${player7!.id}-distance_total_meters`),
     ).toHaveText('11.000 m')
+    await expect(pageA.getByTestId(`veo-player-stat-${player7!.id}-sprints_total`)).toHaveText('22')
+    await expect(pageA.getByTestId(`veo-player-stat-${player7!.id}-top_speed_kmh`)).toHaveText(
+      '27,8 km/h',
+    )
+    await expect(pageA.getByTestId(`veo-player-stat-${player7!.id}-average_speed_kmh`)).toHaveText(
+      '18,8 km/h',
+    )
     await expect(
-      pageA.getByTestId(`veo-player-stat-${player7!.id}-sprints_total`),
-    ).toHaveText('22')
-    await expect(
-      pageA.getByTestId(`veo-player-stat-${player7!.id}-top_speed_kmh`),
-    ).toHaveText('27,8 km/h')
-    await expect(
-      pageA.getByTestId(`veo-player-stat-${player7!.id}-average_speed_kmh`),
-    ).toHaveText('18,8 km/h')
-    await expect(pageA.getByTestId(`veo-player-stat-${player10!.id}-seconds_played_total`)).toHaveCount(0)
+      pageA.getByTestId(`veo-player-stat-${player10!.id}-seconds_played_total`),
+    ).toHaveCount(0)
 
     // Leaderboard-per-metric shows independently of the single-player
     // selection above — player7 leads distance (11.000 > 4.000), ranked #1.
@@ -384,7 +384,9 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     await expect(
       pageA.getByTestId(`veo-player-stat-${player10!.id}-seconds_played_total`),
     ).toHaveText('45 min') // 2700s -> minutes
-    const player7Distance = pageA.getByTestId(`veo-player-stat-${player7!.id}-distance_total_meters`)
+    const player7Distance = pageA.getByTestId(
+      `veo-player-stat-${player7!.id}-distance_total_meters`,
+    )
     const player10Distance = pageA.getByTestId(
       `veo-player-stat-${player10!.id}-distance_total_meters`,
     )

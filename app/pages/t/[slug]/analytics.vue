@@ -29,10 +29,13 @@ const loadError = ref<string | null>(null)
 const activeRoster = ref<ActiveRosterPlayer[]>([])
 const unassignedByMatch = ref<Record<string, VeoUnassignedJerseyStat[]>>({})
 const correctionError = ref<string | null>(null)
+let loadVersion = 0
 
 const load = async () => {
+  const requestVersion = ++loadVersion
   const teamId = currentTeam.value?.id
   if (!teamId) return
+  const isCurrentLoad = () => requestVersion === loadVersion && currentTeam.value?.id === teamId
   isLoading.value = true
   loadError.value = null
   correctionError.value = null
@@ -41,6 +44,7 @@ const load = async () => {
       listMatches(teamId),
       getSyncStatus(teamId),
     ])
+    if (!isCurrentLoad()) return
     // A failed status fetch must not hide the match list.
     syncStatus.value = statusResult.status === 'fulfilled' ? statusResult.value : null
     if (matchesResult.status === 'rejected') throw matchesResult.reason
@@ -57,6 +61,7 @@ const load = async () => {
         getActiveRoster(teamId),
         listUnassignedJerseyStats(matchIds),
       ])
+      if (!isCurrentLoad()) return
       freshRoster = rosterResult.status === 'fulfilled' ? rosterResult.value : []
       freshUnassigned = unassignedResult.status === 'fulfilled' ? unassignedResult.value : {}
       const failed = [rosterResult, unassignedResult].find((r) => r.status === 'rejected')
@@ -66,6 +71,7 @@ const load = async () => {
           : 'Trikotnummer-Zuordnung konnte nicht geladen werden'
         : null
     }
+    if (!isCurrentLoad()) return
 
     // Assigned together, with no `await` in between: a jersey number
     // transitioning between assigned/unassigned must never be briefly
@@ -82,15 +88,26 @@ const load = async () => {
       selectedMatchId.value = matches.value[0]?.id ?? null
     }
   } catch (err) {
+    if (!isCurrentLoad()) return
     loadError.value = err instanceof Error ? err.message : 'Konnte Veo-Daten nicht laden'
   } finally {
-    isLoading.value = false
+    if (requestVersion === loadVersion) isLoading.value = false
   }
 }
 
 watch(
   () => currentTeam.value?.id,
-  () => void load(),
+  () => {
+    matches.value = []
+    selectedMatchId.value = null
+    syncStatus.value = null
+    loadError.value = null
+    activeRoster.value = []
+    unassignedByMatch.value = {}
+    correctionError.value = null
+    isLoading.value = false
+    void load()
+  },
   { immediate: true },
 )
 

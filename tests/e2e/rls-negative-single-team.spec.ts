@@ -348,7 +348,7 @@ test.describe('RLS negative — single team (SC-003)', () => {
     // N17 — assigned stats remain visible to every team member, but the raw
     // unassigned correction row is trainer-only (FR-011). The UI filter alone
     // is not sufficient because a player can query PostgREST directly.
-    const unassignedQuery = `veo_player_match_stats?match_id=eq.${veoMatch!.id}&select=veo_jersey_number,player_id`
+    const unassignedQuery = `veo_player_match_stats?match_id=eq.${veoMatch!.id}&select=veo_jersey_number,player_id&order=veo_jersey_number.asc`
     const playerUnassigned = await playerCtx.request.get(
       `${SUPABASE_URL}/rest/v1/${unassignedQuery}`,
       {
