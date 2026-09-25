@@ -1,48 +1,45 @@
 {
   "items": [
     {
-      "player": {
-        "jersey_number": "7",
-        "first_name": null,
-        "last_name": null,
-        "known_name": null
-      },
+      "type": "cross_match_player",
+      "team_id": "88536f41-beaf-479e-9b7f-bbf6b2f8410c",
+      "match_ids": ["a1b2c3d4-0000-0000-0000-000000000000"],
+      "player_id": "b1f38e83-bad3-4ed3-9a99-ff483c9932c8",
+      "jersey_number": "7",
       "stats": [
-        { "type": "distance_total_meters", "value": 8532.4, "category": { "id": "physical" }, "periods": [{ "period": 1, "value": 4200.1 }, { "period": 2, "value": 4332.3 }] },
-        { "type": "sprints_total", "value": 14, "category": { "id": "physical" }, "periods": [{ "period": 1, "value": 6 }, { "period": 2, "value": 8 }] },
-        { "type": "top_speed_kmh", "value": 27.8, "category": { "id": "physical" }, "periods": [{ "period": 1, "value": 27.8 }, { "period": 2, "value": 26.1 }] },
-        { "type": "average_speed_kmh", "value": 7.6, "category": { "id": "physical" }, "periods": [{ "period": 1, "value": 7.9 }, { "period": 2, "value": 7.3 }] },
-        { "type": "high_intensity_runs_total", "value": 9, "category": { "id": "physical" }, "periods": [{ "period": 1, "value": 4 }, { "period": 2, "value": 5 }] },
-        { "type": "seconds_played_total", "value": 5400, "category": { "id": "physical" }, "periods": [{ "period": 1, "value": 2700 }, { "period": 2, "value": 2700 }] },
-        { "type": "football_shots_total", "value": 3, "category": { "id": "attacking" }, "periods": [{ "period": 1, "value": 1 }, { "period": 2, "value": 2 }] },
-        { "type": "football_goal_total", "value": 1, "category": { "id": "attacking" }, "periods": [{ "period": 2, "value": 1 }] },
-        { "type": "football_goal_involvement_total", "value": 2, "category": { "id": "attacking" }, "periods": [{ "period": 1, "value": 1 }, { "period": 2, "value": 1 }] },
-        { "type": "football_touches_total", "value": 41, "category": { "id": "possession" }, "periods": [] }
+        { "type": "distance_total_meters", "value": 8532.4, "unit": "meter" },
+        { "type": "sprints_total", "value": 14, "unit": "count" },
+        { "type": "top_speed_kmh", "value": 27.8, "unit": "kilometer_per_hour" },
+        { "type": "average_speed_kmh", "value": 7.6, "unit": "kilometer_per_hour" },
+        { "type": "high_intensity_runs_total", "value": 9, "unit": "count" },
+        { "type": "seconds_played_total", "value": 5400, "unit": "second" },
+        { "type": "football_shots_total", "value": 3, "unit": "count" },
+        { "type": "football_goal_total", "value": 1, "unit": "count" },
+        { "type": "football_goal_involvement_total", "value": 2, "unit": "count" },
+        { "type": "football_touches_total", "value": 41, "unit": "count" }
       ]
     },
     {
-      "player": {
-        "jersey_number": "10",
-        "first_name": null,
-        "last_name": null,
-        "known_name": null
-      },
+      "type": "cross_match_player",
+      "team_id": "88536f41-beaf-479e-9b7f-bbf6b2f8410c",
+      "match_ids": ["a1b2c3d4-0000-0000-0000-000000000000"],
+      "player_id": null,
+      "jersey_number": "10",
       "stats": [
-        { "type": "distance_total_meters", "value": 7210.9, "category": { "id": "physical" }, "periods": [{ "period": 1, "value": 3600.4 }, { "period": 2, "value": 3610.5 }] },
-        { "type": "sprints_total", "value": 8, "category": { "id": "physical" }, "periods": [{ "period": 1, "value": 5 }, { "period": 2, "value": 3 }] },
-        { "type": "seconds_played_total", "value": 5100, "category": { "id": "physical" }, "periods": [{ "period": 1, "value": 2700 }, { "period": 2, "value": 2400 }] }
+        { "type": "distance_total_meters", "value": 7210.9, "unit": "meter" },
+        { "type": "sprints_total", "value": 8, "unit": "count" },
+        { "type": "seconds_played_total", "value": 5100, "unit": "second" }
       ]
     },
     {
-      "player": {
-        "jersey_number": "99",
-        "first_name": null,
-        "last_name": null,
-        "known_name": null
-      },
+      "type": "cross_match_player",
+      "team_id": "88536f41-beaf-479e-9b7f-bbf6b2f8410c",
+      "match_ids": ["a1b2c3d4-0000-0000-0000-000000000000"],
+      "player_id": null,
+      "jersey_number": "99",
       "stats": [
-        { "type": "distance_total_meters", "value": 3000, "category": { "id": "physical" }, "periods": [{ "period": 1, "value": 3000 }] },
-        { "type": "sprints_total", "value": 2, "category": { "id": "physical" }, "periods": [{ "period": 1, "value": 2 }] }
+        { "type": "distance_total_meters", "value": 3000, "unit": "meter" },
+        { "type": "sprints_total", "value": 2, "unit": "count" }
       ]
     }
   ],

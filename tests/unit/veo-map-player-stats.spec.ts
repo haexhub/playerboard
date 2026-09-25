@@ -43,12 +43,12 @@ describe('mapPlayerStats', () => {
     const payload = {
       items: [
         {
-          player: { jersey_number: '7' },
-          stats: [{ category: { id: 'physical' }, value: 27.8, type: 'top_speed_kmh' }],
+          jersey_number: '7',
+          stats: [{ value: 27.8, type: 'top_speed_kmh' }],
         },
         {
-          player: { jersey_number: '07' },
-          stats: [{ category: { id: 'physical' }, value: 26.1, type: 'top_speed_kmh' }],
+          jersey_number: '07',
+          stats: [{ value: 26.1, type: 'top_speed_kmh' }],
         },
       ],
     }
@@ -73,7 +73,7 @@ describe('mapPlayerStats', () => {
     expect(() => mapPlayerStats({ unexpected: true }, MATCH_ID, ROSTER)).toThrow()
     expect(() => mapPlayerStats(null, MATCH_ID, ROSTER)).toThrow()
     expect(() =>
-      mapPlayerStats({ items: [{ player: { jersey_number: 7 }, stats: [] }] }, MATCH_ID, ROSTER),
+      mapPlayerStats({ items: [{ jersey_number: 7, stats: [] }] }, MATCH_ID, ROSTER),
     ).toThrow()
   })
 })

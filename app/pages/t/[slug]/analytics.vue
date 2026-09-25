@@ -22,6 +22,7 @@ const { currentTeam, isTrainer } = useTeamContext()
 const { listMatches, getSyncStatus, listUnassignedJerseyStats, getActiveRoster } = useVeoAnalytics()
 
 const matches = ref<VeoMatch[]>([])
+const selectedMatchId = ref<string | null>(null)
 const syncStatus = ref<VeoSyncStatus | null>(null)
 const isLoading = ref(false)
 const loadError = ref<string | null>(null)
@@ -43,29 +44,42 @@ const load = async () => {
     // A failed status fetch must not hide the match list.
     syncStatus.value = statusResult.status === 'fulfilled' ? statusResult.value : null
     if (matchesResult.status === 'rejected') throw matchesResult.reason
-    matches.value = matchesResult.value
+    const freshMatches = matchesResult.value
 
     // US3 — trainer-only correction data, fetched alongside the match list
     // but never mixed into the member-facing `matches` above.
+    let freshRoster: ActiveRosterPlayer[] = []
+    let freshUnassigned: Record<string, VeoUnassignedJerseyStat[]> = {}
+    let freshCorrectionError: string | null = null
     if (isTrainer.value) {
-      const matchIds = matches.value.map((m) => m.id)
+      const matchIds = freshMatches.map((m) => m.id)
       const [rosterResult, unassignedResult] = await Promise.allSettled([
         getActiveRoster(teamId),
         listUnassignedJerseyStats(matchIds),
       ])
-      activeRoster.value = rosterResult.status === 'fulfilled' ? rosterResult.value : []
-      unassignedByMatch.value =
-        unassignedResult.status === 'fulfilled' ? unassignedResult.value : {}
+      freshRoster = rosterResult.status === 'fulfilled' ? rosterResult.value : []
+      freshUnassigned = unassignedResult.status === 'fulfilled' ? unassignedResult.value : {}
       const failed = [rosterResult, unassignedResult].find((r) => r.status === 'rejected')
-      correctionError.value = failed
+      freshCorrectionError = failed
         ? failed.reason instanceof Error
           ? failed.reason.message
           : 'Trikotnummer-Zuordnung konnte nicht geladen werden'
         : null
-    } else {
-      activeRoster.value = []
-      unassignedByMatch.value = {}
-      correctionError.value = null
+    }
+
+    // Assigned together, with no `await` in between: a jersey number
+    // transitioning between assigned/unassigned must never be briefly
+    // absent from both `matches` and `unassignedByMatch` at once — that
+    // transient gap was resetting VeoMatchCard's own jersey selection.
+    matches.value = freshMatches
+    activeRoster.value = freshRoster
+    unassignedByMatch.value = freshUnassigned
+    correctionError.value = freshCorrectionError
+    // Keep the trainer's current selection across a reload (e.g. after
+    // assigning a jersey number); only default to the newest match when
+    // nothing is selected yet or the selected match is gone.
+    if (!matches.value.some((m) => m.id === selectedMatchId.value)) {
+      selectedMatchId.value = matches.value[0]?.id ?? null
     }
   } catch (err) {
     loadError.value = err instanceof Error ? err.message : 'Konnte Veo-Daten nicht laden'
@@ -81,6 +95,22 @@ watch(
 )
 
 const seasonSummary = computed(() => computeSeasonSummary(matches.value))
+const selectedMatch = computed(
+  () => matches.value.find((m) => m.id === selectedMatchId.value) ?? null,
+)
+
+const matchOptionLabel = (match: VeoMatch) => {
+  const date = new Date(match.played_at).toLocaleDateString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+  const score =
+    match.own_score !== null && match.opponent_score !== null
+      ? ` (${match.own_score}:${match.opponent_score})`
+      : ''
+  return `${date} · vs. ${match.opponent_name}${score}`
+}
 </script>
 
 <template>
@@ -120,7 +150,11 @@ const seasonSummary = computed(() => computeSeasonSummary(matches.value))
 
     <VeoSyncStatusBanner v-if="!isLoading && !loadError" :status="syncStatus" />
 
-    <p v-if="isLoading" class="text-sm text-neutral-500">Lade Veo-Daten…</p>
+    <!-- `isLoading` only replaces the match view on the very first load
+    (no matches yet) — a reload triggered by `@reassigned` must not unmount
+    VeoMatchCard, or its own selection state (jersey/player dropdowns)
+    silently resets. -->
+    <p v-if="isLoading && !matches.length" class="text-sm text-neutral-500">Lade Veo-Daten…</p>
     <p v-else-if="loadError" class="text-sm text-red-700" role="alert">{{ loadError }}</p>
     <p
       v-else-if="!matches.length"
@@ -131,14 +165,28 @@ const seasonSummary = computed(() => computeSeasonSummary(matches.value))
     </p>
     <div v-else class="space-y-4">
       <VeoSeasonSummary :summary="seasonSummary" />
+
+      <label class="block max-w-md space-y-1 text-sm">
+        <span class="text-neutral-700">Spiel auswählen</span>
+        <select
+          v-model="selectedMatchId"
+          class="min-h-touch w-full rounded border border-neutral-300 px-2 text-sm"
+          data-testid="veo-match-select"
+        >
+          <option v-for="match in matches" :key="match.id" :value="match.id">
+            {{ matchOptionLabel(match) }}
+          </option>
+        </select>
+      </label>
+
       <VeoMatchCard
-        v-for="match in matches"
-        :key="match.id"
-        :match="match"
+        v-if="selectedMatch"
+        :key="selectedMatch.id"
+        :match="selectedMatch"
         :team-id="currentTeam?.id"
         :is-trainer="isTrainer"
         :roster="activeRoster"
-        :unassigned-stats="unassignedByMatch[match.id] ?? []"
+        :unassigned-stats="unassignedByMatch[selectedMatch.id] ?? []"
         @reassigned="load"
       />
     </div>

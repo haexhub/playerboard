@@ -139,15 +139,86 @@ player (non-trainer) of the same team, the route returns 403.
 
 - [X] T022 [P] Run `pnpm lint` and `pnpm typecheck`; fix any violations across all files touched by this feature
 - [X] T023 Run `pnpm db:migrate` and `pnpm gen:types` locally to confirm the new migration applies cleanly end-to-end (quickstart.md)
-- [ ] T024 Capture one real `POST .../analysis/stats/` (`type: cross_match, group_by: player`) response from the live Veo account and diff it against T005's fixture / [research.md §2](./research.md#2-player-stats-response-shape)'s inferred shape; update the fixture, `mapPlayerStats.ts`'s Zod schema, and this doc if the real nesting differs
+- [X] T024 Capture one real `POST .../analysis/stats/` (`type: cross_match, group_by: player`) response from the live Veo account and diff it against T005's fixture / [research.md §2](./research.md#2-player-stats-response-shape)'s inferred shape; update the fixture, `mapPlayerStats.ts`'s Zod schema, and this doc if the real nesting differs
 
-  **Blocked**: this session has no live Veo account/session cookie to
-  capture against (research.md §2's explicitly-flagged inference risk).
-  T005's fixture and `mapPlayerStats.ts`'s Zod schema ship as-is,
-  fail-closed (a shape mismatch throws "Unexpected Veo player-stats
-  response shape" and fails that match's sync, per research.md §2) —
-  someone with Veo account access must do this five-minute check before
-  fully trusting production sync output.
+  **Done (2026-09-25)**: captured via a real headless-Chromium session
+  (Playwright) against a linked team's live Veo account. The inference was
+  wrong on two counts (flat item fields instead of a nested `player` object;
+  no per-stat `category`) and `team_id` turned out to be a required request
+  field the original decision had assumed away — both caused every
+  production sync to fail. Fixed in `client.ts`/`mapPlayerStats.ts`/
+  `sync.post.ts`, fixture and research.md §§1-2 updated to match, regression
+  tests added (`tests/unit/veo-client.spec.ts`,
+  `tests/unit/veo-map-player-stats.spec.ts`).
+
+- [X] T025 [US2] Replace the analytics page's stacked list of `VeoMatchCard`s with a single-match view, selected via a dropdown over all synced matches (FR-017)
+
+  **Done (2026-09-25)**: `app/pages/t/[slug]/analytics.vue` — native
+  `<select>` bound to `selectedMatchId`, defaulting to the newest match;
+  selection survives `@reassigned` reloads. `tests/e2e/veo-analytics-flow.spec.ts`
+  updated to switch the selector between assertions instead of relying on
+  multiple simultaneously-rendered cards.
+
+- [X] T026 [US1] Replace the dashboard's stacked per-player list with a single-player dropdown view, plus a manual up-to-4 comparison with best-value highlighting (FR-018), plus an automatic top-3-per-metric leaderboard independent of the manual selection (FR-019)
+
+  **Done (2026-09-25)**: `app/components/veo/VeoPlayerSeasonSummary.vue`
+  rewritten — one dropdown slot per compared player (1-4, "+ Spieler
+  vergleichen" to add), comparison table highlighting the row's max value
+  in green when 2+ players are selected, plus a separate "Bestenliste je
+  Metrik" section (top 3, ties extend the list). `VeoSeasonSummary.vue`'s
+  header spells out Siege/Unentschieden/Niederlagen instead of "5S 1U 0N".
+  e2e coverage extended accordingly.
+
+- [X] T027 [US1] [US2] Display curated stats with their unit instead of a bare number (FR-020)
+
+  **Done (2026-09-25)**: `formatStatValue()` added to
+  `app/utils/veoStatLabels.ts` — distance in `m`, both speed stats in
+  `km/h`, `seconds_played_total` converted from seconds to whole minutes
+  (`min`); count-only stats stay unitless. Applied in
+  `VeoPlayerSeasonSummary.vue` and `VeoMatchCard.vue` (per-match player
+  breakdown and the trainer-only unassigned-jersey stats).
+
+- [X] T028 [US1] [US2] Extend the single-select/compare-up-to-4/leaderboard UI (T026) to the per-match player breakdown too, not just the season summary (FR-018/FR-019)
+
+  **Done (2026-09-25)**: extracted the dropdown-picker/compare-table/
+  leaderboard UI out of `VeoPlayerSeasonSummary.vue` into a shared
+  `app/components/veo/VeoPlayerStatsCompare.vue` (generic `entries: {key,
+  jerseyNumber, playerName, statTotals}[]`), used by both
+  `VeoPlayerSeasonSummary.vue` (season) and `VeoMatchCard.vue` (per-match,
+  replacing the old stacked `playerBreakdown` list). `CURATED_STAT_ORDER`
+  moved to `veoStatLabels.ts` so both call sites share one order.
+
+- [X] T029 [US1] [US2] [US3] Leaderboard/compare MUST include a trainer-visible unassigned jersey number, not just assigned players (FR-019)
+
+  **Done (2026-09-25)**: added `computeUnassignedJerseySeasonSummary()` to
+  `useVeoAnalytics.ts` (season-wide sum of `listUnassignedJerseyStats()`,
+  same MAX/MEAN aggregation rules as `computePlayerSeasonSummary` via a new
+  shared `applyStatAggregation` helper). `dashboard.vue` only fetches/passes
+  it when `isTrainer` (FR-002/FR-011/SC-004 unaffected for regular members —
+  also still enforced at the RLS layer regardless). `VeoMatchCard.vue`
+  reuses its existing per-match `unassignedStats` prop for the same purpose.
+  Unassigned entries render as `#<jerseyNumber> Nicht zugeordnet`, keyed
+  `jersey-<number>` — never a guessed player name.
+
+- [X] T030 [US3] Apply the same single-select-via-dropdown treatment to the jersey-number correction UI (FR-021); gold/silver/bronze styling for leaderboard ranks 1-3 (FR-019); fix a reactivity race that reset that selection
+
+  **Done (2026-09-25)**: `VeoMatchCard.vue`'s "Trikotnummer-Zuordnung" now
+  shows one jersey number's correction at a time via `veo-jersey-select`,
+  same pattern as the match/player selectors.
+  `VeoPlayerStatsCompare.vue`'s leaderboard now computes a competition-style
+  rank (ties share a rank, so a tie can never push past 3) and applies
+  gold/silver/bronze background classes for ranks 1-3.
+  Root-caused and fixed two reactivity bugs that silently reset this kind
+  of local selection state on every reload: (1) `analytics.vue`'s
+  `v-if="isLoading"` unmounted the whole match view (including
+  `VeoMatchCard`) on every `@reassigned` reload, not just the first load —
+  changed to `isLoading && !matches.length`; (2) `load()` (both
+  `analytics.vue` and `dashboard.vue`) assigned `matches`/`unassignedByMatch`
+  in two separate reactive steps with a real `await` between them, so a
+  jersey number transitioning between assigned ↔ unassigned could be
+  transiently absent from *both* sources at once — fixed by fetching
+  everything first and assigning all refs together, with no `await` in
+  between.
 
 ---
 

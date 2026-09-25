@@ -195,6 +195,7 @@ const syncTeam = async (db: Db, mapping: TeamMapping) => {
         // failure here must skip the whole match (match + team stats
         // included), not just the player stats (FR-015, research.md §13).
         const playerStatsPayload = await fetchPlayerAnalysisStats(accessToken, {
+          veoTeamId: match.team.id,
           veoMatchIds: [match.identifier],
         })
         // One transaction per match: a malformed stats payload or a failure

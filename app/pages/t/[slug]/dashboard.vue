@@ -4,7 +4,11 @@ import RankingTable from '~/components/stats/RankingTable.vue'
 import TimeframePicker from '~/components/stats/TimeframePicker.vue'
 import VeoPlayerSeasonSummary from '~/components/veo/VeoPlayerSeasonSummary.vue'
 import { useTimeframedRanking } from '~/composables/useRanking'
-import { computePlayerSeasonSummary, useVeoAnalytics } from '~/composables/useVeoAnalytics'
+import {
+  computePlayerSeasonSummary,
+  computeUnassignedJerseySeasonSummary,
+  useVeoAnalytics,
+} from '~/composables/useVeoAnalytics'
 import type { Database } from '~/types/database'
 
 definePageMeta({
@@ -38,17 +42,33 @@ const loadLinkedPlayer = async () => {
 
 await loadLinkedPlayer()
 
-const { listMatches } = useVeoAnalytics()
+const { listMatches, listUnassignedJerseyStats } = useVeoAnalytics()
 const veoPlayerSeasonSummary = ref<ReturnType<typeof computePlayerSeasonSummary>>([])
+const veoUnassignedJerseySeasonSummary = ref<ReturnType<typeof computeUnassignedJerseySeasonSummary>>(
+  [],
+)
 
 const loadVeoPlayerStats = async () => {
   if (!teamId.value) return
   try {
-    veoPlayerSeasonSummary.value = computePlayerSeasonSummary(await listMatches(teamId.value))
+    const matches = await listMatches(teamId.value)
+    // Trainer-only (FR-002/FR-011/SC-004) — lets the leaderboard include a
+    // jersey number nobody has claimed yet instead of silently omitting it.
+    // Fetched before assigning either ref: a jersey number transitioning
+    // between assigned/unassigned must never be briefly missing from both
+    // at once (see the same fix in analytics.vue's `load()`).
+    const freshUnassigned = isTrainer.value
+      ? computeUnassignedJerseySeasonSummary(
+          await listUnassignedJerseyStats(matches.map((m) => m.id)),
+        )
+      : []
+    veoPlayerSeasonSummary.value = computePlayerSeasonSummary(matches)
+    veoUnassignedJerseySeasonSummary.value = freshUnassigned
   } catch {
     // Veo is an optional per-team integration; a fetch error here must not
     // break the rest of the dashboard.
     veoPlayerSeasonSummary.value = []
+    veoUnassignedJerseySeasonSummary.value = []
   }
 }
 await loadVeoPlayerStats()
@@ -152,8 +172,9 @@ const topThree = computed(() => ranking.value?.rows.slice(0, 3) ?? [])
     />
 
     <VeoPlayerSeasonSummary
-      v-if="veoPlayerSeasonSummary.length"
+      v-if="veoPlayerSeasonSummary.length || veoUnassignedJerseySeasonSummary.length"
       :players="veoPlayerSeasonSummary"
+      :unassigned-jersey-totals="veoUnassignedJerseySeasonSummary"
     />
   </section>
 </template>

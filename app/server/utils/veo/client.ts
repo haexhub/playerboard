@@ -118,16 +118,19 @@ export type VeoClub = z.infer<typeof veoClubSchema>
 export type VeoTeam = z.infer<typeof veoTeamSchema>
 
 /** POST .../api/app/analysis/stats/ for a batch of matches, grouped by
- * player instead of team association (004-veo-player-analytics research.md
- * §1) — no `team_id` field needed for this variant. */
+ * player instead of team association. `team_id` IS required here despite
+ * research.md §1's original assumption — confirmed by capturing the real
+ * request the Veo web app itself sends (2026-09-25); omitting it fails with
+ * HTTP 400. */
 export const fetchPlayerAnalysisStats = async (
   accessToken: string,
-  params: { veoMatchIds: string[] },
+  params: { veoTeamId: string; veoMatchIds: string[] },
 ): Promise<unknown> =>
   veoFetch(accessToken, '/analysis/stats/', {
     method: 'POST',
     body: JSON.stringify({
       type: 'cross_match',
+      team_id: params.veoTeamId,
       group_by: 'player',
       match_ids: params.veoMatchIds,
     }),

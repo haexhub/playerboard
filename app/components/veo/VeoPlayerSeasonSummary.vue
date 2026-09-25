@@ -1,21 +1,32 @@
 <script setup lang="ts">
-import type { VeoPlayerSeasonTotals } from '~/composables/useVeoAnalytics'
-import { statLabel } from '~/utils/veoStatLabels'
+import { computed } from 'vue'
+import type {
+  VeoPlayerSeasonTotals,
+  VeoUnassignedJerseySeasonTotals,
+} from '~/composables/useVeoAnalytics'
+import VeoPlayerStatsCompare, { type VeoPlayerStatEntry } from './VeoPlayerStatsCompare.vue'
 
-defineProps<{ players: VeoPlayerSeasonTotals[] }>()
+const props = defineProps<{
+  players: VeoPlayerSeasonTotals[]
+  // Trainer-only — the parent only fetches/passes these for a trainer
+  // (FR-002/FR-011/SC-004: regular members never see unassigned stats).
+  unassignedJerseyTotals?: VeoUnassignedJerseySeasonTotals[]
+}>()
 
-// Fixed display order, same curated list as research.md §3.
-const CURATED_STAT_ORDER = [
-  'distance_total_meters',
-  'sprints_total',
-  'top_speed_kmh',
-  'average_speed_kmh',
-  'high_intensity_runs_total',
-  'seconds_played_total',
-  'football_shots_total',
-  'football_goal_total',
-  'football_goal_involvement_total',
-]
+const entries = computed<VeoPlayerStatEntry[]>(() => [
+  ...props.players.map((p) => ({
+    key: p.playerId,
+    jerseyNumber: p.jerseyNumber,
+    playerName: p.playerName,
+    statTotals: p.statTotals,
+  })),
+  ...(props.unassignedJerseyTotals ?? []).map((u) => ({
+    key: `jersey-${u.jerseyNumber}`,
+    jerseyNumber: u.jerseyNumber,
+    playerName: null,
+    statTotals: u.statTotals,
+  })),
+])
 </script>
 
 <template>
@@ -26,32 +37,6 @@ const CURATED_STAT_ORDER = [
     <h2 class="text-sm font-medium uppercase tracking-wide text-neutral-500">
       Spieler-Statistiken (Saison)
     </h2>
-    <div
-      v-for="player in players"
-      :key="player.playerId"
-      class="space-y-1"
-      data-testid="veo-player-season-row"
-    >
-      <p class="text-sm font-semibold text-neutral-900">
-        <span v-if="player.jerseyNumber !== null" class="tabular-nums">
-          #{{ player.jerseyNumber }}
-        </span>
-        {{ player.playerName }}
-      </p>
-      <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-        <template
-          v-for="statType in CURATED_STAT_ORDER.filter((s) => player.statTotals[s] !== undefined)"
-          :key="statType"
-        >
-          <span class="text-neutral-700">{{ statLabel(statType) }}</span>
-          <span
-            class="text-right tabular-nums font-medium"
-            :data-testid="`veo-player-season-stat-${player.playerId}-${statType}`"
-          >
-            {{ player.statTotals[statType]!.toLocaleString('de-DE', { maximumFractionDigits: 1 }) }}
-          </span>
-        </template>
-      </div>
-    </div>
+    <VeoPlayerStatsCompare :entries="entries" />
   </div>
 </template>
