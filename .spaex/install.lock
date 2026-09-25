@@ -1,5 +1,5 @@
 {
-  "generation_id": "g_20260921T003220Z_e3b0",
+  "generation_id": "g_20260925T101303Z_e3b0",
   "molecules": [
     {
       "id": "com.github.haexmas.atoms.coding-guideline-javascript-typescript",
@@ -18,7 +18,7 @@
       "source": "https://github.com/haexmas/atoms"
     },
     {
-      "hook_status": "skipped",
+      "hook_status": "ok",
       "id": "com.github.haexmas.atoms.graphify-first-authoring",
       "paths": [
         ".spaex/constitution.md"
