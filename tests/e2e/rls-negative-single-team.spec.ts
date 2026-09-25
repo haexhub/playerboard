@@ -325,6 +325,51 @@ test.describe('RLS negative — single team (SC-003)', () => {
         home_or_away: 'home',
       },
     ])
+
+    await restInsert('veo_player_match_stats', [
+      {
+        match_id: veoMatch!.id,
+        veo_jersey_number: 7,
+        stat_type: 'sprints_total',
+        player_id: rosterPlayer!.id,
+        category: 'physical',
+        value: 10,
+      },
+      {
+        match_id: veoMatch!.id,
+        veo_jersey_number: 99,
+        stat_type: 'football_goal_total',
+        player_id: null,
+        category: 'attacking',
+        value: 3,
+      },
+    ])
+
+    // N17 — assigned stats remain visible to every team member, but the raw
+    // unassigned correction row is trainer-only (FR-011). The UI filter alone
+    // is not sufficient because a player can query PostgREST directly.
+    const unassignedQuery = `veo_player_match_stats?match_id=eq.${veoMatch!.id}&select=veo_jersey_number,player_id`
+    const playerUnassigned = await playerCtx.request.get(
+      `${SUPABASE_URL}/rest/v1/${unassignedQuery}`,
+      {
+        headers: asUser(playerToken),
+      },
+    )
+    expect(playerUnassigned.ok()).toBe(true)
+    expect(await playerUnassigned.json()).toEqual([
+      { veo_jersey_number: 7, player_id: rosterPlayer!.id },
+    ])
+
+    const trainerUnassigned = await trainerCtx.request.get(
+      `${SUPABASE_URL}/rest/v1/${unassignedQuery}`,
+      { headers: asUser(trainerToken) },
+    )
+    expect(trainerUnassigned.ok()).toBe(true)
+    expect(await trainerUnassigned.json()).toEqual([
+      { veo_jersey_number: 7, player_id: rosterPlayer!.id },
+      { veo_jersey_number: 99, player_id: null },
+    ])
+
     const n16 = await playerPage.request.post(
       `/api/veo/matches/${veoMatch!.id}/player-assignment`,
       { data: { team_id: teamId, veo_jersey_number: 7, player_id: null } },

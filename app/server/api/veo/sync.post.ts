@@ -188,7 +188,7 @@ const syncTeam = async (db: Db, mapping: TeamMapping) => {
     for (const match of analyzable) {
       try {
         const statsPayload = await fetchAnalysisStats(accessToken, {
-          veoTeamId: match.team__id,
+          veoTeamId: match.team.id,
           veoMatchIds: [match.identifier],
         })
         // Fetched before the transaction, same as statsPayload above: a

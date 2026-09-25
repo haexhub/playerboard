@@ -30,7 +30,7 @@ export type VeoMatch = {
   stats: VeoMatchStat[]
   // Member-facing only — rows with no resolved player are excluded here
   // (FR-002/SC-004); the trainer-only correction path fetches those
-  // separately via `listUnassignedJerseyNumbers()`.
+  // separately via `listUnassignedJerseyStats()`.
   player_stats: VeoPlayerMatchStat[]
 }
 
@@ -45,6 +45,16 @@ export type ActiveRosterPlayer = {
   id: string
   name: string
   jerseyNumber: number | null
+}
+
+// Trainer-only (User Story 3): the raw curated stats Veo delivered for a
+// jersey number that has no player_id yet — shown as a hint that a mapping
+// is still missing, never with a guessed player name (SC-004).
+export type VeoUnassignedJerseyStat = {
+  veoJerseyNumber: number
+  statType: string
+  category: string
+  value: number
 }
 
 export type VeoSyncStatus = {
@@ -176,28 +186,30 @@ export const useVeoAnalytics = () => {
   // Trainer-only: every team member could technically read these via RLS
   // (data-model.md has no per-role restriction), but only the correction UI
   // (US3) ever requests them — never mixed into the member-facing display.
-  const listUnassignedJerseyNumbers = async (
+  // Returns the actual stat values (not just the jersey number) so the
+  // trainer sees what Veo recorded even before it's mapped to a player.
+  const listUnassignedJerseyStats = async (
     matchIds: string[],
-  ): Promise<Record<string, number[]>> => {
+  ): Promise<Record<string, VeoUnassignedJerseyStat[]>> => {
     if (matchIds.length === 0) return {}
     const { data, error } = await client
       .from('veo_player_match_stats')
-      .select('match_id, veo_jersey_number')
+      .select('match_id, veo_jersey_number, stat_type, category, value')
       .in('match_id', matchIds)
       .is('player_id', null)
     if (error) throw error
-    const byMatch = new Map<string, Set<number>>()
+    const byMatch = new Map<string, VeoUnassignedJerseyStat[]>()
     for (const row of data ?? []) {
-      const set = byMatch.get(row.match_id) ?? new Set<number>()
-      set.add(row.veo_jersey_number)
-      byMatch.set(row.match_id, set)
+      const list = byMatch.get(row.match_id) ?? []
+      list.push({
+        veoJerseyNumber: row.veo_jersey_number,
+        statType: row.stat_type,
+        category: row.category,
+        value: row.value,
+      })
+      byMatch.set(row.match_id, list)
     }
-    return Object.fromEntries(
-      [...byMatch.entries()].map(([matchId, numbers]) => [
-        matchId,
-        [...numbers].sort((a, b) => a - b),
-      ]),
-    )
+    return Object.fromEntries(byMatch)
   }
 
   const getActiveRoster = async (team_id: string): Promise<ActiveRosterPlayer[]> => {
@@ -211,5 +223,5 @@ export const useVeoAnalytics = () => {
     return (data ?? []).map((p) => ({ id: p.id, name: p.name, jerseyNumber: p.jersey_number }))
   }
 
-  return { listMatches, getSyncStatus, listUnassignedJerseyNumbers, getActiveRoster }
+  return { listMatches, getSyncStatus, listUnassignedJerseyStats, getActiveRoster }
 }

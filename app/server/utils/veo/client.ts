@@ -12,7 +12,11 @@ const veoMatchListItemSchema = z.object({
   opponent_team_name: z.string(),
   has_analytics_enabled: z.boolean(),
   own_team_home_or_away: z.enum(['home', 'away']),
-  team__id: z.string(),
+  // Nested `team.id`, not a flattened `team__id` — the API stopped honoring
+  // the `fields=` sparse-fieldset selection at some point and now always
+  // returns the full nested `team` object (confirmed against a live sync
+  // failure, "Unexpected Veo matches response shape", 2026-09-25).
+  team: z.object({ id: z.string() }),
   info: z
     .object({
       stats: z
@@ -51,9 +55,19 @@ const MATCH_LIST_FIELDS = [
   'opponent_team_name',
   'has_analytics_enabled',
   'own_team_home_or_away',
-  'team__id',
+  'team',
   'info',
 ]
+
+/** Validates a raw `.../matches/` response — exported separately so it can be
+ * unit-tested against a captured fixture without a real Veo session. */
+export const parseMatchListResponse = (json: unknown): VeoMatchListItem[] => {
+  const parsed = z.array(veoMatchListItemSchema).safeParse(json)
+  if (!parsed.success) {
+    throw new Error('Unexpected Veo matches response shape')
+  }
+  return parsed.data
+}
 
 /** GET .../api/app/matches/ for one Veo club/team, newest first. */
 export const listMatches = async (
@@ -69,11 +83,7 @@ export const listMatches = async (
   })
   for (const field of MATCH_LIST_FIELDS) query.append('fields', field)
   const json = await veoFetch<unknown>(accessToken, `/matches/?${query.toString()}`)
-  const parsed = z.array(veoMatchListItemSchema).safeParse(json)
-  if (!parsed.success) {
-    throw new Error('Unexpected Veo matches response shape')
-  }
-  return parsed.data
+  return parseMatchListResponse(json)
 }
 
 /** POST .../api/app/analysis/stats/ for a batch of matches of one Veo team. */

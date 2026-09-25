@@ -26,6 +26,9 @@ const lastSuccessLabel = computed(() => {
     Die automatische Aktualisierung der Veo-Daten funktioniert seit
     {{ status?.consecutive_failures }} Versuchen nicht mehr. Die angezeigten Daten können veraltet
     sein.
+    <span v-if="status?.last_error" data-testid="veo-sync-status-error-detail">
+      Fehler: {{ status.last_error }}
+    </span>
   </p>
   <p v-else-if="lastSuccessLabel" class="text-xs text-neutral-500" data-testid="veo-sync-status-ok">
     Letzter erfolgreicher Sync: {{ lastSuccessLabel }}

@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
 import { toast } from 'vue-sonner'
-import type { ActiveRosterPlayer, VeoMatch } from '~/composables/useVeoAnalytics'
+import type {
+  ActiveRosterPlayer,
+  VeoMatch,
+  VeoUnassignedJerseyStat,
+} from '~/composables/useVeoAnalytics'
 import { useVeoPlayerAssignment } from '~/composables/useVeoPlayerAssignment'
 import { categoryLabel, statLabel } from '~/utils/veoStatLabels'
 
@@ -10,7 +14,7 @@ const props = defineProps<{
   teamId?: string
   isTrainer?: boolean
   roster?: ActiveRosterPlayer[]
-  unassignedJerseyNumbers?: number[]
+  unassignedStats?: VeoUnassignedJerseyStat[]
 }>()
 
 const emit = defineEmits<{ reassigned: [] }>()
@@ -79,8 +83,16 @@ const playerBreakdown = computed<PlayerBreakdown[]>(() => {
   )
 })
 
-// User Story 3 — trainer-only jersey-number assignment/correction.
-type JerseyGroup = { jerseyNumber: number; playerId: string | null; playerName: string | null }
+// User Story 3 — trainer-only jersey-number assignment/correction. Unassigned
+// jerseys carry their raw stats too (never a guessed player name, SC-004) —
+// a trainer sees them as a hint that a mapping is still missing, instead of
+// the jersey number silently disappearing.
+type JerseyGroup = {
+  jerseyNumber: number
+  playerId: string | null
+  playerName: string | null
+  stats: { statType: string; value: number }[]
+}
 
 const jerseyGroups = computed<JerseyGroup[]>(() => {
   const byJersey = new Map<number, JerseyGroup>()
@@ -90,12 +102,21 @@ const jerseyGroups = computed<JerseyGroup[]>(() => {
         jerseyNumber: stat.veo_jersey_number,
         playerId: stat.player_id,
         playerName: stat.player_name,
+        stats: [],
       })
     }
   }
-  for (const jerseyNumber of props.unassignedJerseyNumbers ?? []) {
-    if (!byJersey.has(jerseyNumber)) {
-      byJersey.set(jerseyNumber, { jerseyNumber, playerId: null, playerName: null })
+  for (const stat of props.unassignedStats ?? []) {
+    const existing = byJersey.get(stat.veoJerseyNumber)
+    if (existing) {
+      existing.stats.push({ statType: stat.statType, value: stat.value })
+    } else {
+      byJersey.set(stat.veoJerseyNumber, {
+        jerseyNumber: stat.veoJerseyNumber,
+        playerId: null,
+        playerName: null,
+        stats: [{ statType: stat.statType, value: stat.value }],
+      })
     }
   }
   return [...byJersey.values()].sort((a, b) => a.jerseyNumber - b.jerseyNumber)
@@ -204,34 +225,46 @@ const submitAssignment = async (jerseyNumber: number) => {
       <div
         v-for="group in jerseyGroups"
         :key="group.jerseyNumber"
-        class="flex flex-wrap items-center gap-2 text-sm"
+        class="space-y-1"
         :data-testid="`veo-assignment-row-${group.jerseyNumber}`"
       >
-        <span class="w-10 tabular-nums text-neutral-500">#{{ group.jerseyNumber }}</span>
-        <span class="flex-1 text-neutral-700">
-          {{ group.playerName ?? 'Nicht zugeordnet' }}
-        </span>
-        <select
-          v-model="selections[group.jerseyNumber]"
-          class="min-h-touch rounded border border-neutral-300 px-2 text-sm"
-          :data-testid="`veo-assignment-select-${group.jerseyNumber}`"
+        <div class="flex flex-wrap items-center gap-2 text-sm">
+          <span class="w-10 tabular-nums text-neutral-500">#{{ group.jerseyNumber }}</span>
+          <span class="flex-1 text-neutral-700">
+            {{ group.playerName ?? 'Nicht zugeordnet' }}
+          </span>
+          <select
+            v-model="selections[group.jerseyNumber]"
+            class="min-h-touch rounded border border-neutral-300 px-2 text-sm"
+            :data-testid="`veo-assignment-select-${group.jerseyNumber}`"
+          >
+            <option value="">Spieler wählen…</option>
+            <option v-for="p in roster ?? []" :key="p.id" :value="p.id">
+              {{ p.jerseyNumber !== null ? `#${p.jerseyNumber} ` : '' }}{{ p.name }}
+            </option>
+          </select>
+          <button
+            type="button"
+            class="min-h-touch rounded border border-neutral-300 px-3 text-sm"
+            :data-testid="`veo-assignment-submit-${group.jerseyNumber}`"
+            :disabled="
+              saving[group.jerseyNumber] || (!selections[group.jerseyNumber] && !group.playerId)
+            "
+            @click="submitAssignment(group.jerseyNumber)"
+          >
+            {{ group.playerId ? 'Zuordnung ändern' : 'Spieler zuordnen' }}
+          </button>
+        </div>
+        <div
+          v-if="group.stats.length"
+          class="grid grid-cols-2 gap-x-4 pl-12 text-sm text-neutral-500"
+          :data-testid="`veo-assignment-stats-${group.jerseyNumber}`"
         >
-          <option value="">Spieler wählen…</option>
-          <option v-for="p in roster ?? []" :key="p.id" :value="p.id">
-            {{ p.jerseyNumber !== null ? `#${p.jerseyNumber} ` : '' }}{{ p.name }}
-          </option>
-        </select>
-        <button
-          type="button"
-          class="min-h-touch rounded border border-neutral-300 px-3 text-sm"
-          :data-testid="`veo-assignment-submit-${group.jerseyNumber}`"
-          :disabled="
-            saving[group.jerseyNumber] || (!selections[group.jerseyNumber] && !group.playerId)
-          "
-          @click="submitAssignment(group.jerseyNumber)"
-        >
-          {{ group.playerId ? 'Zuordnung ändern' : 'Spieler zuordnen' }}
-        </button>
+          <template v-for="stat in group.stats" :key="stat.statType">
+            <span>{{ statLabel(stat.statType) }}</span>
+            <span class="text-right tabular-nums">{{ stat.value }}</span>
+          </template>
+        </div>
       </div>
     </div>
   </div>

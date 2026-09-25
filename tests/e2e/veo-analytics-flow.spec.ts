@@ -208,6 +208,9 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     await pageA.reload({ waitUntil: 'networkidle' })
     await expect(pageA.getByTestId('veo-sync-status-failing')).toBeVisible()
     await expect(pageA.getByTestId('veo-sync-status-ok')).toHaveCount(0)
+    await expect(pageA.getByTestId('veo-sync-status-error-detail')).toContainText(
+      'Veo silent re-authentication failed (session likely expired)',
+    )
 
     // 004-veo-player-analytics US1/US2 — roster players and Veo player
     // stats, seeded directly (no live Veo call, research.md §15). player7
@@ -351,6 +354,13 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     // US3 — trainer correction: assign the unmatched jersey 99 (draw match)
     // to player23, a roster player untouched by any Veo data so far.
     const drawCard = pageA.getByTestId('veo-match-card').filter({ hasText: 'SG Neukirchen' })
+
+    // Review fix — jersey 99's raw stats are shown to the trainer in the
+    // correction UI as a hint that a mapping is still missing (FR-011), never
+    // with a guessed player name.
+    await expect(drawCard.getByTestId('veo-assignment-stats-99')).toContainText('3')
+    await expect(drawCard.getByTestId('veo-assignment-row-99')).toContainText('Nicht zugeordnet')
+
     await drawCard.getByTestId('veo-assignment-select-99').selectOption(player23!.id)
     await Promise.all([
       pageA.waitForResponse(
@@ -458,6 +468,19 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     await Promise.all([waitForMappingSave(), toggleInput.uncheck()])
     await expect(toggleInput).not.toBeChecked()
     expect((await fetchPublicVeoStats()).enabled).toBe(false)
+
+    // Review fix — a failed roster/unassigned-stats fetch (US3's
+    // trainer-only correction data) surfaces a visible error instead of
+    // silently leaving the correction UI empty.
+    await pageA.route(
+      (url) => url.pathname === '/rest/v1/players' && url.searchParams.get('active') === 'eq.true',
+      (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{}' }),
+    )
+    await pageA.reload({ waitUntil: 'networkidle' })
+    await expect(pageA.getByTestId('veo-correction-error')).toBeVisible()
+    await expect(pageA.getByTestId('veo-correction-error')).toContainText(
+      'Trikotnummer-Zuordnung konnte nicht geladen werden',
+    )
 
     await ctxA.close()
     await ctxB.close()

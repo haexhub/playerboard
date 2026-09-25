@@ -11,6 +11,7 @@ import {
   type ActiveRosterPlayer,
   type VeoMatch,
   type VeoSyncStatus,
+  type VeoUnassignedJerseyStat,
 } from '~/composables/useVeoAnalytics'
 
 definePageMeta({
@@ -18,21 +19,22 @@ definePageMeta({
 })
 
 const { currentTeam, isTrainer } = useTeamContext()
-const { listMatches, getSyncStatus, listUnassignedJerseyNumbers, getActiveRoster } =
-  useVeoAnalytics()
+const { listMatches, getSyncStatus, listUnassignedJerseyStats, getActiveRoster } = useVeoAnalytics()
 
 const matches = ref<VeoMatch[]>([])
 const syncStatus = ref<VeoSyncStatus | null>(null)
 const isLoading = ref(false)
 const loadError = ref<string | null>(null)
 const activeRoster = ref<ActiveRosterPlayer[]>([])
-const unassignedByMatch = ref<Record<string, number[]>>({})
+const unassignedByMatch = ref<Record<string, VeoUnassignedJerseyStat[]>>({})
+const correctionError = ref<string | null>(null)
 
 const load = async () => {
   const teamId = currentTeam.value?.id
   if (!teamId) return
   isLoading.value = true
   loadError.value = null
+  correctionError.value = null
   try {
     const [matchesResult, statusResult] = await Promise.allSettled([
       listMatches(teamId),
@@ -49,14 +51,21 @@ const load = async () => {
       const matchIds = matches.value.map((m) => m.id)
       const [rosterResult, unassignedResult] = await Promise.allSettled([
         getActiveRoster(teamId),
-        listUnassignedJerseyNumbers(matchIds),
+        listUnassignedJerseyStats(matchIds),
       ])
       activeRoster.value = rosterResult.status === 'fulfilled' ? rosterResult.value : []
       unassignedByMatch.value =
         unassignedResult.status === 'fulfilled' ? unassignedResult.value : {}
+      const failed = [rosterResult, unassignedResult].find((r) => r.status === 'rejected')
+      correctionError.value = failed
+        ? failed.reason instanceof Error
+          ? failed.reason.message
+          : 'Trikotnummer-Zuordnung konnte nicht geladen werden'
+        : null
     } else {
       activeRoster.value = []
       unassignedByMatch.value = {}
+      correctionError.value = null
     }
   } catch (err) {
     loadError.value = err instanceof Error ? err.message : 'Konnte Veo-Daten nicht laden'
@@ -98,6 +107,15 @@ const seasonSummary = computed(() => computeSeasonSummary(matches.value))
 
       <VeoLinkForm :key="currentTeam.id" :team-id="currentTeam.id" />
       <VeoPublicStatsToggle :key="`public-${currentTeam.id}`" :team-id="currentTeam.id" />
+
+      <p
+        v-if="correctionError"
+        class="text-sm text-red-700"
+        role="alert"
+        data-testid="veo-correction-error"
+      >
+        Trikotnummer-Zuordnung konnte nicht geladen werden: {{ correctionError }}
+      </p>
     </section>
 
     <VeoSyncStatusBanner v-if="!isLoading && !loadError" :status="syncStatus" />
@@ -120,7 +138,7 @@ const seasonSummary = computed(() => computeSeasonSummary(matches.value))
         :team-id="currentTeam?.id"
         :is-trainer="isTrainer"
         :roster="activeRoster"
-        :unassigned-jersey-numbers="unassignedByMatch[match.id] ?? []"
+        :unassigned-stats="unassignedByMatch[match.id] ?? []"
         @reassigned="load"
       />
     </div>
