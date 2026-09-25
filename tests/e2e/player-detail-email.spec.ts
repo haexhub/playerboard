@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { signInWithMagicLink } from './helpers/magic-link'
+import { countMailsTo, signInWithMagicLink } from './helpers/magic-link'
 import { restGet } from './helpers/supabase-rest'
 
 const uniqueSuffix = () => Math.random().toString(36).slice(2, 8)
@@ -54,11 +54,25 @@ test.describe('trainer manages a player email from the detail page', () => {
     await trainerPage.goto(`/t/${teamSlug}/players/${erin!.id}`, { waitUntil: 'networkidle' })
     const erinSettings = trainerPage.getByTestId('player-detail-settings')
     const erinEmail = erinSettings.getByLabel('E-Mail')
+    const erinInvite = erinSettings.getByTestId('player-settings-invite-button')
     await expect(erinEmail).toHaveValue('')
-    await erinEmail.fill(`erin-${suffix}@example.com`)
+    await expect(erinInvite).toBeDisabled()
+    const firstErinEmail = `erin-${suffix}@example.com`
+    await erinEmail.fill(firstErinEmail)
     await expect(erinSettings.getByTestId('player-form-save-status')).toHaveText('Gespeichert', {
       timeout: 10_000,
     })
+
+    // Inviting is only possible once the address is actually persisted — the
+    // whole point of this test (add/change an email, then invite from here).
+    await expect(erinInvite).toBeEnabled()
+    await erinInvite.click()
+    await expect(erinSettings.getByText(`Einladung an ${firstErinEmail} gesendet.`)).toBeVisible()
+    await expect.poll(() => countMailsTo(firstErinEmail)).toBe(1)
+    const [invitation] = await restGet<{ email: string }>(
+      `invitations?select=email&player_id=eq.${erin!.id}&accepted_at=is.null`,
+    )
+    expect(invitation!.email).toBe(firstErinEmail)
 
     // Persists across a reload.
     await trainerPage.reload({ waitUntil: 'networkidle' })

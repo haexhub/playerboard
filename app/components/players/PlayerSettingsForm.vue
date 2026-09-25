@@ -12,6 +12,7 @@ const emit = defineEmits<{
 }>()
 
 const { update, requestLinkedEmailChange } = usePlayers()
+const { issue } = useInvitations()
 
 const {
   isLinked,
@@ -129,6 +130,32 @@ const flushPendingSave = async () => {
   debouncedAutoSave.cancel()
   await runAutoSave()
 }
+
+// Ties to lastSavedEmail, not the live email ref, so the button only appears
+// once the address is actually persisted — matching the invite route's check
+// against the stored players.email (015-unify-player-invite-dialog FR-014).
+const canInvite = computed(() => !isLinked.value && !!lastSavedEmail.value)
+const inviting = ref(false)
+
+const onInvite = async () => {
+  if (!canInvite.value || inviting.value) return
+  submitError.value = null
+  submitNotice.value = null
+  inviting.value = true
+  try {
+    await issue({
+      team_id: props.teamId,
+      email: lastSavedEmail.value!,
+      role: 'player',
+      player_id: props.player.id,
+    })
+    submitNotice.value = `Einladung an ${lastSavedEmail.value} gesendet.`
+  } catch (err) {
+    submitError.value = errorMessage(err, 'Einladung konnte nicht verschickt werden.')
+  } finally {
+    inviting.value = false
+  }
+}
 </script>
 
 <template>
@@ -152,6 +179,17 @@ const flushPendingSave = async () => {
         fieldErrors.email
       }}</span>
     </ShadcnLabel>
+    <ShadcnButton
+      v-if="!isLinked"
+      type="button"
+      variant="outline"
+      size="sm"
+      data-testid="player-settings-invite-button"
+      :disabled="!canInvite || inviting"
+      @click="onInvite"
+    >
+      {{ inviting ? 'Sendet…' : 'Einladen' }}
+    </ShadcnButton>
     <div class="flex gap-3">
       <ShadcnLabel class="flex-1 block space-y-1">
         <span>Trikotnummer (optional)</span>
