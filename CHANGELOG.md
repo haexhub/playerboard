@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.1](https://github.com/haexhub/playerboard/compare/v0.10.0...v0.10.1) (2026-09-25)
+
+
+### Bug Fixes
+
+* address public Veo stats review findings ([3449e37](https://github.com/haexhub/playerboard/commit/3449e3733f85d67ab8d88c5e9462f1ae629c3c67))
+* show all public Veo stats with medal highlights ([4e36fcc](https://github.com/haexhub/playerboard/commit/4e36fcc493fc4bdcbd6fe8c04f8724f7ff3705a2))
+
 ## [0.10.0](https://github.com/haexhub/playerboard/compare/v0.9.0...v0.10.0) (2026-09-25)
 
 
