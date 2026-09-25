@@ -119,8 +119,10 @@ test.describe('US5 — anonymous public ranking', () => {
       `players?team_id=eq.${team_id}&jersey_number=eq.11&select=id`,
     )
     const player11Id = player11!.id
-    const [player22] = await restInsert<{ id: string }>('players', [
+    const [player22, player33, player44] = await restInsert<{ id: string }>('players', [
       { team_id, name: 'Veo Secret Player 22', jersey_number: 22, active: true },
+      { team_id, name: 'Veo Secret Player 33', jersey_number: 33, active: true },
+      { team_id, name: 'Veo Secret Player 44', jersey_number: 44, active: true },
     ])
     const [matchInSeason] = await restInsert<{ id: string }>('veo_matches', [
       {
@@ -171,6 +173,30 @@ test.describe('US5 — anonymous public ranking', () => {
         player_id: player22!.id,
         category: 'physical',
         value: 10,
+      },
+      {
+        match_id: matchInSeason!.id,
+        veo_jersey_number: 33,
+        stat_type: 'distance_total_meters',
+        player_id: player33!.id,
+        category: 'physical',
+        value: 4000,
+      },
+      {
+        match_id: matchInSeason!.id,
+        veo_jersey_number: 44,
+        stat_type: 'distance_total_meters',
+        player_id: player44!.id,
+        category: 'physical',
+        value: 3000,
+      },
+      {
+        match_id: matchInSeason!.id,
+        veo_jersey_number: 11,
+        stat_type: 'future_sensitive_metric',
+        player_id: player11Id,
+        category: 'physical',
+        value: 123,
       },
       {
         match_id: matchInSeason!.id,
@@ -227,15 +253,46 @@ test.describe('US5 — anonymous public ranking', () => {
     await anonPage.reload({ waitUntil: 'networkidle' })
     await anonPage.getByTestId('public-tab-veo').click()
     const veoRows = anonPage.getByTestId('public-veo-stats-row')
-    await expect(veoRows).toHaveCount(2)
+    await expect(veoRows).toHaveCount(4)
     const jersey11Row = veoRows.filter({ hasText: '#11' })
+    const jersey22Row = veoRows.filter({ hasText: '#22' })
+    const jersey33Row = veoRows.filter({ hasText: '#33' })
+    const jersey44Row = veoRows.filter({ hasText: '#44' })
+
+    // Every visible jersey gets the complete stat grid. Missing Veo values
+    // stay explicit and do not participate in the medal ranking.
+    for (const row of [jersey11Row, jersey22Row, jersey33Row, jersey44Row]) {
+      for (const statType of [
+        'distance_total_meters',
+        'sprints_total',
+        'top_speed_kmh',
+        'average_speed_kmh',
+        'high_intensity_runs_total',
+        'seconds_played_total',
+        'football_shots_total',
+        'football_goal_total',
+        'football_goal_involvement_total',
+      ]) {
+        await expect(row.getByTestId(`public-veo-stat-${statType}`)).toHaveCount(1)
+      }
+    }
+
     await expect(jersey11Row.getByTestId('public-veo-stat-distance_total_meters')).toHaveText(
       '5000',
     )
+    await expect(jersey11Row.getByTestId('public-veo-stat-distance_total_meters')).toHaveClass(
+      /bg-yellow-100/,
+    )
     await expect(jersey11Row.getByTestId('public-veo-stat-top_speed_kmh')).toHaveText('27')
     await expect(jersey11Row.getByTestId('public-veo-stat-average_speed_kmh')).toHaveText('12')
-    const jersey22Row = veoRows.filter({ hasText: '#22' })
     await expect(jersey22Row.getByTestId('public-veo-stat-sprints_total')).toHaveText('10')
+    await expect(jersey22Row.getByTestId('public-veo-stat-distance_total_meters')).toHaveText('–')
+    await expect(jersey33Row.getByTestId('public-veo-stat-distance_total_meters')).toHaveClass(
+      /bg-slate-200/,
+    )
+    await expect(jersey44Row.getByTestId('public-veo-stat-distance_total_meters')).toHaveClass(
+      /bg-orange-100/,
+    )
     await expect(anonPage.locator('body')).not.toContainText('Veo Secret Player 22')
     await expect(anonPage.locator('body')).not.toContainText('Secret Name Should Not Leak')
 
@@ -250,10 +307,25 @@ test.describe('US5 — anonymous public ranking', () => {
       rows: Array<Record<string, unknown>>
     }
     expect(rpcBody.enabled).toBe(true)
+    const publicStatTypes = new Set([
+      'distance_total_meters',
+      'sprints_total',
+      'top_speed_kmh',
+      'average_speed_kmh',
+      'high_intensity_runs_total',
+      'seconds_played_total',
+      'football_shots_total',
+      'football_goal_total',
+      'football_goal_involvement_total',
+    ])
     for (const row of rpcBody.rows) {
       expect(Object.keys(row).sort()).toEqual(['jersey_number', 'stats'])
+      expect(
+        Object.keys(row.stats as Record<string, unknown>).every((key) => publicStatTypes.has(key)),
+      ).toBe(true)
     }
     expect(JSON.stringify(rpcBody)).not.toContain('Veo Secret Player 22')
+    expect(JSON.stringify(rpcBody)).not.toContain('future_sensitive_metric')
 
     // Switching to Veo-Stats and back preserves the Trainingsbewertungen
     // tab's content (US3 regression). Player 22 (added above, purely for
