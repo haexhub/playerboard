@@ -251,6 +251,18 @@ test.describe('RLS negative — cross team (SC-008, SC-009)', () => {
     )
     expect(x14.status()).toBe(403)
 
+    // X15 — same cross-team gate for the bulk jersey-assignment route; the
+    // player_id doesn't need to be real, requireTrainer() denies on team_id
+    // membership before anything else is checked.
+    const x15 = await trainerAPage.request.post('/api/veo/player-assignment-bulk', {
+      data: {
+        team_id: teamBId,
+        veo_jersey_number: 9,
+        player_id: '00000000-0000-0000-0000-000000000000',
+      },
+    })
+    expect(x15.status()).toBe(403)
+
     // Positive verification for X13 — team B's switch is still off despite
     // both attackers' attempts above.
     const [mappingBAfterAttacks] = await restGet<{ public_stats_enabled: boolean }>(

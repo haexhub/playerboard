@@ -16,7 +16,9 @@ const categoryEntries = computed(() => Object.entries(props.summary.categoryTota
   >
     <h2 class="text-sm font-medium uppercase tracking-wide text-neutral-500">Saison-Übersicht</h2>
     <p class="text-lg font-semibold text-neutral-900" data-testid="veo-season-record">
-      {{ summary.wins }}S {{ summary.draws }}U {{ summary.losses }}N
+      {{ summary.wins }} {{ summary.wins === 1 ? 'Sieg' : 'Siege' }},
+      {{ summary.draws }} Unentschieden, {{ summary.losses }}
+      {{ summary.losses === 1 ? 'Niederlage' : 'Niederlagen' }}
       <span class="text-sm font-normal text-neutral-500">({{ totalGames }} Spiele)</span>
     </p>
     <div v-if="categoryEntries.length" class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">

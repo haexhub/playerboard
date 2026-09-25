@@ -39,3 +39,35 @@ const humanize = (key: string) =>
 
 export const statLabel = (statType: string) => STAT_LABELS[statType] ?? humanize(statType)
 export const categoryLabel = (category: string) => CATEGORY_LABELS[category] ?? category
+
+// Fixed display order for the nine curated per-player stats (research.md §3),
+// shared by every player-stats display (season summary, per-match breakdown).
+export const CURATED_STAT_ORDER = [
+  'distance_total_meters',
+  'sprints_total',
+  'top_speed_kmh',
+  'average_speed_kmh',
+  'high_intensity_runs_total',
+  'seconds_played_total',
+  'football_shots_total',
+  'football_goal_total',
+  'football_goal_involvement_total',
+]
+
+// Per-player curated stats (004-veo-player-analytics) are stored in Veo's own
+// raw units — seconds, meters, km/h — and displayed without a unit otherwise,
+// which reads as a bare, ambiguous number. seconds_played_total in particular
+// is converted (seconds -> whole minutes), not just suffixed.
+const STAT_UNIT_SUFFIX: Record<string, string> = {
+  distance_total_meters: 'm',
+  top_speed_kmh: 'km/h',
+  average_speed_kmh: 'km/h',
+  seconds_played_total: 'min',
+}
+
+export const formatStatValue = (statType: string, value: number): string => {
+  const displayValue = statType === 'seconds_played_total' ? Math.round(value / 60) : value
+  const formatted = displayValue.toLocaleString('de-DE', { maximumFractionDigits: 1 })
+  const unit = STAT_UNIT_SUFFIX[statType]
+  return unit ? `${formatted} ${unit}` : formatted
+}

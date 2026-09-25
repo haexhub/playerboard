@@ -33,32 +33,6 @@ const submitError = ref<string | null>(null)
 const submitNotice = ref<string | null>(null)
 const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
-const canInvite = computed(() => !isLinked.value && email.value.trim() !== '')
-const invitePending = ref(false)
-const inviteNotice = ref<string | null>(null)
-const inviteError = ref<string | null>(null)
-
-const onInvite = async () => {
-  if (!canInvite.value || invitePending.value) return
-  invitePending.value = true
-  inviteError.value = null
-  inviteNotice.value = null
-  try {
-    if (!(await flushPendingSave())) return
-    await issue({
-      team_id: props.teamId,
-      email: email.value.trim(),
-      role: 'player',
-      player_id: props.player.id,
-    })
-    inviteNotice.value = `Einladung an ${email.value.trim()} gesendet.`
-  } catch (err) {
-    inviteError.value = errorMessage(err, 'Einladung konnte nicht verschickt werden.')
-  } finally {
-    invitePending.value = false
-  }
-}
-
 const lastSaved = ref({
   name: props.player.name,
   jersey_number: props.player.jersey_number,
@@ -168,6 +142,39 @@ const flushPendingSave = async (): Promise<boolean> => {
   debouncedAutoSave.cancel()
   return runAutoSave()
 }
+
+// Only enable invitations for a persisted, valid address. The invitation
+// route checks the stored players.email, so an invalid unsaved edit must not
+// leave the button enabled for the previous address.
+const canInvite = computed(
+  () => !isLinked.value && !!lastSavedEmail.value && !fieldErrors.value.email,
+)
+const invitePending = ref(false)
+const inviteNotice = ref<string | null>(null)
+const inviteError = ref<string | null>(null)
+
+const onInvite = async () => {
+  if (!canInvite.value || invitePending.value) return
+  invitePending.value = true
+  inviteError.value = null
+  inviteNotice.value = null
+  try {
+    if (!(await flushPendingSave())) return
+    const savedEmail = lastSavedEmail.value
+    if (!savedEmail) return
+    await issue({
+      team_id: props.teamId,
+      email: savedEmail,
+      role: 'player',
+      player_id: props.player.id,
+    })
+    inviteNotice.value = `Einladung an ${savedEmail} gesendet.`
+  } catch (err) {
+    inviteError.value = errorMessage(err, 'Einladung konnte nicht verschickt werden.')
+  } finally {
+    invitePending.value = false
+  }
+}
 </script>
 
 <template>
@@ -191,18 +198,17 @@ const flushPendingSave = async (): Promise<boolean> => {
         fieldErrors.email
       }}</span>
     </ShadcnLabel>
-    <div class="flex items-center gap-2">
-      <ShadcnButton
-        type="button"
-        variant="outline"
-        size="sm"
-        data-testid="player-detail-invite-button"
-        :disabled="!canInvite || invitePending"
-        @click="onInvite"
-      >
-        Einladen
-      </ShadcnButton>
-    </div>
+    <ShadcnButton
+      v-if="!isLinked"
+      type="button"
+      variant="outline"
+      size="sm"
+      data-testid="player-detail-invite-button"
+      :disabled="!canInvite || invitePending"
+      @click="onInvite"
+    >
+      Einladen
+    </ShadcnButton>
     <p v-if="inviteNotice" class="text-sm text-foreground" role="status">{{ inviteNotice }}</p>
     <p v-if="inviteError" class="text-sm text-destructive" role="alert">{{ inviteError }}</p>
     <div class="flex gap-3">

@@ -1,16 +1,22 @@
 <script setup lang="ts">
-import { computed, reactive } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
-import type { ActiveRosterPlayer, VeoMatch } from '~/composables/useVeoAnalytics'
+import type {
+  ActiveRosterPlayer,
+  VeoMatch,
+  VeoUnassignedJerseyStat,
+} from '~/composables/useVeoAnalytics'
 import { useVeoPlayerAssignment } from '~/composables/useVeoPlayerAssignment'
-import { categoryLabel, statLabel } from '~/utils/veoStatLabels'
+import { categoryLabel, formatStatValue, statLabel } from '~/utils/veoStatLabels'
+import VeoPlayerStatsCompare, { type VeoPlayerStatEntry } from './VeoPlayerStatsCompare.vue'
 
 const props = defineProps<{
   match: VeoMatch
   teamId?: string
+  slug?: string
   isTrainer?: boolean
   roster?: ActiveRosterPlayer[]
-  unassignedJerseyNumbers?: number[]
+  unassignedStats?: VeoUnassignedJerseyStat[]
 }>()
 
 const emit = defineEmits<{ reassigned: [] }>()
@@ -53,34 +59,50 @@ const hasScore = computed(
   () => props.match.own_score !== null && props.match.opponent_score !== null,
 )
 
-// User Story 2 — per-player breakdown, assigned rows only (already filtered
-// by useVeoAnalytics().listMatches()).
-type PlayerBreakdown = {
-  playerId: string
-  playerName: string
-  jerseyNumber: number | null
-  stats: { statType: string; value: number }[]
-}
-
-const playerBreakdown = computed<PlayerBreakdown[]>(() => {
-  const byPlayer = new Map<string, PlayerBreakdown>()
+// User Story 2 — per-player breakdown for this match. Assigned rows are
+// already filtered member-facing by useVeoAnalytics().listMatches(); unassigned
+// ones only ever arrive via `unassignedStats`, which the parent only passes
+// for a trainer (FR-002/FR-011/SC-004).
+const playerStatEntries = computed<VeoPlayerStatEntry[]>(() => {
+  const byKey = new Map<string, VeoPlayerStatEntry>()
   for (const stat of props.match.player_stats) {
-    const existing = byPlayer.get(stat.player_id) ?? {
+    const existing = byKey.get(stat.player_id) ?? {
+      key: stat.player_id,
       playerId: stat.player_id,
-      playerName: stat.player_name,
       jerseyNumber: stat.jersey_number,
-      stats: [],
+      playerName: stat.player_name,
+      statTotals: {},
     }
-    existing.stats.push({ statType: stat.stat_type, value: stat.value })
-    byPlayer.set(stat.player_id, existing)
+    existing.statTotals[stat.stat_type] = stat.value
+    byKey.set(stat.player_id, existing)
   }
-  return [...byPlayer.values()].sort(
+  for (const stat of props.unassignedStats ?? []) {
+    const key = `jersey-${stat.veoJerseyNumber}`
+    const existing = byKey.get(key) ?? {
+      key,
+      playerId: null,
+      jerseyNumber: stat.veoJerseyNumber,
+      playerName: null,
+      statTotals: {},
+    }
+    existing.statTotals[stat.statType] = stat.value
+    byKey.set(key, existing)
+  }
+  return [...byKey.values()].sort(
     (a, b) => (a.jerseyNumber ?? Infinity) - (b.jerseyNumber ?? Infinity),
   )
 })
 
-// User Story 3 — trainer-only jersey-number assignment/correction.
-type JerseyGroup = { jerseyNumber: number; playerId: string | null; playerName: string | null }
+// User Story 3 — trainer-only jersey-number assignment/correction. Unassigned
+// jerseys carry their raw stats too (never a guessed player name, SC-004) —
+// a trainer sees them as a hint that a mapping is still missing, instead of
+// the jersey number silently disappearing.
+type JerseyGroup = {
+  jerseyNumber: number
+  playerId: string | null
+  playerName: string | null
+  stats: { statType: string; value: number }[]
+}
 
 const jerseyGroups = computed<JerseyGroup[]>(() => {
   const byJersey = new Map<number, JerseyGroup>()
@@ -90,33 +112,80 @@ const jerseyGroups = computed<JerseyGroup[]>(() => {
         jerseyNumber: stat.veo_jersey_number,
         playerId: stat.player_id,
         playerName: stat.player_name,
+        stats: [],
       })
     }
   }
-  for (const jerseyNumber of props.unassignedJerseyNumbers ?? []) {
-    if (!byJersey.has(jerseyNumber)) {
-      byJersey.set(jerseyNumber, { jerseyNumber, playerId: null, playerName: null })
+  for (const stat of props.unassignedStats ?? []) {
+    const existing = byJersey.get(stat.veoJerseyNumber)
+    if (existing) {
+      existing.stats.push({ statType: stat.statType, value: stat.value })
+    } else {
+      byJersey.set(stat.veoJerseyNumber, {
+        jerseyNumber: stat.veoJerseyNumber,
+        playerId: null,
+        playerName: null,
+        stats: [{ statType: stat.statType, value: stat.value }],
+      })
     }
   }
   return [...byJersey.values()].sort((a, b) => a.jerseyNumber - b.jerseyNumber)
 })
 
-const { assignPlayer } = useVeoPlayerAssignment()
+// One jersey number's correction at a time, picked via dropdown — a full
+// season can have many pending corrections, stacking them all is as
+// cluttered as the match/player lists this mirrors.
+const selectedJerseyNumber = ref<number | null>(null)
+
+watch(
+  jerseyGroups,
+  (groups) => {
+    if (!groups.some((g) => g.jerseyNumber === selectedJerseyNumber.value)) {
+      selectedJerseyNumber.value = groups[0]?.jerseyNumber ?? null
+    }
+  },
+  { immediate: true },
+)
+
+const selectedJerseyGroup = computed(
+  () => jerseyGroups.value.find((g) => g.jerseyNumber === selectedJerseyNumber.value) ?? null,
+)
+
+const { assignPlayer, assignPlayerToAllMatches } = useVeoPlayerAssignment()
 const selections = reactive<Record<number, string>>({})
 const saving = reactive<Record<number, boolean>>({})
+// Registering a player only after their matches already synced is common
+// (FR-003 keeps the sync-time assignment frozen, on purpose) — this lets a
+// trainer fix every already-synced match in one go instead of once each.
+const applyToAllMatches = reactive<Record<number, boolean>>({})
 
 const submitAssignment = async (jerseyNumber: number) => {
   const playerId = selections[jerseyNumber] ?? ''
   if (!props.teamId) return
   saving[jerseyNumber] = true
   try {
-    await assignPlayer({
-      team_id: props.teamId,
-      match_id: props.match.id,
-      veo_jersey_number: jerseyNumber,
-      player_id: playerId === '' ? null : playerId,
-    })
+    if (playerId !== '' && applyToAllMatches[jerseyNumber]) {
+      await assignPlayer({
+        team_id: props.teamId,
+        match_id: props.match.id,
+        veo_jersey_number: jerseyNumber,
+        player_id: playerId,
+      })
+      await assignPlayerToAllMatches({
+        team_id: props.teamId,
+        veo_jersey_number: jerseyNumber,
+        player_id: playerId,
+      })
+    } else {
+      await assignPlayer({
+        team_id: props.teamId,
+        match_id: props.match.id,
+        veo_jersey_number: jerseyNumber,
+        player_id: playerId === '' ? null : playerId,
+      })
+    }
     selections[jerseyNumber] = ''
+    applyToAllMatches[jerseyNumber] = false
     emit('reassigned')
   } catch {
     toast.error('Zuordnung konnte nicht gespeichert werden')
@@ -163,34 +232,11 @@ const submitAssignment = async (jerseyNumber: number) => {
       </div>
     </div>
 
-    <div v-if="playerBreakdown.length" class="space-y-2 border-t border-neutral-100 pt-3">
+    <div v-if="playerStatEntries.length" class="space-y-2 border-t border-neutral-100 pt-3">
       <p class="text-xs font-medium uppercase tracking-wide text-neutral-500">
         Spieler-Statistiken
       </p>
-      <div
-        v-for="player in playerBreakdown"
-        :key="player.playerId"
-        class="space-y-0.5"
-        data-testid="veo-match-player-row"
-      >
-        <p class="text-sm font-medium text-neutral-900">
-          <span v-if="player.jerseyNumber !== null" class="tabular-nums">
-            #{{ player.jerseyNumber }}
-          </span>
-          {{ player.playerName }}
-        </p>
-        <div class="grid grid-cols-2 gap-x-4 text-sm">
-          <template v-for="stat in player.stats" :key="stat.statType">
-            <span class="text-neutral-700">{{ statLabel(stat.statType) }}</span>
-            <span
-              class="text-right tabular-nums font-medium"
-              :data-testid="`veo-match-player-stat-${player.playerId}-${stat.statType}`"
-            >
-              {{ stat.value }}
-            </span>
-          </template>
-        </div>
-      </div>
+      <VeoPlayerStatsCompare :entries="playerStatEntries" :slug="slug" />
     </div>
 
     <div
@@ -201,37 +247,74 @@ const submitAssignment = async (jerseyNumber: number) => {
       <p class="text-xs font-medium uppercase tracking-wide text-neutral-500">
         Trikotnummer-Zuordnung
       </p>
-      <div
-        v-for="group in jerseyGroups"
-        :key="group.jerseyNumber"
-        class="flex flex-wrap items-center gap-2 text-sm"
-        :data-testid="`veo-assignment-row-${group.jerseyNumber}`"
+      <select
+        v-model.number="selectedJerseyNumber"
+        class="min-h-touch w-full max-w-xs rounded border border-neutral-300 px-2 text-sm"
+        data-testid="veo-jersey-select"
       >
-        <span class="w-10 tabular-nums text-neutral-500">#{{ group.jerseyNumber }}</span>
-        <span class="flex-1 text-neutral-700">
-          {{ group.playerName ?? 'Nicht zugeordnet' }}
-        </span>
-        <select
-          v-model="selections[group.jerseyNumber]"
-          class="min-h-touch rounded border border-neutral-300 px-2 text-sm"
-          :data-testid="`veo-assignment-select-${group.jerseyNumber}`"
+        <option v-for="group in jerseyGroups" :key="group.jerseyNumber" :value="group.jerseyNumber">
+          #{{ group.jerseyNumber }} · {{ group.playerName ?? 'Nicht zugeordnet' }}
+        </option>
+      </select>
+
+      <div
+        v-if="selectedJerseyGroup"
+        class="space-y-1"
+        :data-testid="`veo-assignment-row-${selectedJerseyGroup.jerseyNumber}`"
+      >
+        <div class="flex flex-wrap items-center gap-2 text-sm">
+          <span class="w-10 tabular-nums text-neutral-500"
+            >#{{ selectedJerseyGroup.jerseyNumber }}</span
+          >
+          <span class="flex-1 text-neutral-700">
+            {{ selectedJerseyGroup.playerName ?? 'Nicht zugeordnet' }}
+          </span>
+          <select
+            v-model="selections[selectedJerseyGroup.jerseyNumber]"
+            class="min-h-touch rounded border border-neutral-300 px-2 text-sm"
+            :data-testid="`veo-assignment-select-${selectedJerseyGroup.jerseyNumber}`"
+          >
+            <option value="">Spieler wählen…</option>
+            <option v-for="p in roster ?? []" :key="p.id" :value="p.id">
+              {{ p.jerseyNumber !== null ? `#${p.jerseyNumber} ` : '' }}{{ p.name }}
+            </option>
+          </select>
+          <button
+            type="button"
+            class="min-h-touch rounded border border-neutral-300 px-3 text-sm"
+            :data-testid="`veo-assignment-submit-${selectedJerseyGroup.jerseyNumber}`"
+            :disabled="
+              saving[selectedJerseyGroup.jerseyNumber] ||
+              (!selections[selectedJerseyGroup.jerseyNumber] && !selectedJerseyGroup.playerId)
+            "
+            @click="submitAssignment(selectedJerseyGroup.jerseyNumber)"
+          >
+            {{ selectedJerseyGroup.playerId ? 'Zuordnung ändern' : 'Spieler zuordnen' }}
+          </button>
+        </div>
+        <label
+          v-if="selections[selectedJerseyGroup.jerseyNumber]"
+          class="flex items-center gap-1.5 pl-12 text-xs text-neutral-500"
         >
-          <option value="">Spieler wählen…</option>
-          <option v-for="p in roster ?? []" :key="p.id" :value="p.id">
-            {{ p.jerseyNumber !== null ? `#${p.jerseyNumber} ` : '' }}{{ p.name }}
-          </option>
-        </select>
-        <button
-          type="button"
-          class="min-h-touch rounded border border-neutral-300 px-3 text-sm"
-          :data-testid="`veo-assignment-submit-${group.jerseyNumber}`"
-          :disabled="
-            saving[group.jerseyNumber] || (!selections[group.jerseyNumber] && !group.playerId)
-          "
-          @click="submitAssignment(group.jerseyNumber)"
+          <input
+            v-model="applyToAllMatches[selectedJerseyGroup.jerseyNumber]"
+            type="checkbox"
+            :data-testid="`veo-assignment-bulk-${selectedJerseyGroup.jerseyNumber}`"
+          />
+          Für alle noch nicht zugeordneten Spiele dieser Trikotnummer übernehmen
+        </label>
+        <div
+          v-if="selectedJerseyGroup.stats.length"
+          class="grid grid-cols-2 gap-x-4 pl-12 text-sm text-neutral-500"
+          :data-testid="`veo-assignment-stats-${selectedJerseyGroup.jerseyNumber}`"
         >
-          {{ group.playerId ? 'Zuordnung ändern' : 'Spieler zuordnen' }}
-        </button>
+          <template v-for="stat in selectedJerseyGroup.stats" :key="stat.statType">
+            <span>{{ statLabel(stat.statType) }}</span>
+            <span class="text-right tabular-nums">{{
+              formatStatValue(stat.statType, stat.value)
+            }}</span>
+          </template>
+        </div>
       </div>
     </div>
   </div>

@@ -15,5 +15,21 @@ export const useVeoPlayerAssignment = () => {
     })
   }
 
-  return { assignPlayer }
+  // Assigns a jersey number to a player across every one of the team's
+  // matches where that jersey number is still unassigned — for a player
+  // registered only after those matches already synced (see
+  // player-assignment-bulk.post.ts for why this doesn't touch already
+  // resolved-differently rows).
+  const assignPlayerToAllMatches = async (params: {
+    team_id: string
+    veo_jersey_number: number
+    player_id: string
+  }) => {
+    return await $fetch<{ ok: true }>('/api/veo/player-assignment-bulk', {
+      method: 'POST',
+      body: params,
+    })
+  }
+
+  return { assignPlayer, assignPlayerToAllMatches }
 }

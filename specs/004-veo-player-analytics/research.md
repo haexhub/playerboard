@@ -6,75 +6,84 @@ recorded.
 
 ## 1. Fetching player stats: same endpoint, different parameters
 
-**Decision**: Add `fetchPlayerAnalysisStats(accessToken, { veoMatchIds })` to
-`app/server/utils/veo/client.ts`, calling the same
+**Decision**: Add `fetchPlayerAnalysisStats(accessToken, { veoTeamId, veoMatchIds })`
+to `app/server/utils/veo/client.ts`, calling the same
 `POST app.veo.co/api/app/analysis/stats/` endpoint the existing
 `fetchAnalysisStats()` already uses for team stats, with:
 
 ```json
-{ "type": "cross_match", "group_by": "player", "match_ids": ["<one match id>"] }
+{ "type": "cross_match", "team_id": "<veo team id>", "group_by": "player", "match_ids": ["<one match id>"] }
 ```
 
-No `team_id` field is needed for this variant (confirmed live during the
-prior research session referenced in the `/speckit.specify` input for this
-feature) — unlike the team-level call, which requires `team_id` alongside
-`match_ids`.
+**Correction (2026-09-25)**: `team_id` **is** required for this variant —
+the original decision below assumed otherwise and shipped without it, which
+made every sync fail with HTTP 400 in production. Confirmed by capturing the
+literal request `app.veo.co`'s own frontend sends (real headless-browser
+session, `/analysis/stats/` request body observed directly), not inferred.
 
 **Rationale**: Reuses the exact HTTP client, auth header, and error-handling
 shape already in `client.ts` — no new fetch wrapper, no new endpoint.
 
 ## 2. Player-stats response shape
 
-**Decision**: The response wrapper is assumed structurally identical to the
-already-implemented team-stats response (`{ items: [...] }`, each item
-carrying a `stats: [{ type, value, category: { id }, periods }]` array — see
-`app/server/utils/veo/mapStats.ts`), with the per-item discriminator being a
-`player` object instead of a bare `team_association` string:
+**Decision (superseded, 2026-09-25 — see below)**: ~~The response wrapper is
+assumed structurally identical to the already-implemented team-stats
+response..., with the per-item discriminator being a `player` object...~~
+This was never verified live and was wrong on two points once checked
+against a real response.
+
+**Confirmed real shape** (captured directly from the live API, 2026-09-25):
 
 ```json
 {
   "items": [
     {
-      "player": {
-        "jersey_number": "7",
-        "first_name": null,
-        "last_name": null,
-        "known_name": null
-      },
+      "type": "cross_match_player",
+      "team_id": "88536f41-beaf-479e-9b7f-bbf6b2f8410c",
+      "match_ids": ["<match id>"],
+      "player_id": "b1f38e83-bad3-4ed3-9a99-ff483c9932c8",
+      "jersey_number": "7",
       "stats": [
-        { "type": "distance_total_meters", "value": 8532.4, "category": { "id": "physical" }, "periods": [...] },
-        { "type": "sprints_total", "value": 14, "category": { "id": "physical" }, "periods": [...] }
+        { "type": "distance_total_meters", "value": 8532.4, "unit": "meter" },
+        { "type": "sprints_total", "value": 14, "unit": "count" }
       ]
     }
-  ]
+  ],
+  "meta": {}
 }
 ```
 
-**Evidence**: field names and the "one entry per jersey number active in the
-match, ~31 values, names are null" fact come from live research against the
-real Veo account performed for this feature's `/speckit.specify` input
-(explicitly marked "already verified live, do not re-research"). The exact
-JSON nesting shown above (a `player` sub-object vs. a top-level
-`jersey_number` field) is **inferred by symmetry** with the team-level
-response this project already parses successfully, not itself re-verified
-live per that same instruction.
+Two differences from the original assumption:
 
-**Risk accepted / follow-up**: `mapPlayerStats.ts`'s Zod schema is written
-against this inferred shape. Because the input is `unknown` and parsed with
-`.safeParse()` (same fail-closed pattern as `mapStats.ts`), a shape mismatch
-fails the sync for that match with a clear "Unexpected Veo player-stats
-response shape" error (surfaced via `veo_sync_status.last_error`, same as any
-other sync failure) rather than corrupting data. The fixture used for the
-unit test should be replaced with a real captured payload at the start of
-implementation (tasks.md), the same way `tests/fixtures/veo/analysis-stats-response.json`
-was captured for the team-level feature — a five-minute check, not a design
-question.
+1. Player identity fields (`jersey_number`, `player_id`, `user_id`,
+   `first_name`, `last_name`, …) sit **directly on the item**, not nested
+   under a `player` object.
+2. Each stat entry is `{ type, value, unit }` — **no `category` field**
+   (unlike the team-stats response, which does carry `category: { id }` per
+   stat). `mapPlayerStats.ts` now assigns the category itself via a static
+   `CURATED_STAT_CATEGORY` map (physical/attacking), matching what this
+   research had originally assumed Veo would label each curated type.
 
-**Alternatives considered**: Re-run live browser research now to nail the
-exact shape — rejected per this feature's explicit brief not to re-research
-already-confirmed feasibility; the fail-closed parsing above makes a wrong
-guess a loud sync error, not silent data corruption, so the cost of being
-wrong is low and cheaply caught during implementation.
+`player_id`/`user_id`/name fields are present but unused: this feature
+matches purely on `jersey_number` against Playerboard's own roster (§ "player
+matching" below), independent of whether Veo itself has linked that jersey
+number to a Veo user account.
+
+**Evidence**: captured by driving a real headless Chromium (Playwright, the
+same package `app/server/utils/veo/login.ts` already depends on) through the
+stored session cookie of an actual linked team, opening a real match's
+Analytics panel in the app.veo.co web app, and logging the exact
+request/response bodies it exchanges with `/api/app/analysis/stats/`. Not
+inferred, not guessed against production.
+
+**Consequence for the fail-closed design**: this shape mismatch was silent
+until a real sync ran — `mapPlayerStats.ts`'s `.safeParse()` correctly
+turned it into a loud `veo_sync_status.last_error` ("Unexpected Veo
+player-stats response shape") rather than corrupting data, exactly as this
+research originally intended, but per FR-015 that failure also skipped
+committing the *team*-level match/stats for the same match (they share one
+per-match transaction), so nothing synced at all until this was fixed —
+worth knowing if this class of bug recurs.
 
 ## 3. Curated stat types (FR-001, FR-008)
 
@@ -294,6 +303,12 @@ trainer would already be looking at User Story 2's breakdown on — no new
 route, no new navigation entry, and it reuses the existing trainer-only
 conditional pattern already used elsewhere in this app (e.g.
 `dashboard.vue`'s `v-if="isTrainer"` Veo-link shortcut).
+
+**Update (2026-09-25, FR-021)**: listing every unmatched/matched jersey
+number's controls simultaneously proved cluttered for a full season. The
+list is now a `veo-jersey-select` dropdown (one jersey number's controls
+shown at a time), the same single-select pattern FR-017/FR-018 use for
+matches and players.
 
 ## 13. Sync failure mode for player stats (added 2026-09-23, FR-015)
 

@@ -39,16 +39,72 @@ describe('mapPlayerStats', () => {
     expect(rows.some((r) => r.statType === 'football_touches_total')).toBe(false)
   })
 
+  it('rejects non-numeric jersey numbers while accepting leading zeroes', () => {
+    expect(() =>
+      mapPlayerStats({ items: [{ jersey_number: '7x', stats: [] }] }, MATCH_ID, ROSTER),
+    ).toThrow('Unexpected Veo player-stats response shape')
+    expect(() =>
+      mapPlayerStats({ items: [{ jersey_number: '7\n', stats: [] }] }, MATCH_ID, ROSTER),
+    ).toThrow('Unexpected Veo player-stats response shape')
+
+    expect(
+      mapPlayerStats(
+        { items: [{ jersey_number: '07', stats: [{ value: 1, type: 'sprints_total' }] }] },
+        MATCH_ID,
+        ROSTER,
+      ),
+    ).toMatchObject([{ veoJerseyNumber: 7, playerId: 'player-7', statType: 'sprints_total' }])
+  })
+
+  it('skips jersey numbers outside the safe integer range', () => {
+    expect(
+      mapPlayerStats(
+        {
+          items: [
+            {
+              jersey_number: '9'.repeat(400),
+              stats: [{ value: 1, type: 'sprints_total' }],
+            },
+          ],
+        },
+        MATCH_ID,
+        ROSTER,
+      ),
+    ).toEqual([])
+  })
+
+  it('ignores inherited stat keys', () => {
+    const rows = mapPlayerStats(
+      {
+        items: [
+          {
+            jersey_number: '7',
+            stats: [
+              { value: 1, type: 'toString' },
+              { value: 2, type: '__proto__' },
+              { value: 3, type: 'sprints_total' },
+            ],
+          },
+        ],
+      },
+      MATCH_ID,
+      ROSTER,
+    )
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.statType).toBe('sprints_total')
+  })
+
   it('keeps only the first row for a duplicate jersey/stat key', () => {
     const payload = {
       items: [
         {
-          player: { jersey_number: '7' },
-          stats: [{ category: { id: 'physical' }, value: 27.8, type: 'top_speed_kmh' }],
+          jersey_number: '7',
+          stats: [{ value: 27.8, type: 'top_speed_kmh' }],
         },
         {
-          player: { jersey_number: '07' },
-          stats: [{ category: { id: 'physical' }, value: 26.1, type: 'top_speed_kmh' }],
+          jersey_number: '07',
+          stats: [{ value: 26.1, type: 'top_speed_kmh' }],
         },
       ],
     }
@@ -73,7 +129,7 @@ describe('mapPlayerStats', () => {
     expect(() => mapPlayerStats({ unexpected: true }, MATCH_ID, ROSTER)).toThrow()
     expect(() => mapPlayerStats(null, MATCH_ID, ROSTER)).toThrow()
     expect(() =>
-      mapPlayerStats({ items: [{ player: { jersey_number: 7 }, stats: [] }] }, MATCH_ID, ROSTER),
+      mapPlayerStats({ items: [{ jersey_number: 7, stats: [] }] }, MATCH_ID, ROSTER),
     ).toThrow()
   })
 })

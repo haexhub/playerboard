@@ -60,4 +60,18 @@ test.describe('API negative — unauthenticated callers', () => {
     )
     expect(res.status()).toBe(401)
   })
+
+  // P6 variant for the bulk jersey-assignment route.
+  test('POST /api/veo/player-assignment-bulk rejects an unauthenticated caller with 401', async ({
+    request,
+  }) => {
+    const res = await request.post('/api/veo/player-assignment-bulk', {
+      data: {
+        team_id: '00000000-0000-0000-0000-000000000000',
+        veo_jersey_number: 7,
+        player_id: '00000000-0000-0000-0000-000000000000',
+      },
+    })
+    expect(res.status()).toBe(401)
+  })
 })

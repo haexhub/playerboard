@@ -8,6 +8,19 @@
 die settings zu diesem spieler bearbeiten können (name, trikotnummer, foto einwilligung etc.),
 z.B. auf /t/c1/players/72b15d25-9c2a-471b-ab60-214bfc4d2534"
 
+## Clarifications
+
+### Session 2026-09-25
+
+- Q: Nach Einführung von `players.email` und der Direkt-einladen-Fähigkeit
+  (015-unify-player-invite-dialog) auf dem Spielerstamm-Dialog: Trägt ein
+  Trainer einem bestehenden Spieler auf dieser Detailseite nachträglich eine
+  E-Mail ein oder ändert eine vorhandene, soll er den Spieler auch von hier aus
+  direkt einladen können, statt dafür zum Spielerstamm wechseln zu müssen? →
+  A: Ja. Das ersetzt die ursprüngliche Annahme dieser Spec ("Konto-Verknüpfung/
+  Einladung bleibt ausschließlich im Spielerstamm"), die vor der Einführung von
+  `players.email` getroffen wurde. Siehe FR-008.
+
 ## Background
 
 Trainer können Spieler-Stammdaten (Name, Trikotnummer, Position, Foto-Einwilligung,
@@ -108,6 +121,16 @@ sowie im Spielerstamm konsistent.
   automatisch gespeichert werden (kein Request pro Tastenanschlag); Änderungen an
   Foto-Einwilligung und Aktiv-Status (Checkboxen) MÜSSEN sofort automatisch
   gespeichert werden. Es gibt keinen expliziten Speichern- oder Abbrechen-Button.
+- **FR-008**: Für einen nicht verknüpften Spieler (`linked_user_id` ist `null`)
+  MUSS der Einstellungen-Bereich einen "Einladen"-Button zeigen, der eine
+  Einladung direkt an die aktuell **gespeicherte** `players.email` verschickt
+  (analog zum bestehenden Einladen-Button im Spielerstamm,
+  015-unify-player-invite-dialog FR-008/FR-009) — ohne dass dafür der
+  Spielerstamm besucht werden muss. Der Button MUSS deaktiviert sein, solange
+  keine E-Mail gespeichert ist (auch wenn im Feld bereits ein noch nicht
+  gespeicherter Wert eingetragen wurde) oder solange der Spieler bereits
+  verknüpft ist. Für verknüpfte Spieler entfällt der Button vollständig, da bei
+  ihnen keine Einladung mehr sinnvoll ist.
 
 ### Key Entities
 
@@ -129,6 +152,9 @@ sowie im Spielerstamm konsistent.
 - **SC-004**: Nach einem erfolgreichen Speichern auf der Detailseite zeigen sowohl
   die Detailseite als auch der Spielerstamm konsistent dieselben, aktualisierten
   Werte.
+- **SC-005**: Ein Trainer kann einem bestehenden, nicht verknüpften Spieler auf
+  dessen Detailseite eine E-Mail hinzufügen oder ändern und ihn im Anschluss,
+  ohne den Spielerstamm zu besuchen, direkt einladen.
 
 ## Assumptions
 
@@ -139,8 +165,11 @@ sowie im Spielerstamm konsistent.
   editierbare Feldset (Name, Trikotnummer, Position, Foto-Einwilligung,
   Aktiv-Status) — keine zusätzlichen Felder über das hinaus, was `PlayerForm`
   heute bereits abdeckt.
-- Konto-Verknüpfung/Einladung (nur relevant beim Anlegen neuer Spieler) bleibt
-  ausschließlich im Spielerstamm; die Detailseite bearbeitet stets nur einen
-  bereits existierenden Spieler.
+- Konto-**Verknüpfung** (Auswahl eines bestehenden Kontos für einen Spieler)
+  bleibt ausschließlich im Spielerstamm; die Detailseite bearbeitet stets nur
+  einen bereits existierenden Spieler. Das direkte **Einladen** eines bereits
+  vorhandenen, noch nicht verknüpften Spielers ist davon ausgenommen (siehe
+  Clarifications, FR-008) — diese ursprüngliche Annahme galt vor Einführung von
+  `players.email`.
 - Keine RLS-Änderung erforderlich: Die bestehende Policy `players_write_trainer`
   erlaubt Schreibzugriff bereits jedem Trainer des jeweiligen Teams.

@@ -7,19 +7,19 @@ No new helper function. One new table, one new policy.
 
 ## `veo_player_match_stats`
 
-Readable by any member of the team (trainer or player — FR-007 makes this an
-explicit, deliberate choice, same visibility as `veo_match_stats`):
+Assigned stats are readable by any member of the team (trainer or player —
+FR-007 makes this an explicit, deliberate choice). Raw rows without a
+`player_id` are correction data and are readable by trainers only (FR-011):
 
 | Policy | Operation, Role | Using |
 |---|---|---|
-| `veo_player_match_stats_read_member` | select, `authenticated` | `public.is_member((select team_id from veo_matches where id = match_id)) and public.is_veo_enabled((select team_id from veo_matches where id = match_id))` |
+| `veo_player_match_stats_read_member` | select, `authenticated` | `public.is_member((select team_id from veo_matches where id = match_id)) and public.is_veo_enabled((select team_id from veo_matches where id = match_id)) and (player_id is not null or public.is_trainer((select team_id from veo_matches where id = match_id)))` |
 
 No `insert`/`update`/`delete` policy for `authenticated` — only
 `service_role` (via `useAdminDb()`, from `POST /api/veo/sync`) writes, same
 boundary as `veo_matches`/`veo_match_stats`/`veo_sync_status`.
 
-Equivalent SQL (mirrors `veo_match_stats_read_member` verbatim, table name
-swapped):
+Equivalent SQL:
 
 ```sql
 create policy veo_player_match_stats_read_member on public.veo_player_match_stats
@@ -31,17 +31,22 @@ create policy veo_player_match_stats_read_member on public.veo_player_match_stat
     and public.is_veo_enabled(
       (select team_id from public.veo_matches where id = match_id)
     )
+    and (
+      player_id is not null
+      or public.is_trainer(
+        (select team_id from public.veo_matches where id = match_id)
+      )
+    )
   );
 ```
 
 ## Why no per-player restriction
 
-FR-007 explicitly requires every team member to see every player's stats,
-not just their own — the same all-or-nothing-per-team gate as
-`veo_match_stats`, not a per-row ownership check like `point_entries`. This
-was a deliberate choice by the requester despite the data being personal
-performance data of largely minor players (spec.md Clarifications); no
-narrower policy is being introduced here to second-guess that decision.
+FR-007 explicitly requires every team member to see every *assigned* player's
+stats, not just their own — the same all-or-nothing-per-team gate as
+`veo_match_stats`, not a per-row ownership check like `point_entries`. Raw
+unassigned rows are the exception required by FR-011: they remain visible to
+trainers for correction but never become player-facing data.
 
 ## `POST /api/veo/sync` writes
 
@@ -80,13 +85,34 @@ updates every `veo_player_match_stats` row sharing
 `(match_id, veo_jersey_number)` to the new `player_id` /
 `matched_manually = true`.
 
+## `POST /api/veo/player-assignment-bulk` (added 2026-09-25)
+
+A trainer who registers a player only *after* that jersey number's matches
+already synced would otherwise have to repeat the single-match route above
+once per match (FR-003 keeps the sync-time assignment frozen — a later
+roster change never retroactively re-resolves it, by design, so this is the
+deliberate escape hatch instead of a live join against the current roster).
+Same auth as the single-match route (`serverSupabaseUser` +
+`requireTrainer`, `useAdminDb()` bypassing RLS). Request body:
+`{ team_id, veo_jersey_number, player_id }` — `player_id` is **not**
+nullable here (bulk-clearing isn't a supported use case). It finds every
+match of `team_id` where that jersey number is still
+`player_id is null` and, for each one, applies the same two steps as the
+single-match route (FR-016 clear-then-set) inside one transaction. It never
+touches a row that already carries an assignment (auto or manual) for a
+*different* player — the same jersey number can legitimately belong to a
+different player in an earlier or later match within the same season.
+
 ## Negative-test matrix
 
 | # | Actor | Attempt | Expected | Covered by |
 |---|---|---|---|---|
 | P1 | Member of a team with no `veo_team_mappings` row (or `is_veo_enabled` false) | `select from veo_player_match_stats` for that team's matches | Empty | `veo-analytics-flow.spec.ts` |
 | P2 | Any authenticated, non-service-role caller | `insert`/`update`/`delete` on `veo_player_match_stats` directly via PostgREST | Denied | `rls-negative-single-team.spec.ts` |
-| P3 | Player (non-trainer) of the mapped team | `select` their own and team-mates' rows in `veo_player_match_stats` | Allowed for both — no per-player restriction (FR-007) | `veo-analytics-flow.spec.ts` |
+| P3 | Player (non-trainer) of the mapped team | `select` assigned and unassigned rows in `veo_player_match_stats` | Assigned rows allowed for all team members; unassigned rows empty for players and visible to trainers (FR-007, FR-011) | `rls-negative-single-team.spec.ts`, `veo-analytics-flow.spec.ts` |
 | P4 | Player (non-trainer) of the mapped team | `POST /api/veo/matches/[matchId]/player-assignment` for that team | 403 (FR-014) | `rls-negative-single-team.spec.ts` |
 | P5 | Trainer of team A | `POST /api/veo/matches/[matchId]/player-assignment` for a match belonging to team B | Denied | `rls-negative-cross-team.spec.ts` |
 | P6 | Unauthenticated caller | `POST /api/veo/matches/[matchId]/player-assignment` | 401 | `api-negative.spec.ts` |
+| P7 | Player (non-trainer) of the mapped team | `POST /api/veo/player-assignment-bulk` for that team | 403 | `rls-negative-single-team.spec.ts` |
+| P8 | Trainer of team A | `POST /api/veo/player-assignment-bulk` with `team_id` belonging to team B | Denied | `rls-negative-cross-team.spec.ts` |
+| P9 | Unauthenticated caller | `POST /api/veo/player-assignment-bulk` | 401 | `api-negative.spec.ts` |

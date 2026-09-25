@@ -62,10 +62,10 @@ player's rows under any other jersey number in the match.
   given match is simply absent — never fabricated as zero (spec.md Edge
   Cases, same rule as `veo_match_stats`).
 
-**RLS**: `select` for `authenticated`, gated by team membership and
-`public.is_veo_enabled(team_id)` resolved via `match_id` — same shape as
-`veo_match_stats_read_member` (see
-[contracts/rls-policies.md](./contracts/rls-policies.md)). No
+**RLS**: assigned rows (`player_id is not null`) are readable by all team
+members; unassigned correction rows are readable only by trainers. Both paths
+are gated by team membership and `public.is_veo_enabled(team_id)` resolved via
+`match_id` (see [contracts/rls-policies.md](./contracts/rls-policies.md)). No
 `insert`/`update`/`delete` policy for `authenticated` — `service_role` (via
 `useAdminDb()`) writes from the sync route, and a trainer's manual
 correction goes through `POST /api/veo/matches/[matchId]/player-assignment`

@@ -25,6 +25,10 @@
 
 **Diese Session hebt den Platform-Admin-Teil von User Story 4 sowie FR-010/FR-011/FR-013 in ihrer bisherigen Form auf — Details in den entsprechenden Abschnitten unten.**
 
+### Session 2026-09-25
+
+- Q: Die Sieg/Unentschieden/Niederlage-Bilanz (FR-004) wurde abgekürzt dargestellt ("5S 1U 0N") — beim Test unklar, wofür die Buchstaben stehen. Wie stattdessen? → A: Ausgeschrieben anzeigen ("5 Siege, 1 Unentschieden, 0 Niederlagen").
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Team-Statistiken eines Spiels ansehen (Priority: P1)

@@ -30,7 +30,7 @@ export type VeoMatch = {
   stats: VeoMatchStat[]
   // Member-facing only — rows with no resolved player are excluded here
   // (FR-002/SC-004); the trainer-only correction path fetches those
-  // separately via `listUnassignedJerseyNumbers()`.
+  // separately via `listUnassignedJerseyStats()`.
   player_stats: VeoPlayerMatchStat[]
 }
 
@@ -45,6 +45,16 @@ export type ActiveRosterPlayer = {
   id: string
   name: string
   jerseyNumber: number | null
+}
+
+// Trainer-only (User Story 3): the raw curated stats Veo delivered for a
+// jersey number that has no player_id yet — shown as a hint that a mapping
+// is still missing, never with a guessed player name (SC-004).
+export type VeoUnassignedJerseyStat = {
+  veoJerseyNumber: number
+  statType: string
+  category: string
+  value: number
 }
 
 export type VeoSyncStatus = {
@@ -63,6 +73,7 @@ export type VeoSeasonSummary = {
 
 const MAX_STATS = new Set(['top_speed_kmh'])
 const MEAN_STATS = new Set(['average_speed_kmh'])
+const SUPABASE_PAGE_SIZE = 1000
 
 /** Aggregates own-team results/stats across the given matches — season
  * overview for User Story 2. Computed on read, not stored (research.md §6). */
@@ -83,6 +94,27 @@ export const computeSeasonSummary = (matches: VeoMatch[]): VeoSeasonSummary => {
   return summary
 }
 
+// Shared by every "sum curated stats across matches" aggregator below —
+// most stats sum, top_speed_kmh takes the max, average_speed_kmh averages.
+const applyStatAggregation = (
+  statTotals: Record<string, number>,
+  meanCounts: Map<string, number>,
+  meanCountKey: string,
+  statType: string,
+  value: number,
+) => {
+  const previous = statTotals[statType]
+  if (MAX_STATS.has(statType)) {
+    statTotals[statType] = Math.max(previous ?? -Infinity, value)
+  } else if (MEAN_STATS.has(statType)) {
+    const count = (meanCounts.get(meanCountKey) ?? 0) + 1
+    meanCounts.set(meanCountKey, count)
+    statTotals[statType] = ((previous ?? 0) * (count - 1) + value) / count
+  } else {
+    statTotals[statType] = (previous ?? 0) + value
+  }
+}
+
 /** Sums each assigned player's curated stats across the given matches —
  * season overview for User Story 1. Computed on read, not stored, same
  * approach as `computeSeasonSummary` (004-veo-player-analytics research.md
@@ -98,23 +130,52 @@ export const computePlayerSeasonSummary = (matches: VeoMatch[]): VeoPlayerSeason
         jerseyNumber: stat.jersey_number,
         statTotals: {},
       }
-      const previous = existing.statTotals[stat.stat_type]
-      if (MAX_STATS.has(stat.stat_type)) {
-        existing.statTotals[stat.stat_type] = Math.max(previous ?? -Infinity, stat.value)
-      } else if (MEAN_STATS.has(stat.stat_type)) {
-        const countKey = `${stat.player_id}:${stat.stat_type}`
-        const count = (meanCounts.get(countKey) ?? 0) + 1
-        meanCounts.set(countKey, count)
-        existing.statTotals[stat.stat_type] = ((previous ?? 0) * (count - 1) + stat.value) / count
-      } else {
-        existing.statTotals[stat.stat_type] = (previous ?? 0) + stat.value
-      }
+      applyStatAggregation(
+        existing.statTotals,
+        meanCounts,
+        `${stat.player_id}:${stat.stat_type}`,
+        stat.stat_type,
+        stat.value,
+      )
       byPlayer.set(stat.player_id, existing)
     }
   }
   return [...byPlayer.values()].sort(
     (a, b) => (a.jerseyNumber ?? Infinity) - (b.jerseyNumber ?? Infinity),
   )
+}
+
+export type VeoUnassignedJerseySeasonTotals = {
+  jerseyNumber: number
+  statTotals: Record<string, number>
+}
+
+/** Trainer-only (User Story 3, same visibility rule as
+ * `listUnassignedJerseyStats`): sums the curated stats of jersey numbers with
+ * no player assigned yet, across all given matches' unassigned rows — so a
+ * trainer's leaderboard can include "#11, noch nicht zugeordnet" instead of
+ * silently omitting a jersey number nobody has claimed yet. */
+export const computeUnassignedJerseySeasonSummary = (
+  unassignedByMatch: Record<string, VeoUnassignedJerseyStat[]>,
+): VeoUnassignedJerseySeasonTotals[] => {
+  const byJersey = new Map<number, Record<string, number>>()
+  const meanCounts = new Map<string, number>()
+  for (const stats of Object.values(unassignedByMatch)) {
+    for (const stat of stats) {
+      const statTotals = byJersey.get(stat.veoJerseyNumber) ?? {}
+      applyStatAggregation(
+        statTotals,
+        meanCounts,
+        `${stat.veoJerseyNumber}:${stat.statType}`,
+        stat.statType,
+        stat.value,
+      )
+      byJersey.set(stat.veoJerseyNumber, statTotals)
+    }
+  }
+  return [...byJersey.entries()]
+    .map(([jerseyNumber, statTotals]) => ({ jerseyNumber, statTotals }))
+    .sort((a, b) => a.jerseyNumber - b.jerseyNumber)
 }
 
 type RawPlayerStatRow = {
@@ -176,28 +237,40 @@ export const useVeoAnalytics = () => {
   // Trainer-only: every team member could technically read these via RLS
   // (data-model.md has no per-role restriction), but only the correction UI
   // (US3) ever requests them — never mixed into the member-facing display.
-  const listUnassignedJerseyNumbers = async (
+  // Returns the actual stat values (not just the jersey number) so the
+  // trainer sees what Veo recorded even before it's mapped to a player.
+  const listUnassignedJerseyStats = async (
     matchIds: string[],
-  ): Promise<Record<string, number[]>> => {
+  ): Promise<Record<string, VeoUnassignedJerseyStat[]>> => {
     if (matchIds.length === 0) return {}
-    const { data, error } = await client
-      .from('veo_player_match_stats')
-      .select('match_id, veo_jersey_number')
-      .in('match_id', matchIds)
-      .is('player_id', null)
-    if (error) throw error
-    const byMatch = new Map<string, Set<number>>()
-    for (const row of data ?? []) {
-      const set = byMatch.get(row.match_id) ?? new Set<number>()
-      set.add(row.veo_jersey_number)
-      byMatch.set(row.match_id, set)
+    const byMatch = new Map<string, VeoUnassignedJerseyStat[]>()
+
+    for (let from = 0; ; from += SUPABASE_PAGE_SIZE) {
+      const { data, error } = await client
+        .from('veo_player_match_stats')
+        .select('match_id, veo_jersey_number, stat_type, category, value')
+        .in('match_id', matchIds)
+        .is('player_id', null)
+        .order('match_id', { ascending: true })
+        .order('veo_jersey_number', { ascending: true })
+        .order('stat_type', { ascending: true })
+        .range(from, from + SUPABASE_PAGE_SIZE - 1)
+      if (error) throw error
+
+      for (const row of data ?? []) {
+        const list = byMatch.get(row.match_id) ?? []
+        list.push({
+          veoJerseyNumber: row.veo_jersey_number,
+          statType: row.stat_type,
+          category: row.category,
+          value: row.value,
+        })
+        byMatch.set(row.match_id, list)
+      }
+
+      if ((data?.length ?? 0) < SUPABASE_PAGE_SIZE) break
     }
-    return Object.fromEntries(
-      [...byMatch.entries()].map(([matchId, numbers]) => [
-        matchId,
-        [...numbers].sort((a, b) => a - b),
-      ]),
-    )
+    return Object.fromEntries(byMatch)
   }
 
   const getActiveRoster = async (team_id: string): Promise<ActiveRosterPlayer[]> => {
@@ -211,5 +284,5 @@ export const useVeoAnalytics = () => {
     return (data ?? []).map((p) => ({ id: p.id, name: p.name, jerseyNumber: p.jersey_number }))
   }
 
-  return { listMatches, getSyncStatus, listUnassignedJerseyNumbers, getActiveRoster }
+  return { listMatches, getSyncStatus, listUnassignedJerseyStats, getActiveRoster }
 }

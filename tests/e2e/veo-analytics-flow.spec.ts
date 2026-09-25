@@ -158,27 +158,38 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     setupPage(pageB)
     await foundTeam(pageB, emailB, `Veo B ${suffix}`, slugB)
 
-    // Team A reaches the page through the menu and sees both matches with the
-    // seeded stats, own vs. opponent.
+    // Team A reaches the page through the menu and sees a match selector,
+    // one match's card at a time (extremely cluttered otherwise with a full
+    // season of matches).
     await pageA.goto(`/t/${slugA}/dashboard`, { waitUntil: 'networkidle' })
     await pageA.getByRole('button', { name: 'Menü öffnen' }).click()
     await pageA.getByRole('link', { name: 'Veo-Analytics' }).click()
     await pageA.waitForURL(new RegExp(`/t/${slugA}/analytics$`))
     await expect(pageA.getByTestId('veo-analytics-page')).toBeVisible()
-    const cards = pageA.getByTestId('veo-match-card')
-    await expect(cards).toHaveCount(2)
-    await expect(pageA.getByText('vs. SG Neukirchen')).toBeVisible()
-    await expect(pageA.getByText('vs. FSV Limbach')).toBeVisible()
+    const matchSelect = pageA.getByTestId('veo-match-select')
+    await expect(matchSelect.locator('option')).toHaveCount(2)
+    await expect(pageA.getByTestId('veo-match-card')).toHaveCount(1)
 
-    const winCard = pageA.getByTestId('veo-match-card').filter({ hasText: 'FSV Limbach' })
+    // Default selection is the newest match (ordering: played_at desc) — the win.
+    const winCard = pageA.getByTestId('veo-match-card')
+    await expect(winCard).toContainText('FSV Limbach')
     await expect(winCard.getByTestId('veo-match-score')).toHaveText('9:0')
     const winGoals = winCard.getByTestId('veo-stat-football_goal_total')
     await expect(winGoals).toContainText('9')
     await expect(winGoals).toContainText('0')
 
+    // Switching the selector swaps the single visible card for the other match.
+    await matchSelect.selectOption({ value: matchDrawId })
+    const drawCardInitial = pageA.getByTestId('veo-match-card')
+    await expect(drawCardInitial).toContainText('SG Neukirchen')
+    await expect(drawCardInitial).not.toContainText('FSV Limbach')
+    await matchSelect.selectOption({ value: matchWinId })
+
     // Season summary aggregates both matches: 1 win, 1 draw, 0 losses;
     // own goals 2+9=11, own corners 3+5=8.
-    await expect(pageA.getByTestId('veo-season-record')).toContainText('1S 1U 0N')
+    await expect(pageA.getByTestId('veo-season-record')).toContainText(
+      '1 Sieg, 1 Unentschieden, 0 Niederlagen',
+    )
     await expect(pageA.getByTestId('veo-season-total-football_goal_total')).toHaveText('11')
     await expect(pageA.getByTestId('veo-season-total-football_corner_total')).toHaveText('8')
 
@@ -208,6 +219,9 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     await pageA.reload({ waitUntil: 'networkidle' })
     await expect(pageA.getByTestId('veo-sync-status-failing')).toBeVisible()
     await expect(pageA.getByTestId('veo-sync-status-ok')).toHaveCount(0)
+    await expect(pageA.getByTestId('veo-sync-status-error-detail')).toContainText(
+      'Veo silent re-authentication failed (session likely expired)',
+    )
 
     // 004-veo-player-analytics US1/US2 — roster players and Veo player
     // stats, seeded directly (no live Veo call, research.md §15). player7
@@ -221,6 +235,11 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     ])
     const [player23] = await restInsert<{ id: string }>('players', [
       { team_id: teamIdA, name: 'Jersey Twenty-Three', jersey_number: 23, active: true },
+    ])
+    // Registered only "after" both matches already synced — the scenario
+    // the bulk jersey-assignment action (below) exists for.
+    const [player30] = await restInsert<{ id: string }>('players', [
+      { team_id: teamIdA, name: 'Jersey Thirty', jersey_number: 30, active: true },
     ])
     await restInsert('veo_player_match_stats', [
       {
@@ -295,6 +314,16 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
         category: 'physical',
         value: 2700,
       },
+      // Shares distance_total_meters with player7 (11.000) at a lower value,
+      // so comparing the two has a deterministic "best" cell to assert on.
+      {
+        match_id: matchWinId,
+        veo_jersey_number: 10,
+        stat_type: 'distance_total_meters',
+        player_id: player10!.id,
+        category: 'physical',
+        value: 4000,
+      },
       // Unmatched jersey number in the draw match — stored, never displayed
       // to a member, until a trainer assigns it (FR-011).
       {
@@ -305,52 +334,194 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
         category: 'attacking',
         value: 3,
       },
+      // Regression for the leaderboard's rank computation: player7 ties
+      // jersey 99 for 1st (both 3 goals), player10 is a clear-but-lower 2nd
+      // (1 goal) — a dense-rank bug once skipped straight to "3." here
+      // instead of "2." whenever two entries shared 1st place.
+      {
+        match_id: matchWinId,
+        veo_jersey_number: 7,
+        stat_type: 'football_goal_total',
+        player_id: player7!.id,
+        category: 'attacking',
+        value: 3,
+      },
+      {
+        match_id: matchWinId,
+        veo_jersey_number: 10,
+        stat_type: 'football_goal_total',
+        player_id: player10!.id,
+        category: 'attacking',
+        value: 1,
+      },
+      // Jersey 55 is unassigned in *both* matches — the bulk-assignment
+      // action (below) must fix both from a single click in either one.
+      {
+        match_id: matchWinId,
+        veo_jersey_number: 55,
+        stat_type: 'football_shots_total',
+        player_id: null,
+        category: 'attacking',
+        value: 2,
+      },
+      {
+        match_id: matchDrawId,
+        veo_jersey_number: 55,
+        stat_type: 'football_shots_total',
+        player_id: null,
+        category: 'attacking',
+        value: 1,
+      },
     ])
 
-    // US1 — dashboard season summary sums across both matches; the
-    // unmatched jersey number never appears.
+    // US1 — dashboard season summary sums across both matches; only one
+    // player is shown by default (jersey 7, lowest jersey number).
     await pageA.goto(`/t/${slugA}/dashboard`, { waitUntil: 'networkidle' })
-    const seasonRows = pageA.getByTestId('veo-player-season-row')
-    await expect(seasonRows).toHaveCount(2)
-    const player7SeasonRow = seasonRows.filter({ hasText: '#7' })
+    await expect(pageA.getByTestId('veo-player-select-1')).toHaveCount(0)
     await expect(
-      player7SeasonRow.getByTestId(`veo-player-season-stat-${player7!.id}-distance_total_meters`),
-    ).toHaveText('11.000')
+      pageA.getByTestId(`veo-player-stat-${player7!.id}-distance_total_meters`),
+    ).toHaveText('11.000 m')
+    await expect(pageA.getByTestId(`veo-player-stat-${player7!.id}-sprints_total`)).toHaveText('22')
+    await expect(pageA.getByTestId(`veo-player-stat-${player7!.id}-top_speed_kmh`)).toHaveText(
+      '27,8 km/h',
+    )
+    await expect(pageA.getByTestId(`veo-player-stat-${player7!.id}-average_speed_kmh`)).toHaveText(
+      '18,8 km/h',
+    )
     await expect(
-      player7SeasonRow.getByTestId(`veo-player-season-stat-${player7!.id}-sprints_total`),
-    ).toHaveText('22')
-    await expect(
-      player7SeasonRow.getByTestId(`veo-player-season-stat-${player7!.id}-top_speed_kmh`),
-    ).toHaveText('27,8')
-    await expect(
-      player7SeasonRow.getByTestId(`veo-player-season-stat-${player7!.id}-average_speed_kmh`),
-    ).toHaveText('18,8')
-    const player10SeasonRow = seasonRows.filter({ hasText: '#10' })
-    await expect(
-      player10SeasonRow.getByTestId(`veo-player-season-stat-${player10!.id}-seconds_played_total`),
-    ).toHaveText('2.700')
-    await expect(pageA.locator('body')).not.toContainText('#99')
+      pageA.getByTestId(`veo-player-stat-${player10!.id}-seconds_played_total`),
+    ).toHaveCount(0)
 
-    // US2 — per-match breakdown on the analytics page; jersey 99 stays
-    // invisible there too, as a trainer who hasn't opened the correction UI.
-    await pageA.goto(`/t/${slugA}/analytics`, { waitUntil: 'networkidle' })
-    const winCardPlayers = pageA
-      .getByTestId('veo-match-card')
-      .filter({ hasText: 'FSV Limbach' })
-      .getByTestId('veo-match-player-row')
-    await expect(winCardPlayers).toHaveCount(2)
-    const drawCardPlayers = pageA
-      .getByTestId('veo-match-card')
-      .filter({ hasText: 'SG Neukirchen' })
-      .getByTestId('veo-match-player-row')
-    await expect(drawCardPlayers).toHaveCount(1)
+    // Leaderboard-per-metric shows independently of the single-player
+    // selection above — player7 leads distance (11.000 > 4.000), ranked #1.
+    // As a trainer, it also includes jersey 99, still unassigned to anyone —
+    // shown as "#99 Nicht zugeordnet", never a guessed name (SC-004).
+    const distanceLeaderboard = pageA.getByTestId('veo-leaderboard-distance_total_meters')
+    const player7Rank = distanceLeaderboard.getByTestId(
+      `veo-leaderboard-entry-distance_total_meters-${player7!.id}`,
+    )
+    const player10Rank = distanceLeaderboard.getByTestId(
+      `veo-leaderboard-entry-distance_total_meters-${player10!.id}`,
+    )
+    await expect(player7Rank).toContainText('1.')
+    await expect(player10Rank).toContainText('2.')
+    // Gold for 1st, silver for 2nd.
+    await expect(player7Rank).toHaveClass(/bg-yellow-100/)
+    await expect(player10Rank).toHaveClass(/bg-slate-200/)
+    // A real player's name links to their profile.
+    await expect(player7Rank.getByRole('link')).toHaveAttribute(
+      'href',
+      `/t/${slugA}/players/${player7!.id}`,
+    )
+
+    // Dense-rank regression: player7 and jersey 99 tie for 1st (3 goals
+    // each) — the next distinct value (player10, 1 goal) must be ranked
+    // "2." (silver), never skipped to "3." just because two entries share
+    // 1st place.
+    const goalsLeaderboard = pageA.getByTestId('veo-leaderboard-football_goal_total')
+    const jersey99Goals = goalsLeaderboard.getByTestId(
+      'veo-leaderboard-entry-football_goal_total-jersey-99',
+    )
+    const player7Goals = goalsLeaderboard.getByTestId(
+      `veo-leaderboard-entry-football_goal_total-${player7!.id}`,
+    )
+    const player10Goals = goalsLeaderboard.getByTestId(
+      `veo-leaderboard-entry-football_goal_total-${player10!.id}`,
+    )
+    await expect(jersey99Goals).toContainText('#99 Nicht zugeordnet')
+    await expect(jersey99Goals).toContainText('3')
+    await expect(jersey99Goals).toContainText('1.')
+    await expect(jersey99Goals).toHaveClass(/bg-yellow-100/)
+    // No profile to link to for an unassigned jersey number.
+    await expect(jersey99Goals.getByRole('link')).toHaveCount(0)
+    await expect(player7Goals).toContainText('1.')
+    await expect(player7Goals).toHaveClass(/bg-yellow-100/)
+    await expect(player10Goals).toContainText('2.')
+    await expect(player10Goals).toHaveClass(/bg-slate-200/)
+
+    // Comparing up to 4 players: add a second slot, pick player10 — both
+    // now show side by side, and the higher shared metric (distance) is
+    // highlighted for whoever has the most, not a fixed player.
+    await pageA.getByTestId('veo-player-compare-add').click()
+    await pageA.getByTestId('veo-player-select-1').selectOption(player10!.id)
     await expect(
-      drawCardPlayers.getByTestId(`veo-match-player-stat-${player7!.id}-distance_total_meters`),
-    ).toHaveText('5000')
+      pageA.getByTestId(`veo-player-stat-${player10!.id}-seconds_played_total`),
+    ).toHaveText('45 min') // 2700s -> minutes
+    const player7Distance = pageA.getByTestId(
+      `veo-player-stat-${player7!.id}-distance_total_meters`,
+    )
+    const player10Distance = pageA.getByTestId(
+      `veo-player-stat-${player10!.id}-distance_total_meters`,
+    )
+    await expect(player7Distance).toHaveText('11.000 m')
+    await expect(player10Distance).toHaveText('4.000 m')
+    await expect(player7Distance).toHaveClass(/bg-green-100/)
+    await expect(player10Distance).not.toHaveClass(/bg-green-100/)
+    // The compare table's column header links to the player's profile too.
+    await expect(
+      pageA.getByRole('columnheader', { name: 'Jersey Seven' }).getByRole('link'),
+    ).toHaveAttribute('href', `/t/${slugA}/players/${player7!.id}`)
+
+    // US2 — per-match breakdown on the analytics page. Only one match's
+    // card is visible at a time — switch the selector. As a trainer, the
+    // per-match compare also includes jersey 99/55 (still unassigned).
+    await pageA.goto(`/t/${slugA}/analytics`, { waitUntil: 'networkidle' })
+    await expect(pageA.getByTestId('veo-match-card')).toContainText('FSV Limbach') // default: newest
+    // Win match: player7 + player10 (assigned) + jersey 55 (unassigned).
+    await expect(pageA.getByTestId('veo-player-select-0').locator('option')).toHaveCount(3)
+
+    // Bulk jersey assignment — player30 was registered only after both
+    // matches already synced (FR-003 froze jersey 55 as unassigned in
+    // both). Assigning it here, with "für alle Spiele übernehmen" checked,
+    // must fix the draw match's jersey 55 too, without ever opening it.
+    const winCardForBulk = pageA.getByTestId('veo-match-card')
+    await winCardForBulk.getByTestId('veo-jersey-select').selectOption('55')
+    await winCardForBulk.getByTestId('veo-assignment-select-55').selectOption(player30!.id)
+    await winCardForBulk.getByTestId('veo-assignment-bulk-55').check()
+    await Promise.all([
+      pageA.waitForResponse(
+        (res) =>
+          res.url().includes('/api/veo/player-assignment-bulk') &&
+          res.request().method() === 'POST',
+      ),
+      winCardForBulk.getByTestId('veo-assignment-submit-55').click(),
+    ])
+    await expect(winCardForBulk.getByTestId('veo-assignment-row-55')).toContainText('Jersey Thirty')
+    const jersey55Rows = await restGet<{ match_id: string; player_id: string | null }>(
+      `veo_player_match_stats?veo_jersey_number=eq.55&match_id=in.(${matchWinId},${matchDrawId})&select=match_id,player_id`,
+    )
+    expect(jersey55Rows).toHaveLength(2)
+    expect(jersey55Rows.every((r) => r.player_id === player30!.id)).toBe(true)
+
+    await matchSelect.selectOption({ value: matchDrawId })
+    // Draw match: player7 (assigned) + jersey 99 (unassigned) + jersey 55,
+    // now assigned to player30 by the bulk action above, not a manual pick
+    // in this match.
+    await expect(pageA.getByTestId('veo-player-select-0').locator('option')).toHaveCount(3)
+    await expect(
+      pageA.getByTestId(`veo-player-stat-${player7!.id}-distance_total_meters`),
+    ).toHaveText('5.000 m')
+    await expect(
+      pageA.getByTestId('veo-match-card').getByTestId('veo-jersey-select'),
+    ).toContainText('Jersey Thirty')
 
     // US3 — trainer correction: assign the unmatched jersey 99 (draw match)
-    // to player23, a roster player untouched by any Veo data so far.
-    const drawCard = pageA.getByTestId('veo-match-card').filter({ hasText: 'SG Neukirchen' })
+    // to player23, a roster player untouched by any Veo data so far. The
+    // draw match stays selected across the `@reassigned` reloads below —
+    // `load()` only resets the selection when it's no longer among the
+    // (unchanged) matches.
+    const drawCard = pageA.getByTestId('veo-match-card')
+
+    // Only one jersey number's correction is shown at a time — pick #99 via
+    // its own dropdown (default is #7, already assigned, listed first).
+    await drawCard.getByTestId('veo-jersey-select').selectOption('99')
+
+    // Review fix — jersey 99's raw stats are shown to the trainer in the
+    // correction UI as a hint that a mapping is still missing (FR-011), never
+    // with a guessed player name.
+    await expect(drawCard.getByTestId('veo-assignment-stats-99')).toContainText('3')
+    await expect(drawCard.getByTestId('veo-assignment-row-99')).toContainText('Nicht zugeordnet')
+
     await drawCard.getByTestId('veo-assignment-select-99').selectOption(player23!.id)
     await Promise.all([
       pageA.waitForResponse(
@@ -458,6 +629,19 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     await Promise.all([waitForMappingSave(), toggleInput.uncheck()])
     await expect(toggleInput).not.toBeChecked()
     expect((await fetchPublicVeoStats()).enabled).toBe(false)
+
+    // Review fix — a failed roster/unassigned-stats fetch (US3's
+    // trainer-only correction data) surfaces a visible error instead of
+    // silently leaving the correction UI empty.
+    await pageA.route(
+      (url) => url.pathname === '/rest/v1/players' && url.searchParams.get('active') === 'eq.true',
+      (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{}' }),
+    )
+    await pageA.reload({ waitUntil: 'networkidle' })
+    await expect(pageA.getByTestId('veo-correction-error')).toBeVisible()
+    await expect(pageA.getByTestId('veo-correction-error')).toContainText(
+      'Trikotnummer-Zuordnung konnte nicht geladen werden',
+    )
 
     await ctxA.close()
     await ctxB.close()
