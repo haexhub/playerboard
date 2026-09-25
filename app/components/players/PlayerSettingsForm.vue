@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useDebounceFn } from '@vueuse/core'
 import type { PlayerFormPlayer } from '~/composables/usePlayerFormFields'
+import { errorMessage } from '~/utils/errors'
 
 const props = defineProps<{
   teamId: string
@@ -12,6 +13,7 @@ const emit = defineEmits<{
 }>()
 
 const { update, requestLinkedEmailChange } = usePlayers()
+const { issue } = useInvitations()
 
 const {
   isLinked,
@@ -30,6 +32,27 @@ const {
 const submitError = ref<string | null>(null)
 const submitNotice = ref<string | null>(null)
 const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
+
+const canInvite = computed(() => !isLinked.value && email.value.trim() !== '')
+const inviteNotice = ref<string | null>(null)
+const inviteError = ref<string | null>(null)
+
+const onInvite = async () => {
+  if (!canInvite.value) return
+  inviteError.value = null
+  inviteNotice.value = null
+  try {
+    await issue({
+      team_id: props.teamId,
+      email: email.value.trim(),
+      role: 'player',
+      player_id: props.player.id,
+    })
+    inviteNotice.value = `Einladung an ${email.value.trim()} gesendet.`
+  } catch (err) {
+    inviteError.value = errorMessage(err, 'Einladung konnte nicht verschickt werden.')
+  }
+}
 
 const lastSaved = ref({
   name: props.player.name,
@@ -152,6 +175,20 @@ const flushPendingSave = async () => {
         fieldErrors.email
       }}</span>
     </ShadcnLabel>
+    <div class="flex items-center gap-2">
+      <ShadcnButton
+        type="button"
+        variant="outline"
+        size="sm"
+        data-testid="player-detail-invite-button"
+        :disabled="!canInvite"
+        @click="onInvite"
+      >
+        Einladen
+      </ShadcnButton>
+    </div>
+    <p v-if="inviteNotice" class="text-sm text-foreground" role="status">{{ inviteNotice }}</p>
+    <p v-if="inviteError" class="text-sm text-destructive" role="alert">{{ inviteError }}</p>
     <div class="flex gap-3">
       <ShadcnLabel class="flex-1 block space-y-1">
         <span>Trikotnummer (optional)</span>
