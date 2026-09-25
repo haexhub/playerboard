@@ -96,11 +96,6 @@ const topThree = computed(() => ranking.value?.rows.slice(0, 3) ?? [])
         <ShadcnBadge variant="secondary">
           {{ isTrainer ? 'Trainer-Ansicht' : 'Spieler-Ansicht' }}
         </ShadcnBadge>
-        <ShadcnButton v-if="isTrainer" as-child variant="outline" size="sm">
-          <NuxtLink :to="`/t/${slug}/analytics`" data-testid="dashboard-veo-link">
-            Veo-Analytics konfigurieren
-          </NuxtLink>
-        </ShadcnButton>
       </div>
     </header>
 
