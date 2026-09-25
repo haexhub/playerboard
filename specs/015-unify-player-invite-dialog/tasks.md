@@ -123,6 +123,7 @@ Kader" → save; the row shows "Aktiv" again.
 ### Tests for User Story 3
 
 - [X] T025 [US3] New scenario `a deactivated player can only be reactivated via the edit dialog` in `tests/e2e/players-flow.spec.ts`: deactivate a player, then reactivate them by opening "Bearbeiten" and checking "Aktiv im Kader" — confirms the row shows "Aktiv" again; confirms no "Aktivieren" button ever appears in the list for an inactive row. This is a locking-in test only — `usePlayers().update()`/the existing `active` checkbox in `PlayerForm.vue` (untouched by T014-T019) already support this end-to-end, per spec.md's Background
+- **Superseded 2026-09-25**: T025's assertion (no reactivation control in the list) was reversed by spec.md's Clarifications session — the list now has a bidirectional status checkbox, and the "Bearbeiten" dialog/button was removed from the list entirely (editing moved to the player detail page, `PlayerSettingsForm.vue`). T025's test was replaced by `roster status checkbox activates and deactivates a player in both directions` in the same file.
 
 **Checkpoint**: All three user stories independently functional.
 

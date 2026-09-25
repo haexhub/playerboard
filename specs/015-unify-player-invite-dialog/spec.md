@@ -36,6 +36,32 @@ Diese Spec vereinheitlicht den Anlegen/Bearbeiten-Dialog auf ein einziges Formul
 zu einem dauerhaft gespeicherten, jederzeit über "Bearbeiten" änderbaren Feld, und macht den
 "Einladen"-Button im Spielerstamm zu einer direkten Aktion ohne Dialog.
 
+## Clarifications
+
+### Session 2026-09-25
+
+- Q: US3 AC2 legt bewusst fest, dass Aktivieren/Deaktivieren über unterschiedliche Wege laufen
+  (Liste vs. Bearbeiten-Dialog). Soll das dabei bleiben? → A: Nein — Status (aktiv/inaktiv) wird
+  direkt in der Spielerliste per Checkbox in beide Richtungen umgeschaltet, wie schon die
+  Foto-Einwilligung. Der separate "Deaktivieren"-Button entfällt. US3 AC2 ist damit überholt (siehe
+  Durchstreichung dort).
+- Q: Wenn der "Bearbeiten"-Button aus der Liste fällt, wie wird ein Spieler dann noch bearbeitet? →
+  A: Der Name in der Spielerliste verlinkt auf die Spieler-Detailseite
+  ([specs/001-points-and-photos](../001-points-and-photos/spec.md) S4); Bearbeiten läuft
+  ausschließlich noch über das dort bereits vorhandene, autospeichernde Formular
+  (`PlayerSettingsForm.vue`). Der separate Bearbeiten-Dialog im Spielerstamm entfällt vollständig;
+  "Neuer Spieler" bleibt ein eigener (Anlegen-only) Dialog.
+- Q: Die Spieler-Detailseite hat kein Einladen — wie lädt ein Trainer einen Spieler ein, dessen
+  E-Mail gerade erst dort eingetragen wurde, ohne zurück zur Liste zu wechseln? → A: Ein
+  "Einladen"-Button neben dem E-Mail-Feld auf der Detailseite, disabled ohne E-Mail oder bei bereits
+  verknüpftem Spieler — exakt dieselbe Bedingung und derselbe `issue()`-Aufruf wie der Listenbutton.
+- Q: Spieler sollen komplett gelöscht werden können — wie verträgt sich das mit FR-032 (kein Löschen
+  bei historischen Punkteinträgen)? → A: Ein "Löschen"-Button pro Zeile in der Spielerliste, mit
+  Sicherheitsabfrage. `players.id` wird von `point_entries.player_id` per `ON DELETE RESTRICT`
+  geschützt (bereits im Schema vorhanden, siehe `db/schema/index.ts`); ein Löschversuch für einen
+  Spieler mit Punkteinträgen schlägt serverseitig fehl und die UI zeigt einen Hinweis, stattdessen zu
+  deaktivieren, statt den Fehler ungefiltert durchzureichen.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Spieler über ein einheitliches Formular anlegen oder bearbeiten (Priority: P1)
@@ -103,21 +129,27 @@ existierte).
 
 ### User Story 3 - Deaktivierten Spieler wieder aktivieren (Priority: P3)
 
+*(Aktualisiert 2026-09-25 — Acceptance Scenario 2 unten ist überholt und durch
+die neue Statuscheckbox in der Liste ersetzt; siehe Clarifications.)*
+
 Ein Trainer möchte einen zuvor deaktivierten Spieler wieder aktiv setzen.
 
 **Why this priority**: Behebt eine bestehende Lücke (keine Reaktivierung möglich), ist aber
 seltener nötig als Anlegen/Bearbeiten oder Einladen.
 
-**Independent Test**: Einen inaktiven Spieler über "Bearbeiten" öffnen, "Aktiv im Kader" ankreuzen,
-speichern — der Spieler erscheint in der Liste wieder als aktiv.
+**Independent Test**: In der Spielerliste die Status-Checkbox einer inaktiven Zeile anhaken —
+der Spieler erscheint sofort wieder als aktiv (alternativ weiterhin über die Checkbox "Aktiv im
+Kader" auf der Spieler-Detailseite, S4 in ui-flows.md).
 
 **Acceptance Scenarios**:
 
-1. **Given** ein Spieler ist inaktiv, **When** der Trainer ihn über "Bearbeiten" öffnet und "Aktiv
-   im Kader" ankreuzt und speichert, **Then** wird der Spieler wieder als aktiv geführt.
-2. **Given** die Spielerliste, **Then** existiert kein separater "Aktivieren"-Button — Aktivieren
+1. **Given** ein Spieler ist inaktiv, **When** der Trainer die Status-Checkbox der Zeile in der
+   Spielerliste anhakt, **Then** wird der Spieler ohne weitere Bestätigung wieder als aktiv
+   geführt.
+2. ~~**Given** die Spielerliste, **Then** existiert kein separater "Aktivieren"-Button — Aktivieren
    und Deaktivieren laufen über unterschiedliche Wege (Liste vs. Bearbeiten-Dialog), das ist so
-   beabsichtigt.
+   beabsichtigt.~~ *(entfällt seit 2026-09-25 — durch eine bidirektionale Status-Checkbox in der
+   Liste ersetzt, siehe Clarifications unten.)*
 
 ### Edge Cases
 
