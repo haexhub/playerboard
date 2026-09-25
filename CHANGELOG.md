@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.10.0](https://github.com/haexhub/playerboard/compare/v0.9.0...v0.10.0) (2026-09-25)
+
+
+### Features
+
+* **dashboard:** highlight top 10 in ranking table, drop Top 3 card ([34bae82](https://github.com/haexhub/playerboard/commit/34bae82c681d2dab2a8a742cc4175d02104f4d5f))
+* **players:** invite button on player detail settings form ([89f00e2](https://github.com/haexhub/playerboard/commit/89f00e208639ab5c6ea8eba218f254583706de9e))
+* **players:** status checkbox, profile-page editing, invite, and delete ([75aa3fc](https://github.com/haexhub/playerboard/commit/75aa3fc6c96d4d58a018d109d140454b8691149c))
+* **veo:** bulk jersey assignment across matches, link players to profiles ([957367a](https://github.com/haexhub/playerboard/commit/957367adc7e237bc2edb12bda090d31c20aa5a68))
+
+
+### Bug Fixes
+
+* address PR 77 review feedback ([9c7dd88](https://github.com/haexhub/playerboard/commit/9c7dd881fffee1ff2bbbe56af74ab021474f5da2))
+* **dashboard:** drop redundant Veo-Analytics shortcut button ([b941750](https://github.com/haexhub/playerboard/commit/b94175083fd141148f5a91d1307665e5d6012268))
+* **players:** disable detail-page invite button on invalid email edit ([b381d8e](https://github.com/haexhub/playerboard/commit/b381d8e05a93fee0964961634300d2da10cc5b55))
+* **trainings:** remove nested scrollbar from point grid ([644d712](https://github.com/haexhub/playerboard/commit/644d712ef9728cf92bb81bd66fffdb6a89bde561))
+* **veo:** address remaining review findings ([5208822](https://github.com/haexhub/playerboard/commit/5208822e08d4cb407491b1119affe07cf68b8540))
+* **veo:** address review findings ([4c04acb](https://github.com/haexhub/playerboard/commit/4c04acb8eb73d9b1de5603d98c6146bd74d94c32))
+* **veo:** correct live API contract, single-select UI, unit-aware display ([91812c5](https://github.com/haexhub/playerboard/commit/91812c5f37d4c10d7f77db8f3a6c7beebf4f150d))
+* **veo:** correct live API contract, single-select UI, unit-aware player stats ([801d66c](https://github.com/haexhub/playerboard/commit/801d66c86e0a04daa6e181cf35438aa5ce341cb8))
+* **veo:** show unassigned jersey stats to trainers, surface sync errors ([dcbf467](https://github.com/haexhub/playerboard/commit/dcbf467a956a98969f6b127d97261c07b1bc175c))
+* **veo:** use dense ranking for the leaderboard, not skip-style ([b2b6fd3](https://github.com/haexhub/playerboard/commit/b2b6fd34d30033cc0bff7ecb65e01a83edfb3bbb))
+
 ## [0.9.0](https://github.com/haexhub/playerboard/compare/v0.8.1...v0.9.0) (2026-09-24)
 
 
