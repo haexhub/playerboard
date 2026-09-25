@@ -106,38 +106,38 @@ const submit = async () => {
     <div class="flex flex-col sm:flex-row gap-3">
       <ShadcnLabel class="flex-1 block space-y-1">
         <span>E-Mail</span>
-        <ShadcnInput v-model="email" type="email" required />
+        <ShadcnInput v-model="email" class="min-h-touch" type="email" required />
         <span v-if="fieldErrors.email" class="block text-sm text-destructive">{{
           fieldErrors.email
         }}</span>
       </ShadcnLabel>
-      <label class="block">
-        <span class="text-sm font-medium text-foreground">Rolle</span>
+      <ShadcnLabel class="block space-y-1">
+        <span>Rolle</span>
         <select
           v-model="role"
-          class="mt-1 w-full min-h-touch px-3 rounded-md border border-input bg-background accent-primary"
+          class="w-full min-h-touch px-3 rounded-md border border-input bg-background accent-primary"
         >
           <option value="player">Spieler</option>
           <option value="trainer">Trainer</option>
         </select>
-      </label>
+      </ShadcnLabel>
     </div>
     <div v-if="role === 'player'" class="space-y-3">
       <ShadcnLabel class="block space-y-1">
         <span>Name (optional)</span>
-        <ShadcnInput v-model="playerName" type="text" />
+        <ShadcnInput v-model="playerName" class="min-h-touch" type="text" />
       </ShadcnLabel>
       <div class="flex gap-3">
         <ShadcnLabel class="flex-1 block space-y-1">
           <span>Trikotnummer (optional)</span>
-          <ShadcnInput v-model="jerseyNumberModel" type="number" min="0" />
+          <ShadcnInput v-model="jerseyNumberModel" class="min-h-touch" type="number" min="0" />
           <span v-if="fieldErrors.jersey_number" class="block text-sm text-destructive">{{
             fieldErrors.jersey_number
           }}</span>
         </ShadcnLabel>
         <ShadcnLabel class="flex-1 block space-y-1">
           <span>Position (optional)</span>
-          <ShadcnInput v-model="position" type="text" />
+          <ShadcnInput v-model="position" class="min-h-touch" type="text" />
         </ShadcnLabel>
       </div>
     </div>
