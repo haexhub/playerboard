@@ -193,6 +193,14 @@ test.describe('US5 — anonymous public ranking', () => {
       {
         match_id: matchInSeason!.id,
         veo_jersey_number: 11,
+        stat_type: 'future_sensitive_metric',
+        player_id: player11Id,
+        category: 'physical',
+        value: 123,
+      },
+      {
+        match_id: matchInSeason!.id,
+        veo_jersey_number: 11,
         stat_type: 'top_speed_kmh',
         player_id: player11Id,
         category: 'physical',
@@ -299,10 +307,25 @@ test.describe('US5 — anonymous public ranking', () => {
       rows: Array<Record<string, unknown>>
     }
     expect(rpcBody.enabled).toBe(true)
+    const publicStatTypes = new Set([
+      'distance_total_meters',
+      'sprints_total',
+      'top_speed_kmh',
+      'average_speed_kmh',
+      'high_intensity_runs_total',
+      'seconds_played_total',
+      'football_shots_total',
+      'football_goal_total',
+      'football_goal_involvement_total',
+    ])
     for (const row of rpcBody.rows) {
       expect(Object.keys(row).sort()).toEqual(['jersey_number', 'stats'])
+      expect(
+        Object.keys(row.stats as Record<string, unknown>).every((key) => publicStatTypes.has(key)),
+      ).toBe(true)
     }
     expect(JSON.stringify(rpcBody)).not.toContain('Veo Secret Player 22')
+    expect(JSON.stringify(rpcBody)).not.toContain('future_sensitive_metric')
 
     // Switching to Veo-Stats and back preserves the Trainingsbewertungen
     // tab's content (US3 regression). Player 22 (added above, purely for

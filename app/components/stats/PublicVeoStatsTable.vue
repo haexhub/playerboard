@@ -23,16 +23,17 @@ const STAT_COLUMNS = [
 
 const rows = computed<PublicVeoStatsRow[]>(() => props.veoStats?.rows ?? [])
 
-const medalRanks = computed(() =>
-  Object.fromEntries(
-    STAT_COLUMNS.map((statType) => [
-      statType,
-      medalRanksForStat(
-        rows.value.map((row) => row.stats[statType]),
-        3,
-      ),
-    ]),
-  ) as Record<string, Array<number | null>>,
+const medalRanks = computed(
+  () =>
+    Object.fromEntries(
+      STAT_COLUMNS.map((statType) => [
+        statType,
+        medalRanksForStat(
+          rows.value.map((row) => row.stats[statType]),
+          3,
+        ),
+      ]),
+    ) as Record<string, Array<number | null>>,
 )
 
 const medalClass = (rowIndex: number, statType: string): string => {
@@ -75,7 +76,7 @@ const displayValue = (row: PublicVeoStatsRow, statType: string): string => {
           Noch keine Veo-Daten für diese Saison.
         </ShadcnTableEmpty>
         <ShadcnTableRow v-for="(row, i) in rows" :key="i" data-testid="public-veo-stats-row">
-          <th scope="row" class="sticky left-0 bg-inherit border-r px-2 py-2 text-left">
+          <th scope="row" class="sticky left-0 bg-card border-r px-2 py-2 text-left">
             {{ row.jersey_number !== null ? `#${row.jersey_number}` : '—' }}
           </th>
           <ShadcnTableCell
