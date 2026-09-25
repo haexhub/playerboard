@@ -133,10 +133,10 @@ test.describe('US2 — player dashboard + progress chart', () => {
     await playerPage.goto(`/t/${teamSlug}/dashboard`, { waitUntil: 'networkidle' })
     await expect(playerPage.getByTestId('dashboard-page')).toBeVisible()
     await expect(playerPage.getByTestId('my-rank-card')).toContainText('1')
-    const top3 = playerPage.getByTestId('top-three')
-    await expect(top3).toContainText('Alice Anker')
-    await expect(top3).toContainText('Bruno Bereit')
-    await expect(top3).toContainText('Chiara Cool')
+    const dashboardRanking = playerPage.getByTestId('ranking-table')
+    await expect(dashboardRanking).toContainText('Alice Anker')
+    await expect(dashboardRanking).toContainText('Bruno Bereit')
+    await expect(dashboardRanking).toContainText('Chiara Cool')
 
     // Player opens own detail via CTA.
     await playerPage.getByRole('link', { name: /mein zeitverlauf/i }).click()

@@ -54,7 +54,7 @@ test.describe('trainer manages a player email from the detail page', () => {
     await trainerPage.goto(`/t/${teamSlug}/players/${erin!.id}`, { waitUntil: 'networkidle' })
     const erinSettings = trainerPage.getByTestId('player-detail-settings')
     const erinEmail = erinSettings.getByLabel('E-Mail')
-    const erinInvite = erinSettings.getByTestId('player-settings-invite-button')
+    const erinInvite = erinSettings.getByTestId('player-detail-invite-button')
     await expect(erinEmail).toHaveValue('')
     await expect(erinInvite).toBeDisabled()
     const firstErinEmail = `erin-${suffix}@example.com`

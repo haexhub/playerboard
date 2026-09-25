@@ -16,6 +16,26 @@ const scoreFor = (row: RankingRow, catId: string): number => Number(row.scores?.
 
 const totalFor = (row: RankingRow): number =>
   cats.value.reduce((sum, c) => sum + scoreFor(row, c.id), 0)
+
+const bottomRanks = computed(() =>
+  [...new Set(rows.value.map((row) => row.rank_position))].sort((a, b) => b - a).slice(0, 2),
+)
+
+const rowHighlightClass = (row: RankingRow): string => {
+  if (row.rank_position === 1) return 'bg-yellow-200/70 hover:bg-yellow-200/90 font-semibold'
+  if (row.rank_position === 2) return 'bg-slate-300/60 hover:bg-slate-300/80 font-semibold'
+  if (row.rank_position === 3) return 'bg-orange-300/50 hover:bg-orange-300/70 font-semibold'
+  if (bottomRanks.value.includes(row.rank_position)) return 'bg-red-500/10 hover:bg-red-500/15'
+  if (row.rank_position <= 10) return 'bg-muted/50 hover:bg-muted/70'
+  return ''
+}
+
+const rankBadgeClass = (rank: number): string => {
+  if (rank === 1) return 'bg-yellow-400 text-yellow-950 border-transparent'
+  if (rank === 2) return 'bg-slate-300 text-slate-900 border-transparent'
+  if (rank === 3) return 'bg-orange-400 text-orange-950 border-transparent'
+  return ''
+}
 </script>
 
 <template>
@@ -37,11 +57,18 @@ const totalFor = (row: RankingRow): number =>
       <ShadcnTableRow
         v-for="row in rows"
         :key="row.player_id"
-        :class="{ 'bg-warning/15 hover:bg-warning/20': row.player_id === highlightPlayerId }"
+        :class="rowHighlightClass(row)"
         :data-testid="`ranking-row-${row.player_id}`"
       >
-        <th scope="row" class="sticky left-0 bg-inherit border-r px-2 py-2 text-left">
-          <ShadcnBadge :variant="row.rank_position <= 3 ? 'default' : 'secondary'">
+        <th
+          scope="row"
+          class="sticky left-0 bg-inherit border-r px-2 py-2 text-left"
+          :class="{ 'border-l-4 border-l-primary': row.player_id === highlightPlayerId }"
+        >
+          <ShadcnBadge
+            :variant="row.rank_position <= 3 ? 'default' : 'secondary'"
+            :class="rankBadgeClass(row.rank_position)"
+          >
             {{ row.rank_position }}
           </ShadcnBadge>
         </th>

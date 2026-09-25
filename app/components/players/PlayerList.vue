@@ -1,17 +1,14 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import type { LinkCandidate } from '~/composables/usePlayers'
-import { errorMessage } from '~/utils/errors'
+import { errorMessage, isForeignKeyViolation } from '~/utils/errors'
 
 const props = defineProps<{
   teamId: string
+  slug: string
 }>()
 
-const emit = defineEmits<{
-  (e: 'edit', player: PlayerRow): void
-}>()
-
-const { list, setActive, setConsent, linkUser, listLinkCandidates } = usePlayers()
+const { list, setActive, setConsent, linkUser, listLinkCandidates, remove } = usePlayers()
 const { issue } = useInvitations()
 
 type PlayerRow = Awaited<ReturnType<typeof list>>[number]
@@ -22,6 +19,7 @@ const linkSelection = ref<Record<string, string>>({})
 const loading = ref(false)
 const error = ref<string | null>(null)
 const notice = ref<string | null>(null)
+const pendingActiveUpdates = ref<Record<string, boolean>>({})
 let latestLoad = 0
 
 const load = async () => {
@@ -60,12 +58,17 @@ const onToggleConsent = async (row: PlayerRow) => {
   }
 }
 
-const onDeactivate = async (row: PlayerRow) => {
+const onToggleActive = async (row: PlayerRow) => {
+  if (pendingActiveUpdates.value[row.id]) return
+  const next = !row.active
+  pendingActiveUpdates.value[row.id] = true
   try {
-    await setActive(row.id, false)
-    row.active = false
+    await setActive(row.id, next)
+    row.active = next
   } catch (err) {
-    error.value = errorMessage(err, 'Spieler:in konnte nicht deaktiviert werden.')
+    error.value = errorMessage(err, 'Status konnte nicht geändert werden.')
+  } finally {
+    delete pendingActiveUpdates.value[row.id]
   }
 }
 
@@ -89,6 +92,36 @@ const onLink = async (row: PlayerRow) => {
     await load()
   } catch (err) {
     error.value = errorMessage(err, 'Konto konnte nicht verknüpft werden.')
+  }
+}
+
+const isDeleteDialogOpen = ref(false)
+const pendingDelete = ref<PlayerRow | null>(null)
+const isDeleting = ref(false)
+const deleteError = ref<string | null>(null)
+
+const openDeleteDialog = (row: PlayerRow) => {
+  if (isDeleting.value) return
+  pendingDelete.value = row
+  deleteError.value = null
+  isDeleteDialogOpen.value = true
+}
+
+const onDelete = async () => {
+  if (!pendingDelete.value || isDeleting.value) return
+  const playerId = pendingDelete.value.id
+  deleteError.value = null
+  isDeleting.value = true
+  try {
+    await remove(playerId)
+    players.value = players.value.filter((p) => p.id !== playerId)
+    isDeleteDialogOpen.value = false
+  } catch (err) {
+    deleteError.value = isForeignKeyViolation(err)
+      ? 'Spieler:in hat bereits erfasste Punkte und kann nicht gelöscht werden. Bitte stattdessen deaktivieren.'
+      : errorMessage(err, 'Spieler:in konnte nicht gelöscht werden.')
+  } finally {
+    isDeleting.value = false
   }
 }
 
@@ -125,7 +158,9 @@ defineExpose({ reload: load })
         >
           <ShadcnTableCell>{{ row.jersey_number ?? '—' }}</ShadcnTableCell>
           <ShadcnTableCell class="font-medium text-foreground">
-            {{ row.name }}
+            <NuxtLink :to="`/t/${slug}/players/${row.id}`" class="underline">
+              {{ row.name }}
+            </NuxtLink>
           </ShadcnTableCell>
           <ShadcnTableCell class="text-muted-foreground">
             {{ row.position ?? '—' }}
@@ -142,9 +177,19 @@ defineExpose({ reload: load })
             </label>
           </ShadcnTableCell>
           <ShadcnTableCell>
-            <ShadcnBadge :variant="row.active ? 'default' : 'secondary'">
-              {{ row.active ? 'Aktiv' : 'Inaktiv' }}
-            </ShadcnBadge>
+            <label class="inline-flex min-h-touch items-center gap-2">
+              <input
+                type="checkbox"
+                :checked="row.active"
+                :aria-label="`Status ${row.name}`"
+                class="h-5 w-5"
+                :disabled="pendingActiveUpdates[row.id]"
+                @change="onToggleActive(row)"
+              />
+              <ShadcnBadge :variant="row.active ? 'default' : 'secondary'">
+                {{ row.active ? 'Aktiv' : 'Inaktiv' }}
+              </ShadcnBadge>
+            </label>
           </ShadcnTableCell>
           <ShadcnTableCell>
             <ShadcnBadge v-if="row.linked_user_id" variant="secondary" data-testid="player-linked">
@@ -177,24 +222,6 @@ defineExpose({ reload: load })
             <div class="flex flex-wrap gap-2">
               <ShadcnButton
                 type="button"
-                data-testid="player-edit-button"
-                variant="outline"
-                size="sm"
-                @click="emit('edit', row)"
-              >
-                Bearbeiten
-              </ShadcnButton>
-              <ShadcnButton
-                v-if="row.active"
-                type="button"
-                variant="outline"
-                size="sm"
-                @click="onDeactivate(row)"
-              >
-                Deaktivieren
-              </ShadcnButton>
-              <ShadcnButton
-                type="button"
                 data-testid="player-invite-button"
                 variant="outline"
                 size="sm"
@@ -203,10 +230,50 @@ defineExpose({ reload: load })
               >
                 Einladen
               </ShadcnButton>
+              <ShadcnButton
+                type="button"
+                data-testid="player-delete-button"
+                variant="destructive"
+                size="sm"
+                @click="openDeleteDialog(row)"
+              >
+                Löschen
+              </ShadcnButton>
             </div>
           </ShadcnTableCell>
         </ShadcnTableRow>
       </ShadcnTableBody>
     </ShadcnTable>
+
+    <ShadcnDialog v-model:open="isDeleteDialogOpen">
+      <ShadcnDialogContent>
+        <div data-testid="player-delete-dialog" class="space-y-4">
+          <ShadcnDialogHeader>
+            <ShadcnDialogTitle>{{ pendingDelete?.name }} löschen?</ShadcnDialogTitle>
+          </ShadcnDialogHeader>
+          <p class="text-sm text-muted-foreground">
+            {{ pendingDelete?.name }} wird unwiderruflich aus dem Kader entfernt. Das ist nur
+            möglich, solange für diese:n Spieler:in noch keine Punkte erfasst wurden.
+          </p>
+          <p v-if="deleteError" class="text-sm text-destructive" role="alert">{{ deleteError }}</p>
+          <ShadcnDialogFooter>
+            <ShadcnDialogClose as-child>
+              <ShadcnButton type="button" variant="outline" :disabled="isDeleting">
+                Abbrechen
+              </ShadcnButton>
+            </ShadcnDialogClose>
+            <ShadcnButton
+              type="button"
+              variant="destructive"
+              :disabled="isDeleting"
+              data-testid="player-delete-confirm-button"
+              @click="onDelete"
+            >
+              {{ isDeleting ? 'Lösche…' : 'Endgültig löschen' }}
+            </ShadcnButton>
+          </ShadcnDialogFooter>
+        </div>
+      </ShadcnDialogContent>
+    </ShadcnDialog>
   </div>
 </template>

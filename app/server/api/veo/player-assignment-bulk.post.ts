@@ -39,7 +39,10 @@ export default defineEventHandler(async (event) => {
         .from(schema.players)
         .where(and(eq(schema.players.id, player_id), eq(schema.players.teamId, team_id)))
       if (!player) {
-        throw createError({ statusCode: 400, statusMessage: 'player_id does not belong to team_id' })
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'player_id does not belong to team_id',
+        })
       }
 
       const targetMatches = await tx

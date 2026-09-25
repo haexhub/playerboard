@@ -481,13 +481,12 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     await Promise.all([
       pageA.waitForResponse(
         (res) =>
-          res.url().includes('/api/veo/player-assignment-bulk') && res.request().method() === 'POST',
+          res.url().includes('/api/veo/player-assignment-bulk') &&
+          res.request().method() === 'POST',
       ),
       winCardForBulk.getByTestId('veo-assignment-submit-55').click(),
     ])
-    await expect(winCardForBulk.getByTestId('veo-assignment-row-55')).toContainText(
-      'Jersey Thirty',
-    )
+    await expect(winCardForBulk.getByTestId('veo-assignment-row-55')).toContainText('Jersey Thirty')
     const jersey55Rows = await restGet<{ match_id: string; player_id: string | null }>(
       `veo_player_match_stats?veo_jersey_number=eq.55&match_id=in.(${matchWinId},${matchDrawId})&select=match_id,player_id`,
     )
@@ -502,9 +501,9 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     await expect(
       pageA.getByTestId(`veo-player-stat-${player7!.id}-distance_total_meters`),
     ).toHaveText('5.000 m')
-    await expect(pageA.getByTestId('veo-match-card').getByTestId('veo-jersey-select')).toContainText(
-      'Jersey Thirty',
-    )
+    await expect(
+      pageA.getByTestId('veo-match-card').getByTestId('veo-jersey-select'),
+    ).toContainText('Jersey Thirty')
 
     // US3 — trainer correction: assign the unmatched jersey 99 (draw match)
     // to player23, a roster player untouched by any Veo data so far. The

@@ -106,8 +106,11 @@ Identical to Round 1 in shape, but all IDs are team-scoped:
 
 ### S2 — Player dashboard (`/t/:slug/dashboard`)
 
-**Shows**: current rank in the current team, top-3 team members,
-timeframe picker, CTA to own `/t/:slug/players/<me>`.
+**Shows**: current rank in the current team, timeframe picker, CTA to own
+`/t/:slug/players/<me>`, and the full team ranking table (shown to both
+players and trainers as of 2026-09-25 — previously trainer-only, with a
+separate top-3 list for players). Ranks 1–3 are highlighted gold/silver/
+bronze, ranks 4–10 with a subtle tint, and the bottom two ranks in red.
 
 ### S3 — Team ranking (`/t/:slug/ranking`)
 
@@ -117,7 +120,12 @@ per-category totals.
 ### S4 — Player detail (`/t/:slug/players/:id`)
 
 **Shows**: name, jersey number, position, line chart per category with
-team average + median comparison lines.
+team average + median comparison lines. Trainers additionally see an
+always-visible, autosaving settings form (name, jersey number, position,
+e-mail, photo consent, active) — this is the only place editing happens
+(the roster list has no separate edit dialog); an "Einladen" button next to
+the e-mail field (since 2026-09-25) is enabled once an e-mail is present and
+the player isn't linked, mirroring the roster's own invite button.
 
 ### S5 — Public anonymous ranking (`/public/:slug/ranking`, layout: `public`)
 
@@ -125,8 +133,14 @@ Identical to Round 1 but the slug is in the URL (per team).
 
 ### S6 — Players CRUD (`/t/:slug/players`)
 
-Trainer-only. Table + edit + deactivate + consent toggle + "Einladen"
-per row. "Einladen" prefills invitation email and role (`player`).
+Trainer-only. Table with, per row: name linked to the player's detail page
+(S4 — that's where editing happens, no edit dialog in the list), a status
+checkbox (active/inactive, togglable in both directions), a consent
+checkbox, "Einladen", and "Löschen" (since 2026-09-25). "Einladen" prefills
+invitation email and role (`player`). "Löschen" asks for confirmation and
+permanently removes the player; the database rejects it (with a UI message
+suggesting deactivation instead) if the player already has recorded points
+(FR-032). The "Neuer Spieler" button still opens a create-only dialog.
 
 ### S7 — Categories CRUD (`/t/:slug/categories`)
 
