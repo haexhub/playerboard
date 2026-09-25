@@ -12,7 +12,9 @@ const playerStatEntrySchema = z.object({
 // the app.veo.co frontend sends (2026-09-25); research.md's original,
 // never-verified fixture had assumed the nested shape.
 const playerItemSchema = z.object({
-  jersey_number: z.string().regex(/^\d+$/),
+  // A negative lookahead for any character forces the regex to consume the
+  // actual end of the string; JavaScript's `$` also matches before a newline.
+  jersey_number: z.string().regex(/^\d+(?![\s\S])/),
   stats: z.array(playerStatEntrySchema),
 })
 
@@ -65,6 +67,7 @@ export const mapPlayerStats = (
   const rowsByKey = new Map<string, VeoPlayerMatchStatRow>()
   for (const item of parsed.data.items) {
     const veoJerseyNumber = Number.parseInt(item.jersey_number, 10)
+    if (!Number.isSafeInteger(veoJerseyNumber)) continue
     const playerId = playerIdByJersey.get(veoJerseyNumber) ?? null
     for (const stat of item.stats) {
       if (!Object.prototype.hasOwnProperty.call(CURATED_STAT_CATEGORY, stat.type)) continue

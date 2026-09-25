@@ -165,6 +165,12 @@ const submitAssignment = async (jerseyNumber: number) => {
   saving[jerseyNumber] = true
   try {
     if (playerId !== '' && applyToAllMatches[jerseyNumber]) {
+      await assignPlayer({
+        team_id: props.teamId,
+        match_id: props.match.id,
+        veo_jersey_number: jerseyNumber,
+        player_id: playerId,
+      })
       await assignPlayerToAllMatches({
         team_id: props.teamId,
         veo_jersey_number: jerseyNumber,

@@ -43,6 +43,9 @@ describe('mapPlayerStats', () => {
     expect(() =>
       mapPlayerStats({ items: [{ jersey_number: '7x', stats: [] }] }, MATCH_ID, ROSTER),
     ).toThrow('Unexpected Veo player-stats response shape')
+    expect(() =>
+      mapPlayerStats({ items: [{ jersey_number: '7\n', stats: [] }] }, MATCH_ID, ROSTER),
+    ).toThrow('Unexpected Veo player-stats response shape')
 
     expect(
       mapPlayerStats(
@@ -51,6 +54,23 @@ describe('mapPlayerStats', () => {
         ROSTER,
       ),
     ).toMatchObject([{ veoJerseyNumber: 7, playerId: 'player-7', statType: 'sprints_total' }])
+  })
+
+  it('skips jersey numbers outside the safe integer range', () => {
+    expect(
+      mapPlayerStats(
+        {
+          items: [
+            {
+              jersey_number: '9'.repeat(400),
+              stats: [{ value: 1, type: 'sprints_total' }],
+            },
+          ],
+        },
+        MATCH_ID,
+        ROSTER,
+      ),
+    ).toEqual([])
   })
 
   it('ignores inherited stat keys', () => {
