@@ -236,6 +236,11 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     const [player23] = await restInsert<{ id: string }>('players', [
       { team_id: teamIdA, name: 'Jersey Twenty-Three', jersey_number: 23, active: true },
     ])
+    // Registered only "after" both matches already synced — the scenario
+    // the bulk jersey-assignment action (below) exists for.
+    const [player30] = await restInsert<{ id: string }>('players', [
+      { team_id: teamIdA, name: 'Jersey Thirty', jersey_number: 30, active: true },
+    ])
     await restInsert('veo_player_match_stats', [
       {
         match_id: matchDrawId,
@@ -349,6 +354,24 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
         category: 'attacking',
         value: 1,
       },
+      // Jersey 55 is unassigned in *both* matches — the bulk-assignment
+      // action (below) must fix both from a single click in either one.
+      {
+        match_id: matchWinId,
+        veo_jersey_number: 55,
+        stat_type: 'football_shots_total',
+        player_id: null,
+        category: 'attacking',
+        value: 2,
+      },
+      {
+        match_id: matchDrawId,
+        veo_jersey_number: 55,
+        stat_type: 'football_shots_total',
+        player_id: null,
+        category: 'attacking',
+        value: 1,
+      },
     ])
 
     // US1 — dashboard season summary sums across both matches; only one
@@ -385,6 +408,11 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     // Gold for 1st, silver for 2nd.
     await expect(player7Rank).toHaveClass(/bg-yellow-100/)
     await expect(player10Rank).toHaveClass(/bg-slate-200/)
+    // A real player's name links to their profile.
+    await expect(player7Rank.getByRole('link')).toHaveAttribute(
+      'href',
+      `/t/${slugA}/players/${player7!.id}`,
+    )
 
     // Dense-rank regression: player7 and jersey 99 tie for 1st (3 goals
     // each) — the next distinct value (player10, 1 goal) must be ranked
@@ -404,6 +432,8 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     await expect(jersey99Goals).toContainText('3')
     await expect(jersey99Goals).toContainText('1.')
     await expect(jersey99Goals).toHaveClass(/bg-yellow-100/)
+    // No profile to link to for an unassigned jersey number.
+    await expect(jersey99Goals.getByRole('link')).toHaveCount(0)
     await expect(player7Goals).toContainText('1.')
     await expect(player7Goals).toHaveClass(/bg-yellow-100/)
     await expect(player10Goals).toContainText('2.')
@@ -427,21 +457,54 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     await expect(player10Distance).toHaveText('4.000 m')
     await expect(player7Distance).toHaveClass(/bg-green-100/)
     await expect(player10Distance).not.toHaveClass(/bg-green-100/)
+    // The compare table's column header links to the player's profile too.
+    await expect(
+      pageA.getByRole('columnheader', { name: 'Jersey Seven' }).getByRole('link'),
+    ).toHaveAttribute('href', `/t/${slugA}/players/${player7!.id}`)
 
     // US2 — per-match breakdown on the analytics page. Only one match's
     // card is visible at a time — switch the selector. As a trainer, the
-    // per-match compare also includes jersey 99 (still unassigned).
+    // per-match compare also includes jersey 99/55 (still unassigned).
     await pageA.goto(`/t/${slugA}/analytics`, { waitUntil: 'networkidle' })
     await expect(pageA.getByTestId('veo-match-card')).toContainText('FSV Limbach') // default: newest
-    // Win match: player7 + player10, both assigned.
-    await expect(pageA.getByTestId('veo-player-select-0').locator('option')).toHaveCount(2)
+    // Win match: player7 + player10 (assigned) + jersey 55 (unassigned).
+    await expect(pageA.getByTestId('veo-player-select-0').locator('option')).toHaveCount(3)
+
+    // Bulk jersey assignment — player30 was registered only after both
+    // matches already synced (FR-003 froze jersey 55 as unassigned in
+    // both). Assigning it here, with "für alle Spiele übernehmen" checked,
+    // must fix the draw match's jersey 55 too, without ever opening it.
+    const winCardForBulk = pageA.getByTestId('veo-match-card')
+    await winCardForBulk.getByTestId('veo-jersey-select').selectOption('55')
+    await winCardForBulk.getByTestId('veo-assignment-select-55').selectOption(player30!.id)
+    await winCardForBulk.getByTestId('veo-assignment-bulk-55').check()
+    await Promise.all([
+      pageA.waitForResponse(
+        (res) =>
+          res.url().includes('/api/veo/player-assignment-bulk') && res.request().method() === 'POST',
+      ),
+      winCardForBulk.getByTestId('veo-assignment-submit-55').click(),
+    ])
+    await expect(winCardForBulk.getByTestId('veo-assignment-row-55')).toContainText(
+      'Jersey Thirty',
+    )
+    const jersey55Rows = await restGet<{ match_id: string; player_id: string | null }>(
+      `veo_player_match_stats?veo_jersey_number=eq.55&match_id=in.(${matchWinId},${matchDrawId})&select=match_id,player_id`,
+    )
+    expect(jersey55Rows).toHaveLength(2)
+    expect(jersey55Rows.every((r) => r.player_id === player30!.id)).toBe(true)
 
     await matchSelect.selectOption({ value: matchDrawId })
-    // Draw match: player7 (assigned) + jersey 99 (unassigned, trainer-only).
-    await expect(pageA.getByTestId('veo-player-select-0').locator('option')).toHaveCount(2)
+    // Draw match: player7 (assigned) + jersey 99 (unassigned) + jersey 55,
+    // now assigned to player30 by the bulk action above, not a manual pick
+    // in this match.
+    await expect(pageA.getByTestId('veo-player-select-0').locator('option')).toHaveCount(3)
     await expect(
       pageA.getByTestId(`veo-player-stat-${player7!.id}-distance_total_meters`),
     ).toHaveText('5.000 m')
+    await expect(pageA.getByTestId('veo-match-card').getByTestId('veo-jersey-select')).toContainText(
+      'Jersey Thirty',
+    )
 
     // US3 — trainer correction: assign the unmatched jersey 99 (draw match)
     // to player23, a roster player untouched by any Veo data so far. The

@@ -13,6 +13,7 @@ import VeoPlayerStatsCompare, { type VeoPlayerStatEntry } from './VeoPlayerStats
 const props = defineProps<{
   match: VeoMatch
   teamId?: string
+  slug?: string
   isTrainer?: boolean
   roster?: ActiveRosterPlayer[]
   unassignedStats?: VeoUnassignedJerseyStat[]
@@ -67,6 +68,7 @@ const playerStatEntries = computed<VeoPlayerStatEntry[]>(() => {
   for (const stat of props.match.player_stats) {
     const existing = byKey.get(stat.player_id) ?? {
       key: stat.player_id,
+      playerId: stat.player_id,
       jerseyNumber: stat.jersey_number,
       playerName: stat.player_name,
       statTotals: {},
@@ -78,6 +80,7 @@ const playerStatEntries = computed<VeoPlayerStatEntry[]>(() => {
     const key = `jersey-${stat.veoJerseyNumber}`
     const existing = byKey.get(key) ?? {
       key,
+      playerId: null,
       jerseyNumber: stat.veoJerseyNumber,
       playerName: null,
       statTotals: {},
@@ -148,22 +151,35 @@ const selectedJerseyGroup = computed(
   () => jerseyGroups.value.find((g) => g.jerseyNumber === selectedJerseyNumber.value) ?? null,
 )
 
-const { assignPlayer } = useVeoPlayerAssignment()
+const { assignPlayer, assignPlayerToAllMatches } = useVeoPlayerAssignment()
 const selections = reactive<Record<number, string>>({})
 const saving = reactive<Record<number, boolean>>({})
+// Registering a player only after their matches already synced is common
+// (FR-003 keeps the sync-time assignment frozen, on purpose) — this lets a
+// trainer fix every already-synced match in one go instead of once each.
+const applyToAllMatches = reactive<Record<number, boolean>>({})
 
 const submitAssignment = async (jerseyNumber: number) => {
   const playerId = selections[jerseyNumber] ?? ''
   if (!props.teamId) return
   saving[jerseyNumber] = true
   try {
-    await assignPlayer({
-      team_id: props.teamId,
-      match_id: props.match.id,
-      veo_jersey_number: jerseyNumber,
-      player_id: playerId === '' ? null : playerId,
-    })
+    if (playerId !== '' && applyToAllMatches[jerseyNumber]) {
+      await assignPlayerToAllMatches({
+        team_id: props.teamId,
+        veo_jersey_number: jerseyNumber,
+        player_id: playerId,
+      })
+    } else {
+      await assignPlayer({
+        team_id: props.teamId,
+        match_id: props.match.id,
+        veo_jersey_number: jerseyNumber,
+        player_id: playerId === '' ? null : playerId,
+      })
+    }
     selections[jerseyNumber] = ''
+    applyToAllMatches[jerseyNumber] = false
     emit('reassigned')
   } catch {
     toast.error('Zuordnung konnte nicht gespeichert werden')
@@ -214,7 +230,7 @@ const submitAssignment = async (jerseyNumber: number) => {
       <p class="text-xs font-medium uppercase tracking-wide text-neutral-500">
         Spieler-Statistiken
       </p>
-      <VeoPlayerStatsCompare :entries="playerStatEntries" />
+      <VeoPlayerStatsCompare :entries="playerStatEntries" :slug="slug" />
     </div>
 
     <div
@@ -270,6 +286,17 @@ const submitAssignment = async (jerseyNumber: number) => {
             {{ selectedJerseyGroup.playerId ? 'Zuordnung ändern' : 'Spieler zuordnen' }}
           </button>
         </div>
+        <label
+          v-if="selections[selectedJerseyGroup.jerseyNumber]"
+          class="flex items-center gap-1.5 pl-12 text-xs text-neutral-500"
+        >
+          <input
+            v-model="applyToAllMatches[selectedJerseyGroup.jerseyNumber]"
+            type="checkbox"
+            :data-testid="`veo-assignment-bulk-${selectedJerseyGroup.jerseyNumber}`"
+          />
+          Für alle noch nicht zugeordneten Spiele dieser Trikotnummer übernehmen
+        </label>
         <div
           v-if="selectedJerseyGroup.stats.length"
           class="grid grid-cols-2 gap-x-4 pl-12 text-sm text-neutral-500"

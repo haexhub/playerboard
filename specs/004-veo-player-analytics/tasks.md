@@ -220,6 +220,25 @@ player (non-trainer) of the same team, the route returns 403.
   everything first and assigning all refs together, with no `await` in
   between.
 
+- [X] T031 [US1] [US2] [US3] Bulk jersey-assignment across all currently-unassigned matches (FR-022); link every assigned player's name to their profile (FR-023)
+
+  **Done (2026-09-25)**: rejected a live-join alternative (would misattribute
+  stats whenever a jersey number is reused by a different player within the
+  same season, see the new Clarifications entry) in favor of a bulk write.
+  New `POST /api/veo/player-assignment-bulk` (mirrors
+  `matches/[matchId]/player-assignment.post.ts`'s auth/FR-016 logic, looped
+  over every match of the team where the jersey number is still
+  `player_id is null`; never touches a differently-assigned row) +
+  `useVeoPlayerAssignment().assignPlayerToAllMatches()` + a "Für alle noch
+  nicht zugeordneten Spiele übernehmen" checkbox next to the existing
+  per-match assignment control in `VeoMatchCard.vue`. Negative-test coverage
+  added (P7-P9 in contracts/rls-policies.md).
+  `VeoPlayerStatEntry` gained a `playerId` field (`null` for an unassigned
+  jersey); `VeoPlayerStatsCompare.vue` takes a `slug` prop and renders a
+  `NuxtLink` to `/t/<slug>/players/<playerId>` for the leaderboard and the
+  compare table's column header whenever `playerId` is set, plain text
+  otherwise — same as `RankingTable`'s existing player links.
+
 ---
 
 ## Dependencies & Execution Order

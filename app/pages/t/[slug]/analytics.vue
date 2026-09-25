@@ -18,7 +18,7 @@ definePageMeta({
   middleware: ['team-context'],
 })
 
-const { currentTeam, isTrainer } = useTeamContext()
+const { currentTeam, currentSlug, isTrainer } = useTeamContext()
 const { listMatches, getSyncStatus, listUnassignedJerseyStats, getActiveRoster } = useVeoAnalytics()
 
 const matches = ref<VeoMatch[]>([])
@@ -201,6 +201,7 @@ const matchOptionLabel = (match: VeoMatch) => {
         :key="selectedMatch.id"
         :match="selectedMatch"
         :team-id="currentTeam?.id"
+        :slug="currentSlug ?? undefined"
         :is-trainer="isTrainer"
         :roster="activeRoster"
         :unassigned-stats="unassignedByMatch[selectedMatch.id] ?? []"

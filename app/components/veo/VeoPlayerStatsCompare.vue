@@ -5,6 +5,9 @@ export type VeoPlayerStatEntry = {
   // null → no roster player assigned yet (trainer-only visibility is the
   // caller's responsibility: only pass unassigned entries when isTrainer).
   playerName: string | null
+  // The real player id for a linkable profile — null for an unassigned
+  // jersey number (`key` is `jersey-<number>` there, not a player id).
+  playerId: string | null
   statTotals: Record<string, number>
 }
 </script>
@@ -13,7 +16,10 @@ export type VeoPlayerStatEntry = {
 import { computed, ref, watch } from 'vue'
 import { CURATED_STAT_ORDER, formatStatValue, statLabel } from '~/utils/veoStatLabels'
 
-const props = defineProps<{ entries: VeoPlayerStatEntry[] }>()
+const props = defineProps<{ entries: VeoPlayerStatEntry[]; slug?: string }>()
+
+const playerProfileLink = (entry: VeoPlayerStatEntry) =>
+  entry.playerId && props.slug ? `/t/${props.slug}/players/${entry.playerId}` : null
 
 const MAX_COMPARE = 4
 const LEADERBOARD_SIZE = 3
@@ -143,7 +149,17 @@ const leaderboardStatTypes = computed(() =>
             :data-testid="`veo-leaderboard-entry-${statType}-${item.entry.key}`"
             :data-rank="item.rank"
           >
-            <span>{{ item.rank }}. {{ entryLabel(item.entry) }}</span>
+            <span>
+              {{ item.rank }}.
+              <NuxtLink
+                v-if="playerProfileLink(item.entry)"
+                :to="playerProfileLink(item.entry)!"
+                class="hover:underline"
+              >
+                {{ entryLabel(item.entry) }}
+              </NuxtLink>
+              <template v-else>{{ entryLabel(item.entry) }}</template>
+            </span>
             <span class="tabular-nums font-medium">{{
               formatStatValue(statType, item.value)
             }}</span>
@@ -204,7 +220,14 @@ const leaderboardStatTypes = computed(() =>
               :key="entry.key"
               class="px-2 text-right font-semibold text-neutral-900"
             >
-              {{ entryLabel(entry) }}
+              <NuxtLink
+                v-if="playerProfileLink(entry)"
+                :to="playerProfileLink(entry)!"
+                class="hover:underline"
+              >
+                {{ entryLabel(entry) }}
+              </NuxtLink>
+              <template v-else>{{ entryLabel(entry) }}</template>
             </th>
           </tr>
         </thead>

@@ -176,6 +176,7 @@ const topThree = computed(() => ranking.value?.rows.slice(0, 3) ?? [])
       v-if="veoPlayerSeasonSummary.length || veoUnassignedJerseySeasonSummary.length"
       :players="veoPlayerSeasonSummary"
       :unassigned-jersey-totals="veoUnassignedJerseySeasonSummary"
+      :slug="slug"
     />
   </section>
 </template>

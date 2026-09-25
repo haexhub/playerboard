@@ -376,6 +376,13 @@ test.describe('RLS negative — single team (SC-003)', () => {
     )
     expect(n16.status()).toBe(403)
 
+    // N17 — same trainer-only gate for the bulk jersey-assignment route
+    // (player-assignment-bulk.post.ts).
+    const n17 = await playerPage.request.post('/api/veo/player-assignment-bulk', {
+      data: { team_id: teamId, veo_jersey_number: 7, player_id: rosterPlayer!.id },
+    })
+    expect(n17.status()).toBe(403)
+
     await trainerCtx.close()
     await playerCtx.close()
   })

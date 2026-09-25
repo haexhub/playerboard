@@ -85,6 +85,24 @@ updates every `veo_player_match_stats` row sharing
 `(match_id, veo_jersey_number)` to the new `player_id` /
 `matched_manually = true`.
 
+## `POST /api/veo/player-assignment-bulk` (added 2026-09-25)
+
+A trainer who registers a player only *after* that jersey number's matches
+already synced would otherwise have to repeat the single-match route above
+once per match (FR-003 keeps the sync-time assignment frozen — a later
+roster change never retroactively re-resolves it, by design, so this is the
+deliberate escape hatch instead of a live join against the current roster).
+Same auth as the single-match route (`serverSupabaseUser` +
+`requireTrainer`, `useAdminDb()` bypassing RLS). Request body:
+`{ team_id, veo_jersey_number, player_id }` — `player_id` is **not**
+nullable here (bulk-clearing isn't a supported use case). It finds every
+match of `team_id` where that jersey number is still
+`player_id is null` and, for each one, applies the same two steps as the
+single-match route (FR-016 clear-then-set) inside one transaction. It never
+touches a row that already carries an assignment (auto or manual) for a
+*different* player — the same jersey number can legitimately belong to a
+different player in an earlier or later match within the same season.
+
 ## Negative-test matrix
 
 | # | Actor | Attempt | Expected | Covered by |
@@ -95,3 +113,6 @@ updates every `veo_player_match_stats` row sharing
 | P4 | Player (non-trainer) of the mapped team | `POST /api/veo/matches/[matchId]/player-assignment` for that team | 403 (FR-014) | `rls-negative-single-team.spec.ts` |
 | P5 | Trainer of team A | `POST /api/veo/matches/[matchId]/player-assignment` for a match belonging to team B | Denied | `rls-negative-cross-team.spec.ts` |
 | P6 | Unauthenticated caller | `POST /api/veo/matches/[matchId]/player-assignment` | 401 | `api-negative.spec.ts` |
+| P7 | Player (non-trainer) of the mapped team | `POST /api/veo/player-assignment-bulk` for that team | 403 | `rls-negative-single-team.spec.ts` |
+| P8 | Trainer of team A | `POST /api/veo/player-assignment-bulk` with `team_id` belonging to team B | Denied | `rls-negative-cross-team.spec.ts` |
+| P9 | Unauthenticated caller | `POST /api/veo/player-assignment-bulk` | 401 | `api-negative.spec.ts` |
