@@ -1,6 +1,6 @@
 {
   "name": "ifa-board",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "private": true,
   "description": "Football team training points and photos — multi-tenant Nuxt + Supabase app",
   "packageManager": "pnpm@9.12.3",
