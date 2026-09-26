@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.0](https://github.com/haexhub/playerboard/compare/v0.10.1...v0.11.0) (2026-09-26)
+
+
+### Features
+
+* unify ranking placement colors ([60eddaf](https://github.com/haexhub/playerboard/commit/60eddafb214dafca87fa98f94230edf2b8542585))
+* unify ranking placement colors ([c6034ce](https://github.com/haexhub/playerboard/commit/c6034ce9d486fde80109966a579c5b44d0ae1d75))
+
 ## [0.10.1](https://github.com/haexhub/playerboard/compare/v0.10.0...v0.10.1) (2026-09-25)
 
 
