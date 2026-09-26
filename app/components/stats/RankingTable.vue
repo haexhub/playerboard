@@ -21,23 +21,7 @@ const bottomRanks = computed(() =>
   [...new Set(rows.value.map((row) => row.rank_position))].sort((a, b) => b - a).slice(0, 2),
 )
 
-const rowHighlightClass = (row: RankingRow): string => {
-  if (row.rank_position === 1) return 'bg-ranking-gold/70 hover:bg-ranking-gold/90 font-semibold'
-  if (row.rank_position === 2)
-    return 'bg-ranking-silver/60 hover:bg-ranking-silver/80 font-semibold'
-  if (row.rank_position === 3)
-    return 'bg-ranking-bronze/50 hover:bg-ranking-bronze/70 font-semibold'
-  if (bottomRanks.value.includes(row.rank_position)) return 'bg-red-500/10 hover:bg-red-500/15'
-  if (row.rank_position <= 10) return 'bg-muted/50 hover:bg-muted/70'
-  return ''
-}
-
-const rankBadgeClass = (rank: number): string => {
-  if (rank === 1) return 'bg-ranking-gold-badge text-ranking-gold-foreground border-transparent'
-  if (rank === 2) return 'bg-ranking-silver-badge text-ranking-silver-foreground border-transparent'
-  if (rank === 3) return 'bg-ranking-bronze-badge text-ranking-bronze-foreground border-transparent'
-  return ''
-}
+const { rowHighlightClass, rankBadgeClass } = useRankingStyles()
 </script>
 
 <template>
@@ -59,7 +43,7 @@ const rankBadgeClass = (rank: number): string => {
       <ShadcnTableRow
         v-for="row in rows"
         :key="row.player_id"
-        :class="rowHighlightClass(row)"
+        :class="rowHighlightClass(row.rank_position, bottomRanks)"
         :data-testid="`ranking-row-${row.player_id}`"
       >
         <th

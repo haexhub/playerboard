@@ -90,13 +90,7 @@ const setSlot = (index: number, key: string) => {
 
 type LeaderboardItem = { entry: VeoPlayerStatEntry; value: number; rank: number }
 
-const MEDAL_CLASS: Record<number, string> = {
-  1: 'rounded bg-ranking-gold/70 px-1.5 py-0.5 text-ranking-gold-foreground',
-  2: 'rounded bg-ranking-silver/60 px-1.5 py-0.5 text-ranking-silver-foreground',
-  3: 'rounded bg-ranking-bronze/50 px-1.5 py-0.5 text-ranking-bronze-foreground',
-}
-
-const medalClass = (rank: number) => MEDAL_CLASS[rank] ?? ''
+const { medalClass } = useRankingStyles()
 
 // Top 3 by value, but a tie extends the list rather than dropping tied
 // entries. Rank is dense competition-style ("1223", not "1224"): a rank

@@ -19,19 +19,7 @@ const scoreFor = (row: PublicRankingRow, categoryName: string): number =>
 const totalFor = (row: PublicRankingRow): number =>
   cats.value.reduce((sum, c) => sum + scoreFor(row, c.name), 0)
 
-const rowHighlightClass = (rank: number): string => {
-  if (rank === 1) return 'bg-ranking-gold/70 hover:bg-ranking-gold/90 font-semibold'
-  if (rank === 2) return 'bg-ranking-silver/60 hover:bg-ranking-silver/80 font-semibold'
-  if (rank === 3) return 'bg-ranking-bronze/50 hover:bg-ranking-bronze/70 font-semibold'
-  return ''
-}
-
-const rankBadgeClass = (rank: number): string => {
-  if (rank === 1) return 'bg-ranking-gold-badge text-ranking-gold-foreground border-transparent'
-  if (rank === 2) return 'bg-ranking-silver-badge text-ranking-silver-foreground border-transparent'
-  if (rank === 3) return 'bg-ranking-bronze-badge text-ranking-bronze-foreground border-transparent'
-  return ''
-}
+const { rowHighlightClass, rankBadgeClass } = useRankingStyles()
 </script>
 
 <template>

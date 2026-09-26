@@ -4,6 +4,8 @@ import type { PublicVeoStats, PublicVeoStatsRow } from '~/composables/usePublicV
 import { statLabel } from '~/utils/veoStatLabels'
 import { medalRanksForStat } from '~/utils/veoPublicStats'
 
+const { medalClass: rankingMedalClass } = useRankingStyles()
+
 const props = defineProps<{
   veoStats: PublicVeoStats | null
 }>()
@@ -38,10 +40,7 @@ const medalRanks = computed(
 
 const medalClass = (rowIndex: number, statType: string): string => {
   const rank = medalRanks.value[statType]?.[rowIndex]
-  if (rank === 1) return 'rounded bg-ranking-gold/70 font-semibold text-ranking-gold-foreground'
-  if (rank === 2) return 'rounded bg-ranking-silver/60 font-semibold text-ranking-silver-foreground'
-  if (rank === 3) return 'rounded bg-ranking-bronze/50 font-semibold text-ranking-bronze-foreground'
-  return ''
+  return rankingMedalClass(rank ?? null)
 }
 
 const displayValue = (row: PublicVeoStatsRow, statType: string): string => {
