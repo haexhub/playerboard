@@ -79,7 +79,9 @@ test.describe('US5 — anonymous public ranking', () => {
     await expect(row).toHaveCount(1)
     await expect(row).toHaveClass(/bg-ranking-gold\/70/)
     await expect(row.locator('th').first()).toHaveText('1') // rank
-    await expect(row.locator('th').first()).toHaveClass(/bg-ranking-gold-badge/)
+    await expect(row.locator('th').first().locator('[data-slot="badge"]')).toHaveClass(
+      /bg-ranking-gold-badge/,
+    )
     const cells = row.locator('td')
     await expect(cells.nth(0)).toHaveText('#11') // jersey
     await expect(cells.nth(1)).toHaveText('4') // "Einsatz" category sum
