@@ -77,7 +77,9 @@ test.describe('US5 — anonymous public ranking', () => {
 
     const row = anonPage.getByTestId('public-ranking-row')
     await expect(row).toHaveCount(1)
+    await expect(row).toHaveClass(/bg-ranking-gold\/70/)
     await expect(row.locator('th').first()).toHaveText('1') // rank
+    await expect(row.locator('th').first()).toHaveClass(/bg-ranking-gold-badge/)
     const cells = row.locator('td')
     await expect(cells.nth(0)).toHaveText('#11') // jersey
     await expect(cells.nth(1)).toHaveText('4') // "Einsatz" category sum
@@ -281,17 +283,17 @@ test.describe('US5 — anonymous public ranking', () => {
       '5000',
     )
     await expect(jersey11Row.getByTestId('public-veo-stat-distance_total_meters')).toHaveClass(
-      /bg-yellow-100/,
+      /bg-ranking-gold\/70/,
     )
     await expect(jersey11Row.getByTestId('public-veo-stat-top_speed_kmh')).toHaveText('27')
     await expect(jersey11Row.getByTestId('public-veo-stat-average_speed_kmh')).toHaveText('12')
     await expect(jersey22Row.getByTestId('public-veo-stat-sprints_total')).toHaveText('10')
     await expect(jersey22Row.getByTestId('public-veo-stat-distance_total_meters')).toHaveText('–')
     await expect(jersey33Row.getByTestId('public-veo-stat-distance_total_meters')).toHaveClass(
-      /bg-slate-200/,
+      /bg-ranking-silver\/60/,
     )
     await expect(jersey44Row.getByTestId('public-veo-stat-distance_total_meters')).toHaveClass(
-      /bg-orange-100/,
+      /bg-ranking-bronze\/50/,
     )
     await expect(anonPage.locator('body')).not.toContainText('Veo Secret Player 22')
     await expect(anonPage.locator('body')).not.toContainText('Secret Name Should Not Leak')

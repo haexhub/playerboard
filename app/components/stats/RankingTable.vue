@@ -22,18 +22,20 @@ const bottomRanks = computed(() =>
 )
 
 const rowHighlightClass = (row: RankingRow): string => {
-  if (row.rank_position === 1) return 'bg-yellow-200/70 hover:bg-yellow-200/90 font-semibold'
-  if (row.rank_position === 2) return 'bg-slate-300/60 hover:bg-slate-300/80 font-semibold'
-  if (row.rank_position === 3) return 'bg-orange-300/50 hover:bg-orange-300/70 font-semibold'
+  if (row.rank_position === 1) return 'bg-ranking-gold/70 hover:bg-ranking-gold/90 font-semibold'
+  if (row.rank_position === 2)
+    return 'bg-ranking-silver/60 hover:bg-ranking-silver/80 font-semibold'
+  if (row.rank_position === 3)
+    return 'bg-ranking-bronze/50 hover:bg-ranking-bronze/70 font-semibold'
   if (bottomRanks.value.includes(row.rank_position)) return 'bg-red-500/10 hover:bg-red-500/15'
   if (row.rank_position <= 10) return 'bg-muted/50 hover:bg-muted/70'
   return ''
 }
 
 const rankBadgeClass = (rank: number): string => {
-  if (rank === 1) return 'bg-yellow-400 text-yellow-950 border-transparent'
-  if (rank === 2) return 'bg-slate-300 text-slate-900 border-transparent'
-  if (rank === 3) return 'bg-orange-400 text-orange-950 border-transparent'
+  if (rank === 1) return 'bg-ranking-gold-badge text-ranking-gold-foreground border-transparent'
+  if (rank === 2) return 'bg-ranking-silver-badge text-ranking-silver-foreground border-transparent'
+  if (rank === 3) return 'bg-ranking-bronze-badge text-ranking-bronze-foreground border-transparent'
   return ''
 }
 </script>

@@ -91,9 +91,9 @@ const setSlot = (index: number, key: string) => {
 type LeaderboardItem = { entry: VeoPlayerStatEntry; value: number; rank: number }
 
 const MEDAL_CLASS: Record<number, string> = {
-  1: 'rounded bg-yellow-100 px-1.5 py-0.5 text-yellow-900',
-  2: 'rounded bg-slate-200 px-1.5 py-0.5 text-slate-800',
-  3: 'rounded bg-orange-100 px-1.5 py-0.5 text-orange-900',
+  1: 'rounded bg-ranking-gold/70 px-1.5 py-0.5 text-ranking-gold-foreground',
+  2: 'rounded bg-ranking-silver/60 px-1.5 py-0.5 text-ranking-silver-foreground',
+  3: 'rounded bg-ranking-bronze/50 px-1.5 py-0.5 text-ranking-bronze-foreground',
 }
 
 const medalClass = (rank: number) => MEDAL_CLASS[rank] ?? ''

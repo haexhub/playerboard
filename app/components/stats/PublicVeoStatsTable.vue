@@ -38,9 +38,9 @@ const medalRanks = computed(
 
 const medalClass = (rowIndex: number, statType: string): string => {
   const rank = medalRanks.value[statType]?.[rowIndex]
-  if (rank === 1) return 'rounded bg-yellow-100 font-semibold text-yellow-900'
-  if (rank === 2) return 'rounded bg-slate-200 font-semibold text-slate-800'
-  if (rank === 3) return 'rounded bg-orange-100 font-semibold text-orange-900'
+  if (rank === 1) return 'rounded bg-ranking-gold/70 font-semibold text-ranking-gold-foreground'
+  if (rank === 2) return 'rounded bg-ranking-silver/60 font-semibold text-ranking-silver-foreground'
+  if (rank === 3) return 'rounded bg-ranking-bronze/50 font-semibold text-ranking-bronze-foreground'
   return ''
 }
 
