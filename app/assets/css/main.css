@@ -2,6 +2,18 @@
 @import 'tw-animate-css';
 @import '@haex-space/ui/assets/css/theme.css';
 
+@theme {
+  --color-ranking-gold: var(--color-yellow-200);
+  --color-ranking-gold-badge: var(--color-yellow-400);
+  --color-ranking-gold-foreground: var(--color-yellow-950);
+  --color-ranking-silver: var(--color-slate-300);
+  --color-ranking-silver-badge: var(--color-slate-300);
+  --color-ranking-silver-foreground: var(--color-slate-900);
+  --color-ranking-bronze: var(--color-orange-300);
+  --color-ranking-bronze-badge: var(--color-orange-400);
+  --color-ranking-bronze-foreground: var(--color-orange-950);
+}
+
 @source "../../components";
 @source "../../layouts";
 @source "../../pages";

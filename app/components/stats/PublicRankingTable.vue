@@ -18,6 +18,8 @@ const scoreFor = (row: PublicRankingRow, categoryName: string): number =>
 
 const totalFor = (row: PublicRankingRow): number =>
   cats.value.reduce((sum, c) => sum + scoreFor(row, c.name), 0)
+
+const { rowHighlightClass, rankBadgeClass } = useRankingStyles()
 </script>
 
 <template>
@@ -40,9 +42,17 @@ const totalFor = (row: PublicRankingRow): number =>
       >
         Keine Punkte im gewählten Zeitraum.
       </ShadcnTableEmpty>
-      <ShadcnTableRow v-for="(row, i) in rows" :key="i" data-testid="public-ranking-row">
+      <ShadcnTableRow
+        v-for="(row, i) in rows"
+        :key="i"
+        :class="rowHighlightClass(row.rank_position)"
+        data-testid="public-ranking-row"
+      >
         <th scope="row" class="sticky left-0 bg-inherit border-r px-2 py-2 text-left">
-          <ShadcnBadge :variant="row.rank_position <= 3 ? 'default' : 'secondary'">
+          <ShadcnBadge
+            :variant="row.rank_position <= 3 ? 'default' : 'secondary'"
+            :class="rankBadgeClass(row.rank_position)"
+          >
             {{ row.rank_position }}
           </ShadcnBadge>
         </th>

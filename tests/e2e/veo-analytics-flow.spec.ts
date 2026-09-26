@@ -406,8 +406,8 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     await expect(player7Rank).toContainText('1.')
     await expect(player10Rank).toContainText('2.')
     // Gold for 1st, silver for 2nd.
-    await expect(player7Rank).toHaveClass(/bg-yellow-100/)
-    await expect(player10Rank).toHaveClass(/bg-slate-200/)
+    await expect(player7Rank).toHaveClass(/bg-ranking-gold\/70/)
+    await expect(player10Rank).toHaveClass(/bg-ranking-silver\/60/)
     // A real player's name links to their profile.
     await expect(player7Rank.getByRole('link')).toHaveAttribute(
       'href',
@@ -431,13 +431,13 @@ test.describe('T003-veo-analytics — Veo camera analytics page', () => {
     await expect(jersey99Goals).toContainText('#99 Nicht zugeordnet')
     await expect(jersey99Goals).toContainText('3')
     await expect(jersey99Goals).toContainText('1.')
-    await expect(jersey99Goals).toHaveClass(/bg-yellow-100/)
+    await expect(jersey99Goals).toHaveClass(/bg-ranking-gold\/70/)
     // No profile to link to for an unassigned jersey number.
     await expect(jersey99Goals.getByRole('link')).toHaveCount(0)
     await expect(player7Goals).toContainText('1.')
-    await expect(player7Goals).toHaveClass(/bg-yellow-100/)
+    await expect(player7Goals).toHaveClass(/bg-ranking-gold\/70/)
     await expect(player10Goals).toContainText('2.')
-    await expect(player10Goals).toHaveClass(/bg-slate-200/)
+    await expect(player10Goals).toHaveClass(/bg-ranking-silver\/60/)
 
     // Comparing up to 4 players: add a second slot, pick player10 — both
     // now show side by side, and the higher shared metric (distance) is
