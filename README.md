@@ -1,5 +1,7 @@
 # ifa-board
 
+> **Eingestellt.** playerboard ist als Modul *PlayerBoard* in [Vereinsfunk](https://github.com/haexor/vereinsfunk) aufgegangen: Kader, Trainingspunkte, Ranglisten, Fotos und die Veo-Anbindung (Pläne 052 und 053 dort). Unter playerboard.de läuft seit dem 9. Oktober 2026 Vereinsfunk; die Mannschaft C1 ist mit ihren Daten umgezogen, Anmeldung weiterhin per Magic Link. Dieses Repository ist archiviert. Die letzten Produktionsdaten liegen als Datenbank-Dump und Foto-Archiv auf haex.space unter `~/backups/playerboard`.
+
 Internal points-and-photos tracker for a football team: trainers log training
 points per player and category, players see rankings and photos.
 
